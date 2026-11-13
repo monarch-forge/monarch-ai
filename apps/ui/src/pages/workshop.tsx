@@ -7,8 +7,9 @@ import { Plus, FolderOpen, X, GitBranch, ChevronRight, RefreshCw, FolderGit2 } f
 import { Panel, Tag, Empty, Spinner, ErrorLine, fmt } from '../components/ui.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
-import { SessionRow, Segmented } from '../components/chat/session-list.tsx';
+import { SessionRow } from '../components/chat/session-list.tsx';
 import { SessionStats, engineLabel } from '../components/chat/meta.tsx';
+import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { DirBrowser } from '../components/config/dir-browser.tsx';
 import { saveSettings } from '../components/config/fields.tsx';
 import { useChatSession, useSessions, totalTokens } from '../lib/chat-store.ts';
@@ -59,8 +60,10 @@ export default function WorkshopPage(props: { params: string[] }) {
 
   const [selected, setSelected] = useState<string>(() => readLS(WS_KEY) ?? '');
   const [browse, setBrowse] = useState(false);
-  const [engine, setEngine] = useState<EngineId | null>(null);
-  const effEngine: EngineId = engine ?? s?.engine ?? 'claude-sdk';
+  // model chosen in the composer (null = default for new sessions / keep current for an open one)
+  const [choice, setChoice] = useState<ModelChoice | null>(null);
+  useEffect(() => setChoice(null), [sessionId]);
+  const effEngine: EngineId = choice?.engine ?? s?.engine ?? 'claude-sdk';
 
   // the open session decides the workspace; otherwise remembered → default → first
   useEffect(() => {
@@ -117,7 +120,7 @@ export default function WorkshopPage(props: { params: string[] }) {
       return;
     }
     try {
-      const id = await chat.sendMessage(text, { kind: 'coding', cwd, engine: effEngine });
+      const id = await chat.sendMessage(text, { kind: 'coding', cwd, engine: session?.id ? choice?.engine : effEngine, model: choice?.model });
       if (id !== sessionId) location.replace(`#/workshop/${encodeURIComponent(id)}`);
     } catch (e: any) {
       if (e?.message !== 'Cancelled') toast(e?.message ?? String(e), 'error');
@@ -285,21 +288,17 @@ export default function WorkshopPage(props: { params: string[] }) {
           meta={
             <>
               <span class="inline-block w-1.5 h-1.5 bg-fg-3" />
-              <span class="truncate">{session?.id ? engineLabel(s, session.engine, session.model) : engineLabel(s, effEngine)}</span>
+              <span class="truncate">{session?.id ? engineLabel(s, session.engine, session.model) : engineLabel(s, effEngine, choice?.model)}</span>
             </>
           }
           tools={
-            isNewMode ? (
-              <Segmented
-                class="w-[200px]"
-                value={effEngine}
-                onChange={(v) => setEngine(v)}
-                options={[
-                  { value: 'claude-sdk', label: 'Claude Code' },
-                  { value: 'pi', label: 'Pi' },
-                ]}
-              />
-            ) : null
+            <ModelPicker
+              value={choice}
+              onChange={setChoice}
+              lockEngine={session?.id ? session.engine : undefined}
+              current={session?.id ? { engine: session.engine, model: session.model } : null}
+              noDefault={!!session?.id}
+            />
           }
         />
       </Panel>

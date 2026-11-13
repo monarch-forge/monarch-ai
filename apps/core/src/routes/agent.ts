@@ -9,6 +9,7 @@ import { cancelGoogleFlow } from '../integrations/google/index.ts';
 import {
   cancelOAuthFlow,
   deleteProviderKey,
+  listAvailableModels,
   listModels,
   listProviders,
   logoutProvider,
@@ -62,6 +63,7 @@ export function register(app: Hono): void {
   });
 
   /* models */
+  app.get('/api/models/available', async (c) => c.json(await listAvailableModels()));
   app.get('/api/models', async (c) => c.json(await listModels(c.req.query('engine') || undefined, c.req.query('provider') || undefined)));
 
   /* sessions */

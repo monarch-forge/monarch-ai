@@ -9,6 +9,7 @@ import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
 import { SessionRow, Segmented } from '../components/chat/session-list.tsx';
 import { SessionStats, engineLabel } from '../components/chat/meta.tsx';
+import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { useChatSession, useSessions, renameSession, totalTokens } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
 import { fmt } from '../components/ui.tsx';
@@ -62,6 +63,9 @@ export default function CommsPage(props: { params: string[] }) {
   const chats = useSessions('chat');
   const chat = useChatSession(sessionId);
   const s = settings.value;
+  // model chosen in the composer for this session (null = default for new / keep current for existing)
+  const [choice, setChoice] = useState<ModelChoice | null>(null);
+  useEffect(() => setChoice(null), [sessionId]);
 
   // no id → open the most recent chat (or stay in "new" mode when there is none)
   useEffect(() => {
@@ -78,7 +82,7 @@ export default function CommsPage(props: { params: string[] }) {
 
   const send = async (text: string) => {
     try {
-      const id = await chat.sendMessage(text, { kind: 'chat' });
+      const id = await chat.sendMessage(text, { kind: 'chat', engine: choice?.engine, model: choice?.model });
       if (id !== sessionId) location.replace(`#/comms/${encodeURIComponent(id)}`);
     } catch (e: any) {
       if (e?.message !== 'Cancelled') toast(e?.message ?? String(e), 'error');
@@ -223,9 +227,18 @@ export default function CommsPage(props: { params: string[] }) {
           meta={
             <>
               <span class="inline-block w-1.5 h-1.5 bg-fg-3" />
-              <span class="truncate">{engineLabel(s, session?.id ? session.engine : undefined, session?.id ? session.model : undefined)}</span>
+              <span class="truncate">{engineLabel(s, session?.id ? session.engine : choice?.engine, session?.id ? session.model : choice?.model)}</span>
               {session && totalTokens(session.usage) > 0 && <span class="hidden lg:inline">{fmt.num(totalTokens(session.usage))} tok</span>}
             </>
+          }
+          tools={
+            <ModelPicker
+              value={choice}
+              onChange={setChoice}
+              lockEngine={session?.id ? session.engine : undefined}
+              current={session?.id ? { engine: session.engine, model: session.model } : null}
+              noDefault={!!session?.id}
+            />
           }
         />
       </Panel>

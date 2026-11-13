@@ -428,6 +428,39 @@ function newSession(opts: { kind?: SessionKind; engine?: EngineId; model?: strin
   return createSession({ kind, engine, model, cwd, title: opts.title, piProvider });
 }
 
+/**
+ * Switch an existing session to another model of the SAME engine (history can't move between engines).
+ * Takes effect from the next turn: pi swaps the agent's model, claude-sdk resumes with the new model.
+ */
+function switchModel(rec: SessionRecord, engine: EngineId | undefined, spec: string | undefined): void {
+  const want = spec?.trim();
+  if (!want) return;
+  if (engine && engine !== rec.engine) {
+    activity('AGT', `Model change ignored — session runs on ${rec.engine}, not ${engine}`, 'warn', rec.id);
+    return;
+  }
+  let model = want;
+  if (rec.engine === 'pi') {
+    try {
+      const r = resolvePiModel(rec.engineState.piProvider || getSettings().pi.provider, want);
+      if (!r.model) {
+        activity('AGT', `Unknown model "${want}" — keeping ${rec.model}`, 'warn', rec.id);
+        return;
+      }
+      rec.engineState.piProvider = r.provider;
+      model = r.model.id;
+    } catch (e) {
+      activity('AGT', `Model change failed: ${e instanceof Error ? e.message : String(e)}`, 'warn', rec.id);
+      return;
+    }
+  }
+  if (model === rec.model) return;
+  rec.model = model;
+  saveSession(rec);
+  broadcastSession(rec);
+  activity('AGT', `Model switched to ${model}`, 'info', rec.id);
+}
+
 function chatSend(cmd: Extract<ClientCommand, { type: 'chat.send' }>): void {
   const text = (cmd.text ?? '').trim();
   let rec: SessionRecord | undefined;
@@ -437,6 +470,7 @@ function chatSend(cmd: Extract<ClientCommand, { type: 'chat.send' }>): void {
       bus.broadcast({ type: 'chat.done', sessionId: cmd.sessionId, error: 'Session not found' });
       return;
     }
+    switchModel(rec, cmd.engine, cmd.model);
   } else {
     rec = newSession({ kind: cmd.kind, engine: cmd.engine, model: cmd.model, cwd: cmd.cwd });
     broadcastSession(rec, cmd.clientRef);

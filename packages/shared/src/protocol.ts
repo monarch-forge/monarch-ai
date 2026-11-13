@@ -554,7 +554,7 @@ export type ClientCommand =
       /** omit to create a new session; core replies with session.updated then chat.item(user) */
       sessionId?: ID;
       text: string;
-      /** override for a new session */
+      /** override for a new session; for an existing session `model` switches its model (same engine only) */
       kind?: SessionKind;
       engine?: EngineId;
       model?: string;
@@ -585,6 +585,7 @@ export type ClientCommand =
  * POST   /api/oauth/:flowId/cancel           -> { ok }
  * DELETE /api/providers/:id/login            -> ProviderStatus  (logout)
  * GET    /api/models?engine=pi&provider=x    -> ModelInfo[]
+ * GET    /api/models/available           -> ModelInfo[]  (all models of every configured provider)
  *
  * GET    /api/sessions?kind=chat             -> SessionSummary[]
  * GET    /api/sessions/:id                   -> SessionDetail

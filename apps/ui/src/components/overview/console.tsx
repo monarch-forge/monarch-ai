@@ -1,10 +1,10 @@
 /** Overview command console: input + mic + send, quick actions, and a live reply preview. OWNED BY UI-A. */
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { ArrowRight, CornerDownLeft, Mic, Square, X } from 'lucide-preact';
+import { ArrowRight, CornerDownLeft, Mic, Plus, Square, X } from 'lucide-preact';
 import { conn, settings, toast } from '../../lib/store.ts';
 import { interimTranscript, listen, listening, stopListening, stripMarkdown, voiceSupport, UNSUPPORTED_LISTEN } from '../../lib/voice.ts';
 import { Tag } from '../ui.tsx';
-import { consoleHistory, consoleRun, dismissConsoleRun, runConsoleCommand } from './console-store.ts';
+import { activeConversation, consoleConversation, consoleHistory, consoleRun, dismissConsoleRun, newConsoleConversation, runConsoleCommand } from './console-store.ts';
 
 const QUICK = ['Brief me on today', 'Triage my inbox', "What's on Slack?", 'Plan my afternoon'];
 
@@ -15,6 +15,8 @@ export function CommandConsole() {
   const honorific = settings.value?.user.honorific?.trim() || 'sir';
   const run = consoleRun.value;
   const isListening = listening.value;
+  // read the signal so the component re-renders when the conversation starts/ends
+  const conv = consoleConversation.value ? activeConversation() : null;
 
   const submit = (t: string) => {
     const v = t.trim();
@@ -78,7 +80,7 @@ export function CommandConsole() {
           ref={inputRef}
           type="text"
           class="flex-1 min-w-0 bg-transparent px-2 py-2.5 text-[14px] text-fg placeholder:text-fg-3 outline-none"
-          placeholder={isListening ? 'Listening…' : `Speak or type a command, ${honorific}…`}
+          placeholder={isListening ? 'Listening…' : conv ? `Continue, ${honorific}… (/new to start over)` : `Speak or type a command, ${honorific}…`}
           value={shown}
           onInput={(e) => {
             histIdx.current = -1;
@@ -90,6 +92,20 @@ export function CommandConsole() {
           spellcheck={false}
           readOnly={isListening}
         />
+        {conv && (
+          <button
+            type="button"
+            class="flex items-center gap-1.5 px-2.5 border-l border-line font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2 hover:text-fg hover:bg-white/[0.03]"
+            onClick={() => {
+              newConsoleConversation();
+              inputRef.current?.focus();
+            }}
+            title={`Start a new conversation (${conv.turns} turn${conv.turns === 1 ? '' : 's'} so far) — or type /new`}
+            aria-label="Start a new conversation"
+          >
+            <Plus size={12} strokeWidth={1.75} /> New
+          </button>
+        )}
         <div class={voiceSupport.listen ? 'flex' : 'tooltip tooltip-top flex'} data-tip={voiceSupport.listen ? undefined : UNSUPPORTED_LISTEN}>
           <button
             type="button"
@@ -153,6 +169,7 @@ function ReplyPreview() {
     <div class="border border-line bg-surface/80 flex flex-col min-h-0" role="region" aria-label="Assistant reply" aria-live="polite">
       <div class="flex items-center gap-2 px-3 py-1.5 border-b border-line">
         <span class="font-mono text-[11px] text-fg-3">›</span>
+        {(run.turn ?? 1) > 1 && <span class="font-mono text-[10px] tracking-[0.1em] text-fg-3" title="Turn in this conversation">T{run.turn}</span>}
         <span class="flex-1 min-w-0 truncate text-[12px] text-fg-2" title={run.prompt}>
           {run.prompt}
         </span>

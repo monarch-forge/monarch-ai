@@ -329,7 +329,7 @@ export function useChatSession(sessionId: string | null): ChatSession {
       setLastTurn(null);
 
       if (id) {
-        socket.send({ type: 'chat.send', sessionId: id, text: body });
+        socket.send({ type: 'chat.send', sessionId: id, text: body, engine: opts.engine, model: opts.model });
         if (cur && cur.id === id) setSession({ ...cur, items: [...cur.items, localUser], running: true });
         return Promise.resolve(id);
       }

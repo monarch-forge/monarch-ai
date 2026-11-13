@@ -406,6 +406,13 @@ export function piModelInfo(m: Model<Api>): ModelInfo {
   };
 }
 
+/** every model from every configured provider (Claude subscription, pi providers with credentials, custom) */
+export async function listAvailableModels(): Promise<ModelInfo[]> {
+  const provs = (await listProviders()).filter((p) => p.configured);
+  const lists = await Promise.all(provs.map((p) => listModels(p.engine, p.id).catch(() => [] as ModelInfo[])));
+  return lists.flat();
+}
+
 export async function listModels(engine?: string, provider?: string): Promise<ModelInfo[]> {
   if (provider === CLAUDE_SDK || (engine === 'claude-sdk' && !provider)) return claudeModels({ wait: true });
   const models = piModels();
