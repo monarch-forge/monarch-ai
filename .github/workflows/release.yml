@@ -80,6 +80,10 @@ jobs:
 
       # tauri.conf.json's beforeBuildCommand builds the UI and bundles the Node core into
       # src-tauri/resources/core (the app spawns `node core.mjs` at runtime).
+      - name: Derive version from tag
+        shell: bash
+        run: echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@action-v1.0.0
         env:
@@ -93,6 +97,13 @@ jobs:
             **Requirements:** Node.js ≥ 22.19 on PATH (the app runs its core with your local `node`),
             and for the Claude engine a logged-in Claude Code (`claude auth login`).
             See the README for Google/Slack setup.
+
+            **Arch Linux:** download the package, then install the local file (it isn't signed, so `pacman -U <url>` fails):
+
+            ```bash
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/monarch-ai-bin-${{ env.VERSION }}-1-x86_64.pkg.tar.zst
+            sudo pacman -U ./monarch-ai-bin-${{ env.VERSION }}-1-x86_64.pkg.tar.zst
+            ```
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
