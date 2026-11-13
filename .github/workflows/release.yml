@@ -94,7 +94,7 @@ jobs:
             and for the Claude engine a logged-in Claude Code (`claude auth login`).
             See the README for Google/Slack setup.
           releaseDraft: false
-          prerelease: true
+          prerelease: false
           args: ${{ matrix.args }}
 
   arch:
