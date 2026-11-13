@@ -1,6 +1,6 @@
 [package]
 name = "monarch_ai"
-version = "0.1.1"
+version = "0.2.0"
 description = "Monarch — a Jarvis-style personal agentic OS (desktop shell)"
 edition = "2024"
 rust-version = "1.90"
