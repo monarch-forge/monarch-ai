@@ -44,7 +44,7 @@ function UsageBody(props: { u: UsageReport }) {
         </div>
       </div>
       <div class="relative">
-        <Sparkline values={series.length > 1 ? series : [0, 0]} height={34} min={0} />
+        <Sparkline values={series.length > 1 ? series : [0, 0]} height={34} min={0} stroke="#D71921" fill="rgb(215 25 33 / 0.08)" />
         <div class="flex justify-between font-mono text-[9px] text-fg-3 tracking-[0.1em] mt-0.5">
           <span>−24H</span>
           <span>
@@ -219,7 +219,7 @@ export function LogPanel(props: { class?: string }) {
             return (
               <li key={e.id} class="grid grid-cols-[58px_38px_1fr] gap-2 py-1.5 border-b border-line/50 last:border-b-0">
                 <span class="font-mono text-[10.5px] text-fg-3 tabular-nums pt-px">{fmt.timeSec(e.ts)}</span>
-                <span class={`font-mono text-[10.5px] tracking-[0.06em] pt-px ${err ? 'text-red' : e.level === 'warn' ? 'text-warning' : 'text-fg-3'}`}>{e.tag}</span>
+                <span class={`font-mono text-[10.5px] tracking-[0.06em] pt-px ${err ? 'text-red' : e.level === 'warn' ? 'text-warning' : e.tag === 'AGT' ? 'text-red/80' : 'text-fg-3'}`}>{e.tag}</span>
                 {e.sessionId ? (
                   <a href={`#/comms/${e.sessionId}`} class={`text-[12px] leading-snug line-clamp-2 hover:text-fg ${err ? 'text-fg' : 'text-fg-2'}`} title={e.text}>
                     {e.text}

@@ -1,0 +1,34 @@
+# Arch Linux package for Monarch (repackages the official release .deb).
+# Build locally:   cd packaging/arch && makepkg -si
+# CI sets pkgver from the release tag and fills in the checksum (see .github/workflows/arch.yml).
+
+pkgname=monarch-ai-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Monarch — a calm, Jarvis-style agentic personal OS'
+arch=('x86_64')
+url='https://github.com/monarch-forge/monarch-ai'
+license=('unknown')
+depends=('webkit2gtk-4.1' 'gtk3' 'hicolor-icon-theme' 'nodejs>=22.19')
+optdepends=(
+  'claude-code: Claude engine using your Claude subscription'
+  'ripgrep: faster code search for coding sessions'
+  'libnotify: desktop notifications (notify-send)'
+  'xdg-utils: open links and OAuth pages in your browser'
+)
+provides=('monarch-ai')
+conflicts=('monarch-ai')
+options=('!strip' '!debug')
+source=("Monarch_${pkgver}_amd64.deb::${url}/releases/download/v${pkgver}/Monarch_${pkgver}_amd64.deb")
+sha256sums=('SKIP')
+
+package() {
+  bsdtar -xf data.tar.* -C "${pkgdir}"
+  # Tauri's deb ships a non-standard "256x256@2" icon dir; move it to hicolor's 512x512 slot
+  if [[ -d "${pkgdir}/usr/share/icons/hicolor/256x256@2" ]]; then
+    install -Dm644 "${pkgdir}/usr/share/icons/hicolor/256x256@2/apps/monarch.png" \
+      "${pkgdir}/usr/share/icons/hicolor/512x512/apps/monarch.png"
+    rm -rf "${pkgdir}/usr/share/icons/hicolor/256x256@2"
+  fi
+  chmod 755 "${pkgdir}/usr/bin/monarch"
+}

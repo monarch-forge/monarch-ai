@@ -96,3 +96,11 @@ jobs:
           releaseDraft: false
           prerelease: true
           args: ${{ matrix.args }}
+
+  arch:
+    name: Arch package
+    needs: build
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/arch.yml
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}

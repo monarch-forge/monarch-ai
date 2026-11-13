@@ -394,6 +394,15 @@ textarea::placeholder {
   }
 }
 
+/* Overview: red as a signal marker — panel codes and the top-left corner bracket */
+.ov .hud-code {
+  color: var(--accent-primary);
+  opacity: 0.85;
+}
+.ov .hud-panel::before {
+  border-color: var(--accent-primary);
+}
+
 @keyframes hud-spin {
   to {
     transform: rotate(360deg);

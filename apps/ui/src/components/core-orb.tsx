@@ -187,7 +187,7 @@ export function CoreOrb(props: CoreOrbProps) {
           )}
           {/* small arc ornaments, lower-right */}
           <path d={arc(cx, cy, rText, 20, 70)} fill="none" stroke={C.line} stroke-width="1" />
-          <path d={arc(cx, cy, rText, 74, 80)} fill="none" stroke={C.fg3} stroke-width="1" />
+          <path d={arc(cx, cy, rText, 74, 80)} fill="none" stroke={C.red} stroke-width="1.5" />
 
           {/* 24h usage ring */}
           {Array.from({ length: 24 }, (_, i) => {
@@ -200,8 +200,8 @@ export function CoreOrb(props: CoreOrbProps) {
                 key={i}
                 d={arc(cx, cy, rHours, a1, a2)}
                 fill="none"
-                stroke={v > 0 ? C.fg2 : C.subtle}
-                stroke-opacity={v > 0 ? 0.18 + 0.62 * v : 1}
+                stroke={isNow ? C.red : v > 0 ? C.fg2 : C.subtle}
+                stroke-opacity={isNow ? 0.35 + 0.65 * Math.max(v, 0.4) : v > 0 ? 0.18 + 0.62 * v : 1}
                 stroke-width={hoursW}
               >
                 <title>{`${pad2(i)}:00`}</title>
@@ -216,7 +216,7 @@ export function CoreOrb(props: CoreOrbProps) {
                     const a = -90 + hourNow * 15 + 7.5 + (now.getMinutes() / 60 - 0.5) * 11.8;
                     const [x1, y1] = pt(cx, cy, rHours + hoursW / 2 + 2, a);
                     const [x2, y2] = pt(cx, cy, rHours + hoursW / 2 + 2 + R * 0.035, a);
-                    return <line key="now" x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.fg} stroke-width="1.25" />;
+                    return <line key="now" x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.red} stroke-width="1.5" />;
                   })(),
                 ],
           )}
@@ -243,7 +243,7 @@ export function CoreOrb(props: CoreOrbProps) {
           {/* rotating ring — turns only while working */}
           <circle cx={cx} cy={cy} r={rSpin} fill="none" stroke={C.line} stroke-width="1" />
           <g style={spinStyle}>
-            <path d={arc(cx, cy, rSpin, -120, -62)} fill="none" stroke={working ? C.red : C.fg3} stroke-width="2.5" />
+            <path d={arc(cx, cy, rSpin, -120, -62)} fill="none" stroke={state === 'offline' ? C.fg3 : C.red} stroke-opacity={working ? 1 : 0.6} stroke-width="2.5" />
             <path d={arc(cx, cy, rSpin, 60, 74)} fill="none" stroke={C.fg3} stroke-width="2.5" />
             <path d={arc(cx, cy, rSpin, 150, 153)} fill="none" stroke={C.fg3} stroke-width="2.5" />
           </g>
@@ -263,7 +263,7 @@ export function CoreOrb(props: CoreOrbProps) {
           {[0, 90, 180, 270].map((a) => {
             const [x1, y1] = pt(cx, cy, rInner + 4, a);
             const [x2, y2] = pt(cx, cy, rDash - R * 0.03, a);
-            return <line key={a} x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.fg3} stroke-width="1" />;
+            return <line key={a} x1={x1} y1={y1} x2={x2} y2={y2} stroke={a === 270 && state !== 'offline' ? C.red : C.fg3} stroke-width="1" />;
           })}
 
           {/* core */}
@@ -277,6 +277,9 @@ export function CoreOrb(props: CoreOrbProps) {
             stroke-width="1"
           />
           <circle cx={cx} cy={cy} r={rInner - Math.max(4, R * 0.03)} fill="none" stroke={C.subtle} stroke-width="1" />
+          {state !== 'offline' && (
+            <path d={arc(cx, cy, rInner - Math.max(4, R * 0.03), -104, -76)} fill="none" stroke={C.red} stroke-width="1.5" />
+          )}
         </svg>
       )}
 
@@ -379,7 +382,7 @@ function Leaders(props: { side: 'left' | 'right'; cx: number; cy: number; R: num
         return (
           <g key={i}>
             <polyline points={`${x0},${y0} ${elbowX},${ey} ${edge},${ey}`} fill="none" stroke={C.line} stroke-width="1" />
-            <rect x={x0 - 1.5} y={y0 - 1.5} width="3" height="3" fill={C.fg3} />
+            <rect x={x0 - 2} y={y0 - 2} width="4" height="4" fill={C.red} />
             <rect x={edge - 2} y={ey - 2} width="4" height="4" fill={C.line} />
             {showText && (
               <text

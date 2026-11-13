@@ -1,0 +1,58 @@
+name: Arch package
+
+# Builds an Arch Linux package (monarch-ai-bin .pkg.tar.zst) from a release's .deb inside an
+# Arch container, then attaches it and the matching PKGBUILD to that GitHub Release.
+# Called by release.yml after the desktop builds, or run manually for an existing tag.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  arch:
+    name: Build Arch package
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    env:
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Install tooling
+        run: pacman -Syu --noconfirm --needed git github-cli pacman-contrib
+
+      # PKGBUILD is version-agnostic (pkgver is set from the tag below), so use the workflow's
+      # own revision — that also lets older tags that predate packaging/arch be packaged.
+      - uses: actions/checkout@v7
+
+      - name: Check that runtime dependencies exist in the Arch repos
+        run: |
+          source packaging/arch/PKGBUILD
+          for d in "${depends[@]}"; do pacman -Si "${d%%[<>=]*}" > /dev/null; done
+
+      - name: Build package
+        run: |
+          useradd -m builder
+          mkdir -p /build && cp packaging/arch/PKGBUILD /build/
+          ver="${TAG#v}"
+          sed -i "s/^pkgver=.*/pkgver=${ver}/; s/^pkgrel=.*/pkgrel=1/" /build/PKGBUILD
+          chown -R builder /build
+          cd /build
+          su builder -c 'updpkgsums && makepkg --nodeps --noconfirm'
+          ls -la /build
+
+      - name: Attach to release
+        run: |
+          cd /build
+          gh release upload "$TAG" ./*.pkg.tar.zst PKGBUILD --clobber -R "$REPO"

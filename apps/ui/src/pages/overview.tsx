@@ -21,7 +21,7 @@ export default function OverviewPage(_props: { params: string[] }) {
   const usage = useResource<UsageReport>('/usage?range=24h', ['sessions'], { intervalMs: 60_000 });
 
   return (
-    <div class="h-full overflow-y-auto overflow-x-hidden">
+    <div class="ov h-full overflow-y-auto overflow-x-hidden">
       <div
         class="grid gap-3 p-3 xl:p-4 grid-cols-1 lg:grid-cols-2 xl:h-full xl:min-h-[640px] xl:grid-cols-[minmax(300px,1fr)_minmax(440px,1.42fr)_minmax(300px,1fr)] xl:grid-rows-[minmax(0,1fr)]"
       >
@@ -58,6 +58,19 @@ function partOfDay(d = new Date()): string {
   return h < 5 ? 'evening' : h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
 }
 
+/** render the honorific (e.g. "sir") in the accent red, like a signal marker */
+function accentHonorific(greeting: string, honorific: string) {
+  const i = honorific ? greeting.lastIndexOf(honorific) : -1;
+  if (i < 0) return greeting;
+  return (
+    <>
+      {greeting.slice(0, i)}
+      <span class="text-red">{honorific}</span>
+      {greeting.slice(i + honorific.length)}
+    </>
+  );
+}
+
 function Greeting(props: { briefing?: Briefing; error?: string }) {
   const s = settings.value;
   const honorific = s?.user.honorific?.trim() || 'sir';
@@ -66,7 +79,7 @@ function Greeting(props: { briefing?: Briefing; error?: string }) {
     props.briefing?.headline ?? (conn.value === 'open' ? (props.error ? 'Briefing unavailable. Core systems online.' : 'Compiling your briefing…') : conn.value === 'connecting' ? 'Establishing link to core…' : 'Core offline. Local telemetry unavailable.');
   return (
     <header class="shrink-0 text-center pt-1">
-      <h1 class="text-[clamp(24px,2.3vw,32px)] font-light tracking-[-0.01em] text-fg leading-tight">{greeting}</h1>
+      <h1 class="text-[clamp(24px,2.3vw,32px)] font-light tracking-[-0.01em] text-fg leading-tight">{accentHonorific(greeting, honorific)}</h1>
       <p class="mt-1.5 flex items-center justify-center gap-2 text-[13px] text-fg-2">
         <span class="inline-block w-[5px] h-[5px] bg-red shrink-0" aria-hidden="true" />
         <span class="truncate">{headline}</span>
