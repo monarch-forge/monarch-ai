@@ -46,13 +46,81 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - In a browser, the UI talks to the core directly. In the desktop app the Rust shell starts the core first, unless one is already listening on `:7717`.
 - `docs/ARCHITECTURE.md` lists module ownership, and `docs/research/` holds the verified API notes.
 
-## Requirements
+## Install
+
+Prebuilt installers for every platform are attached to each
+[GitHub release](https://github.com/monarch-forge/monarch-ai/releases). Two things are needed at runtime:
+
+- **Node.js ≥ 22.19** on your `PATH`. The app runs its core with your local `node`.
+- **Claude Code**, logged in with `claude auth login`. Only needed for the Claude engine, which uses your Claude subscription.
+
+The builds are unsigned, so macOS and Windows warn the first time you open the app.
+
+### Arch Linux
+
+Install the `monarch-ai-bin` package straight from the release; `pacman` pulls in `webkit2gtk-4.1`, `gtk3` and `nodejs`:
+
+```bash
+sudo pacman -U https://github.com/monarch-forge/monarch-ai/releases/download/v0.1.1/monarch-ai-bin-0.1.1-1-x86_64.pkg.tar.zst
+```
+
+Optional extras for desktop notifications, opening links and OAuth pages in your browser, and faster code search:
+
+```bash
+sudo pacman -S --needed libnotify xdg-utils ripgrep
+```
+
+Monarch then appears in your application menu, or you can run `monarch`. To build the package yourself instead,
+use the PKGBUILD (it repackages the release `.deb`; set `pkgver` to the release you want):
+
+```bash
+cd packaging/arch && makepkg -si
+```
+
+Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is kept.
+
+### Debian / Ubuntu
+
+```bash
+sudo apt install ./Monarch_0.1.1_amd64.deb
+```
+
+### Fedora / openSUSE
+
+```bash
+sudo dnf install ./Monarch-0.1.1-1.x86_64.rpm
+```
+
+### Any Linux (AppImage)
+
+```bash
+chmod +x Monarch_0.1.1_amd64.AppImage && ./Monarch_0.1.1_amd64.AppImage
+```
+
+### macOS
+
+Open `Monarch_0.1.1_aarch64.dmg` (Apple Silicon) or `Monarch_0.1.1_x64.dmg` (Intel) and drag Monarch to
+Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
+`xattr -dr com.apple.quarantine /Applications/Monarch.app`.
+
+### Windows
+
+Run `Monarch_0.1.1_x64-setup.exe`, or `Monarch_0.1.1_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+
+### Releasing
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds Linux, macOS (arm64 and x64) and Windows
+with Tauri, publishes a GitHub release, and then `.github/workflows/arch.yml` attaches the Arch package and
+its PKGBUILD. To add the Arch package to an existing release, run the **Arch package** workflow by hand with
+that tag.
+
+## Requirements (building from source)
 
 | | |
 |---|---|
 | **Node** | ≥ 22.19 (developed on 26.x). The desktop app runs your system `node` |
 | **Claude Code** | Needed for the Claude engine: `npm i -g @anthropic-ai/claude-code`, then `claude auth login` |
-| **Rust** (desktop only) | Install via [rustup](https://rustup.rs). Any stable ≥ 1.85 works (edition 2024) |
+| **Rust** (desktop only) | Install via [rustup](https://rustup.rs). Any stable ≥ 1.90 works (edition 2024; Tauri 2.12 needs 1.90) |
 | **System libraries** (desktop only, Linux) | See below |
 
 **Rust toolchain.** If `cargo` reports *"no default toolchain configured"*, pick one:
