@@ -58,11 +58,17 @@ The builds are unsigned, so macOS and Windows warn the first time you open the a
 
 ### Arch Linux
 
-Install the `monarch-ai-bin` package straight from the release; `pacman` pulls in `webkit2gtk-4.1`, `gtk3` and `nodejs`:
+Download the `monarch-ai-bin` package from the release, then install the local file. `pacman` pulls in
+`webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-sudo pacman -U https://github.com/monarch-forge/monarch-ai/releases/download/v0.1.1/monarch-ai-bin-0.1.1-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.1.1/monarch-ai-bin-0.1.1-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.1.1-1-x86_64.pkg.tar.zst
 ```
+
+Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
+`RemoteFileSigLevel = Required` rejects unsigned remote packages (a 404 on the `.sig` file). Local files only need
+an optional signature.
 
 Optional extras for desktop notifications, opening links and OAuth pages in your browser, and faster code search:
 
