@@ -1,0 +1,33 @@
+[package]
+name = "monarch_ai"
+version = "0.1.0"
+description = "Monarch — a Jarvis-style personal agentic OS (desktop shell)"
+edition = "2024"
+rust-version = "1.90"
+default-run = "monarch_ai"
+
+[lib]
+# `_lib` suffix: a lib and a bin with the same name collide on Windows (PDB/import-lib clash).
+name = "monarch_ai_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "monarch_ai"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+# Only used from Rust (our `open_external` command); no JS permission is granted for it.
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

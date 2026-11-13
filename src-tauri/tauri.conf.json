@@ -1,0 +1,77 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Monarch",
+  "mainBinaryName": "monarch",
+  "version": "0.1.0",
+  "identifier": "ai.monarch.desktop",
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../apps/ui/dist",
+    "beforeDevCommand": "npm run dev:ui",
+    "beforeBuildCommand": "npm run build --workspace @monarch/ui && npm run bundle:core"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Monarch",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "center": true,
+        "resizable": true,
+        "decorations": true,
+        "backgroundColor": "#121213",
+        "theme": "Dark",
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:7717 ws://127.0.0.1:7717",
+        "img-src": "'self' data: blob: asset: http://asset.localhost http://127.0.0.1:7717 https:",
+        "media-src": "'self' data: blob: http://127.0.0.1:7717",
+        "font-src": "'self' data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "frame-src": "'self' about: blob: data:",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173",
+        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:7717 ws://127.0.0.1:7717 http://localhost:5173 ws://localhost:5173",
+        "img-src": "'self' data: blob: asset: http://asset.localhost http://127.0.0.1:7717 https:",
+        "media-src": "'self' data: blob: http://127.0.0.1:7717",
+        "font-src": "'self' data: http://localhost:5173",
+        "style-src": "'self' 'unsafe-inline' http://localhost:5173",
+        "frame-src": "'self' about: blob: data:",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Monarch — personal agentic OS",
+    "longDescription": "A calm HUD dashboard plus an AI agent that chats, codes, handles mail, Slack, memory, calendar and automations — with approval gates for risky actions.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "resources/core/": "core/"
+    }
+  }
+}

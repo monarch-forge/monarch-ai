@@ -1,0 +1,23 @@
+{
+  "name": "monarch-ai",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace @monarch/core & npm run dev --workspace @monarch/ui; wait",
+    "dev:core": "npm run dev --workspace @monarch/core",
+    "dev:ui": "npm run dev --workspace @monarch/ui",
+    "build": "npm run build --workspace @monarch/core && npm run build --workspace @monarch/ui",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "bundle:core": "node scripts/bundle-core.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
+    "typescript": "^7.0.2"
+  },
+  "engines": { "node": ">=22" }
+}

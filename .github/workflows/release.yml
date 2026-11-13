@@ -1,0 +1,98 @@
+name: Release
+
+# Builds Monarch desktop binaries (Tauri) for Linux, macOS and Windows and attaches them
+# to a GitHub Release. Triggered by pushing a version tag (e.g. v0.1.0) or manually.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-22.04
+            args: ''
+          - name: macos-arm64
+            os: macos-latest
+            args: '--target aarch64-apple-darwin'
+            rust_targets: aarch64-apple-darwin
+          - name: macos-x64
+            os: macos-latest
+            args: '--target x86_64-apple-darwin'
+            rust_targets: x86_64-apple-darwin
+          - name: windows-x64
+            os: windows-latest
+            args: ''
+    runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf build-essential libssl-dev libxdo-dev file
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.name }}
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # tauri.conf.json's beforeBuildCommand builds the UI and bundles the Node core into
+      # src-tauri/resources/core (the app spawns `node core.mjs` at runtime).
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ env.TAG }}
+          releaseName: 'Monarch ${{ env.TAG }}'
+          releaseBody: |
+            Monarch desktop build for ${{ env.TAG }}.
+
+            **Requirements:** Node.js ≥ 22.19 on PATH (the app runs its core with your local `node`),
+            and for the Claude engine a logged-in Claude Code (`claude auth login`).
+            See the README for Google/Slack setup.
+          releaseDraft: false
+          prerelease: true
+          args: ${{ matrix.args }}

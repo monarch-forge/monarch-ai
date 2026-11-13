@@ -1,0 +1,29 @@
+{
+  "name": "@monarch/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@monarch/shared": "*",
+    "@preact/signals": "^2.11.4",
+    "@tauri-apps/api": "^2.12.4",
+    "lucide-preact": "^1.72.0",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@tailwindcss/vite": "^4.3.5",
+    "daisyui": "^5.8.0",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.8",
+    "@babel/core": "^7.28.0"
+  }
+}
