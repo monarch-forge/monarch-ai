@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Monarch",
   "mainBinaryName": "monarch",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "identifier": "ai.monarch.desktop",
   "build": {
     "devUrl": "http://localhost:5173",
