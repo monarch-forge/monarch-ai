@@ -15,7 +15,7 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Slack.** Read channels and DMs, search, and post as yourself with a user token.
 - **Memory.** An Obsidian-compatible markdown vault with `[[wikilinks]]`, tags, backlinks and a graph view. The agent reads and writes it.
 - **Agenda.** Google Calendar, plus local tasks, reminders and cron-style automations.
-- **Systems.** Live CPU, memory, disk, network, battery and process telemetry.
+- **9Router.** Live model proxy status check (localhost:20128) and chat completion gateway diagnostics.
 - **Voice.** Cloud speech in and out: the mic in the console and in Comms records your request, which is transcribed by OpenAI, Groq or any OpenAI-compatible endpoint. Replies are spoken by OpenAI, ElevenLabs or any OpenAI-compatible text-to-speech service. Set it up in **Config → Voice**: pick a provider and add its API key. On Linux the core records with `pw-record` (or `parecord` or `arecord`), stops when you go quiet, and plays replies with `pw-play`, so it doesn't depend on the webview.
 - **Self-evolution.** Monarch extends itself. Ask it (or use **Evolve → Forge**) for a capability it lacks and it writes, sandboxes and tests a new extension (tools, dashboard panels, background jobs) or a skill (a learned procedure). Every change is versioned with rollback and logged on a timeline. An optional daily or weekly self-reflection turns friction into proposals you approve.
 - **Lean prompts.** Only about 14 core tools load into each prompt. The rest, including every extension tool, are found on demand through tool search (Claude Code's native ToolSearch, or `tool_search` on pi). That roughly halves the prompt.
