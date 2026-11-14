@@ -59,7 +59,7 @@ export function App() {
   return (
     <div class="h-full flex flex-col">
       <TopBar active={entry.id} />
-      <main class="flex-1 min-h-0 relative">
+      <main class="flex-1 min-h-0 relative animate-monarch-fade" key={entry.id}>
         <Page params={params} />
       </main>
       <Footer section={entry.label} index={NAV.indexOf(entry)} />

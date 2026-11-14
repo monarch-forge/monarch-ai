@@ -422,6 +422,27 @@ textarea::placeholder {
   animation: hud-blink 1.2s steps(2, start) infinite;
 }
 
+@keyframes monarchFadeZoom {
+  0% { opacity: 0; transform: scale(0.96) translateY(6px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-monarch-fade, .hud-panel, .card, div[class*="border"], section {
+  animation: monarchFadeZoom 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+  transition: none !important;
+}
+
+*, *::before, *::after {
+  outline-color: var(--accent-primary) !important;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 1px solid var(--text-secondary) !important;
+  outline-offset: 1px !important;
+  box-shadow: 0 0 0 2px rgb(158 158 164 / 0.15) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
