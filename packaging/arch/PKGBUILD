@@ -3,7 +3,7 @@
 # CI sets pkgver from the release tag and fills in the checksum (see .github/workflows/arch.yml).
 
 pkgname=monarch-ai-bin
-pkgver=0.3.2
+pkgver=0.3.3
 pkgrel=1
 pkgdesc='Monarch — a calm, Jarvis-style agentic personal OS'
 arch=('x86_64')
@@ -15,6 +15,7 @@ optdepends=(
   'ripgrep: faster code search for coding sessions'
   'libnotify: desktop notifications (notify-send)'
   'xdg-utils: open links and OAuth pages in your browser'
+  'pipewire: voice input and spoken replies (pw-record / pw-play)'
 )
 provides=('monarch-ai')
 conflicts=('monarch-ai')

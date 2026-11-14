@@ -1,7 +1,7 @@
 /** Overview command console: input + mic + send, quick actions, and a live reply preview. OWNED BY UI-A. */
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ArrowRight, CornerDownLeft, Mic, Plus, Square, X } from 'lucide-preact';
-import { conn, settings, toast } from '../../lib/store.ts';
+import { conn, navigate, settings, toast } from '../../lib/store.ts';
 import { interimTranscript, listen, listening, stopListening, stripMarkdown, voiceSupport, UNSUPPORTED_LISTEN } from '../../lib/voice.ts';
 import { Tag } from '../ui.tsx';
 import { activeConversation, consoleConversation, consoleHistory, consoleRun, dismissConsoleRun, newConsoleConversation, runConsoleCommand } from './console-store.ts';
@@ -29,7 +29,8 @@ export function CommandConsole() {
 
   const onMic = async () => {
     if (!voiceSupport.listen) {
-      toast(UNSUPPORTED_LISTEN, 'warn');
+      toast(voiceSupport.sttReady ? 'Voice input is off — turn it on in Config → Voice' : UNSUPPORTED_LISTEN, 'warn');
+      navigate('config/voice');
       return;
     }
     if (isListening) {
@@ -110,7 +111,7 @@ export function CommandConsole() {
           <button
             type="button"
             class={`w-10 flex items-center justify-center border-l border-line ${
-              !voiceSupport.listen ? 'text-fg-3/60 cursor-not-allowed' : isListening ? 'text-red' : 'text-fg-2 hover:text-fg hover:bg-white/[0.03]'
+              !voiceSupport.listen ? 'text-fg-3/60 hover:text-fg-2' : isListening ? 'text-red' : 'text-fg-2 hover:text-fg hover:bg-white/[0.03]'
             }`}
             onClick={onMic}
             aria-label={voiceSupport.listen ? (isListening ? 'Stop listening' : 'Voice input') : UNSUPPORTED_LISTEN}

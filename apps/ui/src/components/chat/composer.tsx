@@ -4,8 +4,9 @@
  */
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { CornerDownLeft, Square } from 'lucide-preact';
-import { conn } from '../../lib/store.ts';
+import { CornerDownLeft, Mic, Square } from 'lucide-preact';
+import { conn, navigate, toast } from '../../lib/store.ts';
+import { listen, listening, micLevel, stopListening, voiceSupport, UNSUPPORTED_LISTEN } from '../../lib/voice.ts';
 
 export interface SlashCommand {
   cmd: string; // "/new"
@@ -51,6 +52,8 @@ export function Composer(props: {
   autoFocus?: boolean;
   /** external text injection (quick prompts): set value + focus */
   inject?: { text: string; n: number } | null;
+  /** show a mic button; the transcript is sent through this (lets the page speak the reply) */
+  onVoiceSend?: (text: string) => void | Promise<unknown>;
 }) {
   const [text, setText] = useState('');
   const [sel, setSel] = useState(0);
@@ -199,11 +202,12 @@ export function Composer(props: {
             setSel(0);
           }}
           onKeyDown={onKey}
-          placeholder={offline ? 'Core offline — reconnecting…' : (props.placeholder ?? 'Message Monarch…')}
+          placeholder={offline ? 'Core offline — reconnecting…' : listening.value && props.onVoiceSend ? 'Listening… speak now (■ to finish)' : (props.placeholder ?? 'Message Monarch…')}
           disabled={offline}
           class="flex-1 resize-none bg-transparent outline-none text-[14px] leading-[1.55] text-fg placeholder:text-fg-3 py-1.5 max-h-[260px] min-h-[34px] disabled:opacity-60"
           aria-label="Message"
         />
+        {props.onVoiceSend && <MicButton disabled={disabled || !!props.running} onText={(t) => void props.onVoiceSend!(t)} />}
         {props.running ? (
           <button
             class="btn btn-sm btn-outline border-red/60 text-fg hover:bg-red hover:border-red rounded-[2px] font-mono font-normal uppercase tracking-wider text-[11px] mb-0.5"
@@ -239,5 +243,45 @@ export function Composer(props: {
         </div>
       </div>
     </div>
+  );
+}
+
+/** push-to-talk: records one utterance through the cloud voice service and hands back the transcript */
+function MicButton(props: { disabled?: boolean; onText: (text: string) => void }) {
+  const on = listening.value;
+  const ready = voiceSupport.listen;
+  const click = async () => {
+    if (!ready) {
+      toast(voiceSupport.sttReady ? 'Voice input is off — turn it on in Config → Voice' : UNSUPPORTED_LISTEN, 'warn');
+      navigate('config/voice');
+      return;
+    }
+    if (on) {
+      stopListening();
+      return;
+    }
+    try {
+      const heard = await listen();
+      props.onText(heard);
+    } catch (e: any) {
+      toast(e?.message ?? 'Voice input failed', 'warn');
+    }
+  };
+  return (
+    <button
+      type="button"
+      class={`relative btn btn-sm rounded-[2px] mb-0.5 px-2.5 border ${
+        on ? 'bg-transparent border-red text-red' : ready ? 'btn-ghost border-line text-fg-2 hover:text-fg hover:border-fg-3' : 'btn-ghost border-line text-fg-3/60 hover:text-fg-2'
+      }`}
+      onClick={() => void click()}
+      disabled={props.disabled && !on}
+      title={on ? 'Stop listening' : ready ? 'Speak your message' : UNSUPPORTED_LISTEN}
+      aria-label={on ? 'Stop listening' : 'Voice input'}
+    >
+      {on ? <Square size={11} fill="currentColor" /> : <Mic size={14} strokeWidth={1.5} />}
+      {on && (
+        <span class="absolute left-0 bottom-0 h-0.5 bg-red transition-[width] duration-100" style={{ width: `${Math.round(Math.max(0.08, micLevel.value) * 100)}%` }} />
+      )}
+    </button>
   );
 }

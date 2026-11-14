@@ -49,7 +49,11 @@ export function ProvidersSection() {
     }
   };
 
-  const list = (res.data ?? []).filter((p) => engineFilter === 'all' || p.engine === engineFilter);
+  // connected providers first, then alphabetical by name
+  const list = (res.data ?? [])
+    .filter((p) => engineFilter === 'all' || p.engine === engineFilter)
+    .slice()
+    .sort((a, b) => Number(b.configured) - Number(a.configured) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   const configured = (res.data ?? []).filter((p) => p.configured).length;
 
   return (

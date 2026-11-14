@@ -3,7 +3,7 @@
  */
 import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
-import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna } from 'lucide-preact';
+import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna, AudioLines } from 'lucide-preact';
 import { conn, health, navigate, settings } from '../lib/store.ts';
 import { Panel, Tag, ErrorLine } from '../components/ui.tsx';
 import { SettingsGate } from '../components/config/fields.tsx';
@@ -13,11 +13,13 @@ import { ProvidersSection } from '../components/config/providers.tsx';
 import { AccountsSection } from '../components/config/accounts.tsx';
 import { PermissionsSection } from '../components/config/permissions.tsx';
 import { EvolutionSection } from '../components/config/evolution.tsx';
+import { VoiceSection } from '../components/config/voice.tsx';
 
 const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
-  { id: 'general', label: 'General', icon: UserRound, desc: 'Identity, location, persona, voice', page: GeneralSection, needsSettings: true },
+  { id: 'general', label: 'General', icon: UserRound, desc: 'Identity, location, persona', page: GeneralSection, needsSettings: true },
   { id: 'models', label: 'Models', icon: Cpu, desc: 'Engine and default models', page: ModelsSection, needsSettings: true },
   { id: 'providers', label: 'Providers', icon: KeyRound, desc: 'API keys and logins', page: ProvidersSection, needsSettings: false },
+  { id: 'voice', label: 'Voice', icon: AudioLines, desc: 'Cloud speech in and out', page: VoiceSection, needsSettings: true },
   { id: 'accounts', label: 'Accounts', icon: Link2, desc: 'Google and Slack', page: AccountsSection, needsSettings: false },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'Approvals and folders', page: PermissionsSection, needsSettings: true },
   { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'Self-extension and reflection', page: EvolutionSection, needsSettings: true },

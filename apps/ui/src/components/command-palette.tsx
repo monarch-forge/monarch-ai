@@ -30,7 +30,7 @@ import {
 import type { Settings } from '@monarch/shared';
 import { api } from '../lib/api.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
-import { stopSpeaking } from '../lib/voice.ts';
+import { stopSpeaking, voiceSupport, UNSUPPORTED_SPEAK } from '../lib/voice.ts';
 import { notificationsOpen } from './notifications.tsx';
 import { sendNewChat } from './overview/console-store.ts';
 
@@ -95,6 +95,11 @@ async function toggleVoice() {
     return;
   }
   const next = !s.assistant.voice.speak;
+  if (next && !voiceSupport.ttsReady) {
+    toast(UNSUPPORTED_SPEAK, 'warn');
+    navigate('config/voice');
+    return;
+  }
   try {
     const updated = await api.put<Settings>('/settings', { assistant: { voice: { speak: next } } });
     if (updated) settings.value = updated;

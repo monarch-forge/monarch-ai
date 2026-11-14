@@ -1,5 +1,5 @@
 /** Config → General: identity, location, assistant persona and voice. */
-import { useEffect, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import type { GeoLocation, Settings } from '@monarch/shared';
 import { MapPin, Search, X } from 'lucide-preact';
 import { api, qs } from '../../lib/api.ts';
@@ -10,35 +10,22 @@ import { Field, INPUT, SELECT, TEXTAREA, ToggleRow, SaveBar, saveSettings, useDr
 
 type Slice = Pick<Settings, 'user' | 'assistant'>;
 
-function useVoices(): SpeechSynthesisVoice[] {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  useEffect(() => {
-    const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
-    if (!synth) return;
-    const load = () => setVoices(synth.getVoices());
-    load();
-    synth.addEventListener?.('voiceschanged', load);
-    return () => synth.removeEventListener?.('voiceschanged', load);
-  }, []);
-  return voices;
-}
-
 export function GeneralSection() {
   const s = settings.value!;
   const [draft, set, dirty, reset] = useDraft<Slice>({ user: s.user, assistant: s.assistant });
   const [saving, setSaving] = useState(false);
-  const voices = useVoices();
   if (!draft) return null;
   const u = draft.user;
   const a = draft.assistant;
   const setUser = (p: Partial<Slice['user']>) => set({ user: { ...u, ...p } });
   const setAsst = (p: Partial<Slice['assistant']>) => set({ assistant: { ...a, ...p } });
-  const setVoice = (p: Partial<Slice['assistant']['voice']>) => setAsst({ voice: { ...a.voice, ...p } });
 
   const save = async () => {
     setSaving(true);
     const { location: _loc, ...user } = draft.user;
-    const ok = await saveSettings({ user, assistant: draft.assistant });
+    // voice lives in Config → Voice; never send a stale copy back
+    const { voice: _voice, ...assistant } = draft.assistant;
+    const ok = await saveSettings({ user, assistant });
     setSaving(false);
     if (ok) reset();
   };
@@ -85,39 +72,12 @@ export function GeneralSection() {
             />
           </Field>
         </div>
-        <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-x-6">
-          <div>
-            <div class="hud-label text-[10px] mb-1">Voice</div>
-            <ToggleRow label="Speak responses" hint="Read assistant replies aloud." checked={a.voice.speak} onChange={(v) => setVoice({ speak: v })} />
-            <ToggleRow label="Listen" hint="Enable push-to-talk / wake listening in the UI." checked={a.voice.listen} onChange={(v) => setVoice({ listen: v })} />
-          </div>
-          <div class="flex flex-col gap-4 pt-5">
-            <Field label={`Speech rate · ${a.voice.rate.toFixed(2)}×`}>
-              <input
-                type="range"
-                min={0.5}
-                max={2}
-                step={0.05}
-                value={a.voice.rate}
-                class="range range-xs [--range-fill:0] text-red"
-                onInput={(e) => setVoice({ rate: Number((e.target as HTMLInputElement).value) })}
-              />
-            </Field>
-            <Field label="Voice">
-              {voices.length ? (
-                <select class={SELECT} value={a.voice.voiceName ?? ''} onChange={(e) => setVoice({ voiceName: (e.target as HTMLSelectElement).value || undefined })}>
-                  <option value="">System default</option>
-                  {voices.map((v) => (
-                    <option key={v.name} value={v.name}>
-                      {v.name} ({v.lang})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input class={INPUT} value={a.voice.voiceName ?? ''} onInput={(e) => setVoice({ voiceName: (e.target as HTMLInputElement).value || undefined })} placeholder="System default" />
-              )}
-            </Field>
-          </div>
+        <div class="mt-5 text-[12px] text-fg-3">
+          Voice input and spoken replies are set up under{' '}
+          <a href="#/config/voice" class="underline underline-offset-2 text-fg-2">
+            Config → Voice
+          </a>
+          .
         </div>
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>

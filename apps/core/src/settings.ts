@@ -8,7 +8,13 @@ export const DEFAULT_SETTINGS: Settings = {
   assistant: {
     name: 'Monarch',
     persona: '',
-    voice: { speak: false, listen: false, rate: 1 },
+    voice: {
+      speak: false,
+      listen: false,
+      rate: 1,
+      stt: { provider: 'none', model: '', language: '', baseUrl: '' },
+      tts: { provider: 'none', model: '', voice: '', baseUrl: '' },
+    },
   },
   engine: 'claude-sdk',
   claudeSdk: { model: 'sonnet', executablePath: '', useSubscription: true, effort: 'medium' },

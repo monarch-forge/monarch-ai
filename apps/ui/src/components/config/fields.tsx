@@ -49,7 +49,7 @@ export function useDraft<T extends object>(source: T | undefined | null): [T | n
   ];
 }
 
-export function Field(props: { label: string; hint?: ComponentChildren; children: ComponentChildren; class?: string; htmlFor?: string }) {
+export function Field(props: { label: ComponentChildren; hint?: ComponentChildren; children: ComponentChildren; class?: string; htmlFor?: string }) {
   return (
     <div class={`flex flex-col gap-1.5 ${props.class ?? ''}`}>
       <label class="hud-label text-[10px]" for={props.htmlFor}>

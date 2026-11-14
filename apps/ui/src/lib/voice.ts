@@ -1,60 +1,100 @@
 /**
- * Voice I/O over the Web Speech API (feature-detected). OWNED BY UI-A.
- *  - speak(text): speechSynthesis, honours settings.assistant.voice.{speak,rate,voiceName}; strips markdown.
- *  - listen(): SpeechRecognition / webkitSpeechRecognition → final transcript.
- * WebKitGTK (Tauri on Linux) usually ships without SpeechRecognition — callers should check `voiceSupport.listen`.
+ * Voice I/O through the core's cloud speech service (Config → Voice).
+ *  - speak(text): cloud text-to-speech; the core plays it (Linux/macOS) or returns audio the UI plays.
+ *  - listen(): the core records the mic and ends on silence (Linux), or the webview's MediaRecorder
+ *    records and the core transcribes. Either way the transcript comes from the cloud provider.
+ * The webview's own Web Speech APIs are not used: WebKitGTK (Tauri on Linux) ships without them.
  */
-import { signal } from '@preact/signals';
-import { settings } from './store.ts';
+import { computed, signal } from '@preact/signals';
+import type { VoiceStatus } from '@monarch/shared';
+import { api, ApiError, CORE_URL, socket } from './api.ts';
+import { onCollectionChanged, settings } from './store.ts';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const w: any = typeof window !== 'undefined' ? window : {};
-const Recognition: any = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+export const UNSUPPORTED_LISTEN = 'Voice input is not set up — choose a speech-to-text provider in Config → Voice';
+export const UNSUPPORTED_SPEAK = 'Voice output is not set up — choose a text-to-speech provider in Config → Voice';
 
-export const voiceSupport = {
-  speak: typeof w.speechSynthesis !== 'undefined' && typeof w.SpeechSynthesisUtterance !== 'undefined',
-  listen: typeof Recognition === 'function',
-};
+/** core voice status (provider readiness, capture/playback mode) */
+export const voiceStatus = signal<VoiceStatus | null>(null);
 
-export const UNSUPPORTED_LISTEN = 'Voice input not supported in this webview';
-export const UNSUPPORTED_SPEAK = 'Speech synthesis not supported in this webview';
+export async function refreshVoiceStatus(): Promise<VoiceStatus | null> {
+  try {
+    voiceStatus.value = await api.get<VoiceStatus>('/voice/status');
+  } catch {
+    /* core offline: keep the last known status */
+  }
+  return voiceStatus.value;
+}
 
-/** true while the microphone is open */
+let started = false;
+/** start tracking voice status + pipeline events (idempotent) */
+export function startVoice(): void {
+  if (started) return;
+  started = true;
+  void refreshVoiceStatus();
+  onCollectionChanged('settings', () => void refreshVoiceStatus());
+  onCollectionChanged('providers', () => void refreshVoiceStatus());
+  socket.onStatus((s) => s === 'open' && void refreshVoiceStatus());
+  socket.on((ev) => {
+    if (ev.type !== 'voice.state') return;
+    voicePhase.value = ev.phase;
+    if (ev.phase === 'listening') micLevel.value = ev.level ?? 0;
+    else micLevel.value = 0;
+    if (ev.phase === 'transcribing' && listening.value) interimTranscript.value = 'Transcribing…';
+  });
+}
+
+/** core pipeline phase (from ws voice.state) */
+export const voicePhase = signal<'idle' | 'listening' | 'transcribing' | 'speaking'>('idle');
+/** 0..1 microphone level while the core is listening */
+export const micLevel = signal(0);
+/** true while the microphone is open (or the take is being transcribed) */
 export const listening = signal(false);
-/** true while an utterance is being spoken */
+/** true while a reply is being spoken */
 export const speaking = signal(false);
-/** interim transcript while listening (for live feedback) */
+/** live feedback text while listening */
 export const interimTranscript = signal('');
+
+const sttReady = computed(() => !!voiceStatus.value?.stt.ready);
+const ttsReady = computed(() => !!voiceStatus.value?.tts.ready);
+
+/** reactive capability flags (read inside components to re-render on change) */
+export const voiceSupport = {
+  /** a speech-to-text provider is set up and voice input is enabled */
+  get listen(): boolean {
+    return sttReady.value && !!settings.value?.assistant.voice.listen;
+  },
+  /** a text-to-speech provider is set up */
+  get speak(): boolean {
+    return ttsReady.value;
+  },
+  get sttReady(): boolean {
+    return sttReady.value;
+  },
+  get ttsReady(): boolean {
+    return ttsReady.value;
+  },
+};
 
 /** reduce markdown to something pleasant to read aloud / show as plain text */
 export function stripMarkdown(md: string): string {
   return (
     md
-      // fenced code blocks → omitted
       .replace(/```[\s\S]*?```/g, ' (code omitted) ')
-      // images ![alt](url) → alt
       .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-      // links [text](url) → text
       .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-      // wikilinks [[a|b]] → b / a
       .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
       .replace(/\[\[([^\]]+)\]\]/g, '$1')
-      // inline code
       .replace(/`([^`]+)`/g, '$1')
-      // headings, blockquotes, list bullets
       .replace(/^\s{0,3}#{1,6}\s+/gm, '')
       .replace(/^\s{0,3}>\s?/gm, '')
       .replace(/^\s*[-*+]\s+(\[[ xX]\]\s+)?/gm, '')
       .replace(/^\s*\d+\.\s+/gm, '')
-      // emphasis
       .replace(/(\*\*|__)(.*?)\1/g, '$2')
       .replace(/(\*|_)(.*?)\1/g, '$2')
       .replace(/~~(.*?)~~/g, '$1')
-      // tables / rules
       .replace(/^\s*\|?[-:\s|]+\|?\s*$/gm, '')
       .replace(/\|/g, ' ')
       .replace(/^\s*([-*_]\s*){3,}$/gm, '')
-      // bare urls are noise when spoken
       .replace(/https?:\/\/\S+/g, 'link')
       .replace(/[ \t]+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
@@ -62,144 +102,156 @@ export function stripMarkdown(md: string): string {
   );
 }
 
-function pickVoice(name?: string): SpeechSynthesisVoice | undefined {
-  if (!voiceSupport.speak) return undefined;
-  const voices = w.speechSynthesis.getVoices() as SpeechSynthesisVoice[];
-  if (!voices.length) return undefined;
-  if (name) {
-    const exact = voices.find((v) => v.name === name);
-    if (exact) return exact;
-    const loose = voices.find((v) => v.name.toLowerCase().includes(name.toLowerCase()));
-    if (loose) return loose;
-  }
-  const lang = (navigator.language || 'en').slice(0, 2);
-  return voices.find((v) => v.default && v.lang.startsWith(lang)) ?? voices.find((v) => v.lang.startsWith(lang)) ?? voices[0];
-}
+/* ─────────────── speaking ─────────────── */
 
-/** available synthesis voices (may be empty until the browser loads them) */
-export function listVoices(): SpeechSynthesisVoice[] {
-  return voiceSupport.speak ? (w.speechSynthesis.getVoices() as SpeechSynthesisVoice[]) : [];
+let audioEl: HTMLAudioElement | null = null;
+let audioUrl: string | null = null;
+let speakSeq = 0;
+
+function dropAudio(): void {
+  if (audioEl) {
+    audioEl.pause();
+    audioEl = null;
+  }
+  if (audioUrl) {
+    URL.revokeObjectURL(audioUrl);
+    audioUrl = null;
+  }
 }
 
 export function stopSpeaking(): void {
-  if (!voiceSupport.speak) return;
-  w.speechSynthesis.cancel();
+  speakSeq++;
+  dropAudio();
+  if (speaking.value) void api.post('/voice/stop', {}).catch(() => {});
   speaking.value = false;
 }
 
 /**
- * Speak text aloud. Respects settings.assistant.voice unless `force` is set
- * (e.g. a "test voice" button). Resolves when finished (or immediately when disabled/unsupported).
+ * Speak text aloud through the cloud voice. Respects settings.assistant.voice.speak unless `force`
+ * (e.g. the "Test voice" button). Resolves when finished; rejects only when `force` is set.
  */
-export function speak(text: string, opts: { force?: boolean; rate?: number; voiceName?: string } = {}): Promise<void> {
+export async function speak(text: string, opts: { force?: boolean } = {}): Promise<void> {
   const cfg = settings.value?.assistant.voice;
-  if (!voiceSupport.speak) return Promise.resolve();
-  if (!opts.force && !cfg?.speak) return Promise.resolve();
+  if (!opts.force && !cfg?.speak) return;
+  if (!voiceStatus.value) await refreshVoiceStatus();
+  if (!ttsReady.value) {
+    if (opts.force) throw new Error(UNSUPPORTED_SPEAK);
+    return;
+  }
   const clean = stripMarkdown(text);
-  if (!clean) return Promise.resolve();
-  w.speechSynthesis.cancel();
-  return new Promise<void>((resolve) => {
-    const u = new w.SpeechSynthesisUtterance(clean.slice(0, 4000)) as SpeechSynthesisUtterance;
-    const rate = opts.rate ?? cfg?.rate ?? 1;
-    u.rate = Math.max(0.5, Math.min(2, rate || 1));
-    const v = pickVoice(opts.voiceName ?? cfg?.voiceName);
-    if (v) {
-      u.voice = v;
-      u.lang = v.lang;
+  if (!clean) return;
+  stopSpeaking();
+  const seq = ++speakSeq;
+  speaking.value = true;
+  try {
+    const res = await fetch(`${CORE_URL}/api/voice/speak`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: clean }),
+    });
+    if (!res.ok) {
+      const j: any = await res.json().catch(() => null);
+      throw new ApiError(res.status, j?.error ?? res.statusText);
     }
-    const done = () => {
-      speaking.value = false;
-      resolve();
-    };
-    u.onstart = () => (speaking.value = true);
-    u.onend = done;
-    u.onerror = done;
-    w.speechSynthesis.speak(u);
-  });
+    const type = res.headers.get('content-type') ?? '';
+    if (type.startsWith('audio/') && seq === speakSeq) {
+      // no player in the core: play it here
+      audioUrl = URL.createObjectURL(await res.blob());
+      audioEl = new Audio(audioUrl);
+      await new Promise<void>((resolve) => {
+        audioEl!.onended = () => resolve();
+        audioEl!.onerror = () => resolve();
+        audioEl!.play().catch(() => resolve());
+      });
+      dropAudio();
+    }
+  } catch (e) {
+    if (opts.force) throw e;
+    console.warn('[voice] speak failed', e);
+  } finally {
+    if (seq === speakSeq) speaking.value = false;
+  }
 }
 
-let active: any = null;
+/* ─────────────── listening ─────────────── */
 
-/** stop an in-progress listen(); the pending promise resolves with what was heard so far */
+let stopBrowserTake: (() => void) | null = null;
+
+/** finish the current take now (it is transcribed) */
 export function stopListening(): void {
-  try {
-    active?.stop();
-  } catch {
-    /* ignore */
-  }
+  if (!listening.value) return;
+  if (stopBrowserTake) stopBrowserTake();
+  else void api.post('/voice/listen/stop', {}).catch(() => {});
+}
+
+/** discard the current take */
+export function cancelListening(): void {
+  if (!listening.value) return;
+  if (stopBrowserTake) stopBrowserTake();
+  else void api.post('/voice/listen/cancel', {}).catch(() => {});
 }
 
 /**
- * Listen for one utterance and resolve with the final transcript.
- * Rejects with a readable Error when unsupported, denied, or nothing was heard.
+ * Record one utterance and resolve with its transcript. The take ends on silence (core capture),
+ * on stopListening(), or after maxMs. Rejects with a readable Error when not set up or nothing was heard.
  */
-export function listen(opts: { lang?: string; timeoutMs?: number } = {}): Promise<string> {
-  if (!voiceSupport.listen) return Promise.reject(new Error(UNSUPPORTED_LISTEN));
-  if (active) {
+export async function listen(opts: { maxMs?: number; force?: boolean } = {}): Promise<string> {
+  if (!voiceStatus.value) await refreshVoiceStatus();
+  if (!sttReady.value || (!opts.force && !settings.value?.assistant.voice.listen)) throw new Error(UNSUPPORTED_LISTEN);
+  if (listening.value) {
     stopListening();
-    return Promise.reject(new Error('Already listening'));
+    throw new Error('Already listening');
   }
   stopSpeaking();
-  return new Promise<string>((resolve, reject) => {
-    let rec: any;
-    try {
-      rec = new Recognition();
-    } catch {
-      reject(new Error(UNSUPPORTED_LISTEN));
-      return;
+  listening.value = true;
+  interimTranscript.value = '';
+  try {
+    let text: string;
+    if (voiceStatus.value?.capture === 'core') {
+      text = (await api.post<{ text: string }>('/voice/listen', { maxMs: opts.maxMs ?? 30_000 })).text;
+    } else {
+      text = await browserTake(opts.maxMs ?? 30_000);
     }
-    active = rec;
-    rec.lang = opts.lang ?? navigator.language ?? 'en-US';
-    rec.interimResults = true;
-    rec.continuous = false;
-    rec.maxAlternatives = 1;
-    let finalText = '';
-    let failed: string | null = null;
-    const timer = window.setTimeout(() => stopListening(), opts.timeoutMs ?? 15000);
-    rec.onstart = () => {
-      listening.value = true;
-      interimTranscript.value = '';
-    };
-    rec.onresult = (e: any) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) finalText += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      interimTranscript.value = (finalText + ' ' + interim).trim();
-    };
-    rec.onerror = (e: any) => {
-      const code = e?.error as string | undefined;
-      failed =
-        code === 'not-allowed' || code === 'service-not-allowed'
-          ? 'Microphone access denied'
-          : code === 'no-speech'
-            ? 'No speech detected'
-            : code === 'audio-capture'
-              ? 'No microphone found'
-              : code === 'network'
-                ? 'Speech service unreachable'
-                : code === 'aborted'
-                  ? 'Listening cancelled'
-                  : `Voice input failed${code ? ` (${code})` : ''}`;
-    };
-    rec.onend = () => {
-      window.clearTimeout(timer);
-      listening.value = false;
-      active = null;
-      const text = (finalText || interimTranscript.value).trim();
-      interimTranscript.value = '';
-      if (text) resolve(text);
-      else reject(new Error(failed ?? 'No speech detected'));
-    };
-    try {
-      rec.start();
-    } catch (e: any) {
-      window.clearTimeout(timer);
-      active = null;
-      listening.value = false;
-      reject(new Error(e?.message ?? 'Voice input failed'));
-    }
-  });
+    text = (text ?? '').trim();
+    if (!text) throw new Error('No speech detected');
+    return text;
+  } catch (e: any) {
+    throw new Error(e?.message ?? 'Voice input failed');
+  } finally {
+    listening.value = false;
+    interimTranscript.value = '';
+    micLevel.value = 0;
+  }
+}
+
+/** record with the webview's MediaRecorder (no recorder in the core), then transcribe in the core */
+async function browserTake(maxMs: number): Promise<string> {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    throw new Error('This webview cannot record audio, and the core found no recorder');
+  }
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    throw new Error('Microphone access denied');
+  }
+  const rec = new MediaRecorder(stream);
+  const parts: Blob[] = [];
+  rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
+  const done = new Promise<void>((resolve) => (rec.onstop = () => resolve()));
+  rec.start();
+  interimTranscript.value = 'Listening… click again to finish';
+  const timer = window.setTimeout(() => rec.state !== 'inactive' && rec.stop(), maxMs);
+  stopBrowserTake = () => rec.state !== 'inactive' && rec.stop();
+  await done;
+  window.clearTimeout(timer);
+  stopBrowserTake = null;
+  stream.getTracks().forEach((t) => t.stop());
+  const blob = new Blob(parts, { type: rec.mimeType || 'audio/webm' });
+  if (blob.size < 2000) throw new Error('No speech detected');
+  interimTranscript.value = 'Transcribing…';
+  const res = await fetch(`${CORE_URL}/api/voice/transcribe`, { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+  const j: any = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(j?.error ?? res.statusText);
+  return String(j?.text ?? '');
 }

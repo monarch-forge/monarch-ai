@@ -48,6 +48,54 @@ export interface CustomModel {
   reasoning?: boolean;
 }
 
+/* ─────────────── voice (cloud speech) ─────────────── */
+
+export type VoiceSttProvider = 'none' | 'openai' | 'groq' | 'custom';
+export type VoiceTtsProvider = 'none' | 'openai' | 'elevenlabs' | 'custom';
+/** where a voice provider's API key comes from */
+export type VoiceKeyProvider = 'openai' | 'groq' | 'elevenlabs' | 'custom';
+
+export interface VoiceSttSettings {
+  provider: VoiceSttProvider;
+  /** '' = provider default (openai: gpt-4o-mini-transcribe, groq: whisper-large-v3-turbo) */
+  model: string;
+  /** ISO-639-1 hint, '' = auto-detect */
+  language: string;
+  /** custom provider: OpenAI-compatible base URL (…/v1) */
+  baseUrl: string;
+}
+
+export interface VoiceTtsSettings {
+  provider: VoiceTtsProvider;
+  /** '' = provider default (openai: gpt-4o-mini-tts, elevenlabs: eleven_flash_v2_5) */
+  model: string;
+  /** voice name (openai: alloy, nova…) or ElevenLabs voice id; '' = provider default */
+  voice: string;
+  baseUrl: string;
+}
+
+export interface VoiceSideStatus {
+  provider: string;
+  /** provider chosen and a key is available */
+  ready: boolean;
+  keySet: boolean;
+  /** where the key comes from: 'voice' (set here), 'provider' (shared with an LLM provider key), 'env' */
+  keySource?: 'voice' | 'provider' | 'env';
+  model: string;
+  error?: string;
+}
+
+export interface VoiceStatus {
+  stt: VoiceSideStatus;
+  tts: VoiceSideStatus;
+  /** 'core' = the core records the mic (pw-record/parecord/arecord); 'browser' = the webview's MediaRecorder */
+  capture: 'core' | 'browser';
+  /** 'core' = the core plays audio (pw-play/paplay/aplay/afplay); 'browser' = the UI plays returned audio */
+  playback: 'core' | 'browser';
+  recorder?: string;
+  player?: string;
+}
+
 /** an OpenAI-compatible endpoint the user added (several allowed); its API key lives in secrets under its id */
 export interface CustomProvider {
   /** provider id used in model specs ("<id>/<model>"): "custom" or "custom-<slug>" */
@@ -69,7 +117,16 @@ export interface Settings {
     name: string; // "Monarch"
     /** extra persona / standing instructions appended to the system prompt */
     persona: string;
-    voice: { speak: boolean; listen: boolean; voiceName?: string; rate: number };
+    /** voice runs on cloud speech APIs (set up in Config → Voice); speak/listen only work once a provider is ready */
+    voice: {
+      speak: boolean;
+      listen: boolean;
+      /** @deprecated browser speech-synthesis voice (unused since cloud voice) */
+      voiceName?: string;
+      rate: number;
+      stt: VoiceSttSettings;
+      tts: VoiceTtsSettings;
+    };
   };
   /** which model loop runs chats by default */
   engine: EngineId;
@@ -769,6 +826,8 @@ export type ServerEvent =
         | 'skills'
         | 'evolution';
     }
+  /** voice pipeline state (mic level 0..1 while listening) */
+  | { type: 'voice.state'; phase: 'idle' | 'listening' | 'transcribing' | 'speaking'; level?: number }
   | { type: 'pong'; t: number };
 
 export type ClientCommand =
@@ -888,4 +947,14 @@ export type ClientCommand =
  * POST   /api/evolution/reflect              -> { sessionId }   (run a reflection now)
  * POST   /api/evolution/forge {text}         -> { sessionId }   (ask the agent to build a capability)
  * GET    /api/tools/catalog                  -> ToolCatalogEntry[]
+ *
+ * GET    /api/voice/status                   -> VoiceStatus
+ * PUT    /api/voice/key {provider: VoiceKeyProvider, apiKey} -> VoiceStatus   (DELETE /api/voice/key/:provider)
+ * GET    /api/voice/voices                   -> { id: string; name: string; hint?: string }[]  (current TTS provider)
+ * POST   /api/voice/listen {maxMs?}          -> { text }   (core capture; ends on silence, /listen/stop or maxMs)
+ * POST   /api/voice/listen/stop              -> { ok }     (finish now and transcribe)
+ * POST   /api/voice/listen/cancel            -> { ok }     (discard)
+ * POST   /api/voice/transcribe  (raw audio body, Content-Type audio/*) -> { text }   (browser capture)
+ * POST   /api/voice/speak {text, play?}      -> core playback: { ok } when finished; else audio/wav bytes (play:false forces bytes)
+ * POST   /api/voice/stop                     -> { ok }     (stop playback)
  */

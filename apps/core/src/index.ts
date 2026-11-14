@@ -14,6 +14,7 @@ import { startMetrics, stopMetrics } from './services/metrics.ts';
 import { flushAll } from './services/persist.ts';
 import { CORE_VERSION } from './services/meta.ts';
 import { initEvolution, shutdownEvolution } from './extensions/index.ts';
+import { stopVoice } from './services/voice.ts';
 
 const port = Number(process.env.MONARCH_PORT) || CORE_PORT;
 const host = process.env.MONARCH_HOST || CORE_HOST;
@@ -46,6 +47,7 @@ async function shutdown(reason: string, code = 0): Promise<void> {
   try {
     stopScheduler();
     stopMetrics();
+    stopVoice();
     await Promise.race([Promise.all([core.close(), shutdownEvolution()]), new Promise((r) => setTimeout(r, 1500))]);
   } catch (e) {
     console.error('[core] error during shutdown:', e);

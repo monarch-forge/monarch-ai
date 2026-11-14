@@ -1,7 +1,8 @@
 /**
  * COMMS — conversations with Monarch (route #/comms/:id?, "#/comms/new" = blank session). UI-B.
  */
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { speak, stopSpeaking } from '../lib/voice.ts';
 import type { SessionKind } from '@monarch/shared';
 import { Plus, Search, MessageSquare, Zap } from 'lucide-preact';
 import { Panel, Tag, Empty, Spinner, ErrorLine } from '../components/ui.tsx';
@@ -80,6 +81,29 @@ export default function CommsPage(props: { params: string[] }) {
     return q ? all.filter((x) => x.title.toLowerCase().includes(q) || x.model.toLowerCase().includes(q)) : all;
   }, [list.sessions, query]);
 
+  // a turn asked by voice gets its reply spoken (when spoken replies are on)
+  const voiceTurn = useRef(false);
+  useEffect(() => {
+    if (!chat.lastTurn || !voiceTurn.current) return;
+    voiceTurn.current = false;
+    if (chat.lastTurn.error) return;
+    const items = chat.session?.items ?? [];
+    const lastUser = items.map((i) => i.kind).lastIndexOf('user');
+    const reply = items
+      .slice(lastUser + 1)
+      .filter((i) => i.kind === 'assistant')
+      .map((i) => (i as { text: string }).text)
+      .join('\n\n')
+      .trim();
+    if (reply) void speak(reply);
+  }, [chat.lastTurn]);
+  useEffect(() => () => stopSpeaking(), [sessionId]);
+
+  const sendVoice = (text: string) => {
+    voiceTurn.current = true;
+    return send(text);
+  };
+
   const send = async (text: string) => {
     try {
       const id = await chat.sendMessage(text, { kind: 'chat', engine: choice?.engine, model: choice?.model });
@@ -150,7 +174,7 @@ export default function CommsPage(props: { params: string[] }) {
             />
           </label>
         </div>
-        <div class="flex-1 min-h-0 overflow-y-auto py-1">
+        <div class="flex-1 min-h-0 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {list.loading && !list.sessions ? (
             <div class="flex justify-center py-6">
               <Spinner />
@@ -217,6 +241,7 @@ export default function CommsPage(props: { params: string[] }) {
         )}
         <Composer
           onSend={send}
+          onVoiceSend={sendVoice}
           onAbort={chat.abort}
           running={chat.running}
           commands={commands}
