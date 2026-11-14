@@ -7,8 +7,8 @@ import { Panel, Stat, Tag } from '../components/ui.tsx';
 
 interface ModelItem {
   id: string;
-  object?: string;
   owned_by?: string;
+  context_length?: number;
 }
 
 export default function RouterPage(_props: { params: string[] }) {
@@ -54,9 +54,12 @@ export default function RouterPage(_props: { params: string[] }) {
           model: testModel,
           messages: [{ role: 'user', content: testPrompt }],
         }),
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(20_000),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+      }
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
       setTestResult(reply);
@@ -81,7 +84,7 @@ export default function RouterPage(_props: { params: string[] }) {
         <div class="hud-panel max-w-md w-full p-6 space-y-4 text-center">
           <div class="font-mono text-xs tracking-widest text-red uppercase">9Router Not Available</div>
           <div class="font-mono text-sm text-fg">9Router is not available on this device or has not been started.</div>
-          <div class="font-mono text-xs text-fg-3">Expected OpenAI-compatible proxy at <code class="text-fg">http://localhost:20128</code></div>
+          <div class="font-mono text-xs text-fg-3">Expected OpenAI-compatible proxy at <code class="text-fg">http://localhost:20128/v1</code></div>
           <button
             onClick={checkRouter}
             class="px-4 py-2 font-mono text-xs uppercase border border-line bg-subtle hover:border-fg-2 text-fg transition"
@@ -155,7 +158,7 @@ export default function RouterPage(_props: { params: string[] }) {
               <div key={m.id} class="p-3 border border-line bg-subtle flex items-center justify-between font-mono text-xs">
                 <div>
                   <div class="text-fg font-medium truncate max-w-[280px]" title={m.id}>{m.id}</div>
-                  <div class="text-[10px] text-fg-3 mt-0.5">{m.owned_by ?? 'upstream proxy'}</div>
+                  <div class="text-[10px] text-fg-3 mt-0.5">Owner: {m.owned_by ?? 'upstream'} {m.context_length ? `· ${m.context_length} ctx` : ''}</div>
                 </div>
                 <Tag tone="ok">ACTIVE</Tag>
               </div>
