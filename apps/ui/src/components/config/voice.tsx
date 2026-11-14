@@ -249,7 +249,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
   useEffect(() => setRate(props.v.rate), [props.v.rate]);
   const ready = !!props.status?.ready;
   useEffect(() => {
-    if (c.provider === 'none' || !ready) {
+    if (c.provider === 'none') {
       setVoices([]);
       return;
     }
