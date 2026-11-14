@@ -66,8 +66,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.3.5/monarch-ai-bin-0.3.5-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.3.5-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.3.6/monarch-ai-bin-0.3.6-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.3.6-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -92,30 +92,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.3.5_amd64.deb
+sudo apt install ./Monarch_0.3.6_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.3.5-1.x86_64.rpm
+sudo dnf install ./Monarch-0.3.6-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.3.5_amd64.AppImage && ./Monarch_0.3.5_amd64.AppImage
+chmod +x Monarch_0.3.6_amd64.AppImage && ./Monarch_0.3.6_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.3.5_aarch64.dmg` (Apple Silicon) or `Monarch_0.3.5_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.3.6_aarch64.dmg` (Apple Silicon) or `Monarch_0.3.6_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.3.5_x64-setup.exe`, or `Monarch_0.3.5_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.3.6_x64-setup.exe`, or `Monarch_0.3.6_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 
