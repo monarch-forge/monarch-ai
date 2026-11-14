@@ -950,7 +950,7 @@ export type ClientCommand =
  *
  * GET    /api/voice/status                   -> VoiceStatus
  * PUT    /api/voice/key {provider: VoiceKeyProvider, apiKey} -> VoiceStatus   (DELETE /api/voice/key/:provider)
- * GET    /api/voice/voices                   -> { id: string; name: string; hint?: string }[]  (current TTS provider)
+ * GET    /api/voice/voices                   -> { id: string; name: string; hint?: string; disabled?: boolean }[]  (current TTS provider; disabled = not usable on this plan)
  * POST   /api/voice/listen {maxMs?}          -> { text }   (core capture; ends on silence, /listen/stop or maxMs)
  * POST   /api/voice/listen/stop              -> { ok }     (finish now and transcribe)
  * POST   /api/voice/listen/cancel            -> { ok }     (discard)

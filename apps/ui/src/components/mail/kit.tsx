@@ -4,6 +4,7 @@
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { X } from 'lucide-preact';
 import { socket } from '../../lib/api.ts';
 import { conn, navigate } from '../../lib/store.ts';
@@ -91,9 +92,11 @@ export function Modal(props: {
     };
   }, [props.open]);
   if (!props.open) return null;
-  return (
+  // portal to <body>: a modal rendered inside a panel would otherwise be clipped by the panel's
+  // overflow / stacking context (e.g. the automation editor's Delete button)
+  return createPortal(
     <div
-      class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) props.onClose();
       }}
@@ -110,6 +113,7 @@ export function Modal(props: {
         {props.footer && <footer class="flex items-center gap-2 justify-end px-3.5 py-2.5 border-t border-line">{props.footer}</footer>}
       </div>
     </div>
+    ,document.body,
   );
 }
 

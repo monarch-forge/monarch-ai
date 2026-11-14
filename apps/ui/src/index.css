@@ -101,9 +101,14 @@ textarea::placeholder {
   color: var(--text-primary);
 }
 
+/* no scroll indicators anywhere: areas still scroll (wheel, touch, keyboard), the bars are just hidden */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-default) transparent;
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* ───────────── HUD primitives (used by components/ui.tsx) ───────────── */

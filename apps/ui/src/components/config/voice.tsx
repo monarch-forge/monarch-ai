@@ -243,7 +243,7 @@ function SttPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
 function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Partial<Voice>, ok?: string | false) => Promise<void> }) {
   const c = props.v.tts;
   const set = (p: Partial<VoiceTtsSettings>) => void props.onPatch({ tts: { ...c, ...p } });
-  const [voices, setVoices] = useState<{ id: string; name: string; hint?: string }[]>([]);
+  const [voices, setVoices] = useState<{ id: string; name: string; hint?: string; disabled?: boolean }[]>([]);
   const [rate, setRate] = useState(props.v.rate);
   useEffect(() => setRate(props.v.rate), [props.v.rate]);
   const ready = !!props.status?.ready;
@@ -253,7 +253,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
       return;
     }
     api
-      .get<{ id: string; name: string; hint?: string }[]>('/voice/voices')
+      .get<{ id: string; name: string; hint?: string; disabled?: boolean }[]>('/voice/voices')
       .then(setVoices)
       .catch(() => setVoices([]));
   }, [c.provider, ready]);
@@ -285,12 +285,21 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
             )}
             <KeyField provider={c.provider as VoiceKeyProvider} status={props.status} />
             <div class="grid grid-cols-2 gap-3">
-              <Field label="Voice">
+              <Field
+                label="Voice"
+                hint={
+                  voices.find((x) => x.id === c.voice)?.disabled ? (
+                    <span class="text-warning">This voice needs a paid ElevenLabs plan — pick a premade voice.</span>
+                  ) : c.provider === 'elevenlabs' && voices.some((x) => x.disabled) ? (
+                    'Free plan: premade voices only.'
+                  ) : undefined
+                }
+              >
                 {voices.length ? (
                   <select class={SELECT} value={c.voice} onChange={(e) => set({ voice: (e.target as HTMLSelectElement).value })}>
                     <option value="">Default</option>
                     {voices.map((x) => (
-                      <option key={x.id} value={x.id}>
+                      <option key={x.id} value={x.id} disabled={x.disabled && x.id !== c.voice}>
                         {x.name}
                         {x.hint ? ` — ${x.hint}` : ''}
                       </option>

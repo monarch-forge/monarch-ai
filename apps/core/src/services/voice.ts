@@ -37,7 +37,7 @@ const TTS_DEFAULT_MODEL: Record<string, string> = {
 };
 const TTS_DEFAULT_VOICE: Record<string, string> = {
   openai: 'alloy',
-  elevenlabs: '21m00Tcm4TlvDq8ikWAM', // "Rachel"
+  elevenlabs: 'JBFqnCBsd6RMkjVDRZzb', // "George" (premade; only a fallback — see defaultElevenVoice)
   custom: 'alloy',
 };
 const OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse'];
@@ -340,7 +340,7 @@ export async function synthesize(text: string): Promise<Buffer> {
   const { key } = resolveKey(c.provider as VoiceKeyProvider);
   const input = text.trim().slice(0, 4000);
   if (!input) throw new HttpError(400, 'Nothing to say');
-  const voice = c.voice.trim() || TTS_DEFAULT_VOICE[c.provider] || 'alloy';
+  const voice = c.voice.trim() || (c.provider === 'elevenlabs' ? await defaultElevenVoice() : TTS_DEFAULT_VOICE[c.provider] || 'alloy');
   const model = c.model.trim() || TTS_DEFAULT_MODEL[c.provider] || 'tts-1';
   const rate = Math.max(0.5, Math.min(2, v.rate || 1));
   let res: Response;
@@ -364,7 +364,19 @@ export async function synthesize(text: string): Promise<Buffer> {
   } catch (e) {
     throw new HttpError(502, `Text-to-speech unreachable: ${e instanceof Error ? e.message : e}`);
   }
-  if (!res.ok) await apiError(res, 'Text-to-speech failed');
+  if (!res.ok) {
+    if (c.provider === 'elevenlabs' && res.status === 402) {
+      const body: any = await res.json().catch(() => null);
+      const msg = String(body?.detail?.message ?? body?.detail ?? '');
+      throw new HttpError(
+        402,
+        /library voice/i.test(msg)
+          ? 'This ElevenLabs voice is a library voice, which needs a paid ElevenLabs plan. Pick a voice marked "premade" in Config → Voice (or leave Voice on Default).'
+          : `ElevenLabs refused the request (payment required)${msg ? `: ${msg.slice(0, 200)}` : ''}`,
+      );
+    }
+    await apiError(res, 'Text-to-speech failed');
+  }
   const buf = Buffer.from(await res.arrayBuffer());
   if (c.provider === 'elevenlabs') return pcmToWav(buf, 24_000);
   return buf;
@@ -419,19 +431,56 @@ export async function speak(text: string, opts: { play?: boolean } = {}): Promis
 
 /* ─────────────── voices ─────────────── */
 
-export async function listVoices(): Promise<{ id: string; name: string; hint?: string }[]> {
+interface ElevenVoice {
+  voice_id: string;
+  name?: string;
+  category?: string;
+  labels?: Record<string, string>;
+}
+
+let elevenCache: { key: string; at: number; voices: ElevenVoice[]; tier?: string } | null = null;
+
+/** the account's voices + plan tier (cached 10 min per key) */
+async function elevenVoices(): Promise<{ voices: ElevenVoice[]; tier?: string }> {
+  const { key } = resolveKey('elevenlabs');
+  if (!key) return { voices: [] };
+  if (elevenCache && elevenCache.key === key && Date.now() - elevenCache.at < 10 * 60_000) return elevenCache;
+  const get = (path: string) =>
+    fetch(`${ELEVEN_BASE}${path}`, { headers: { 'xi-api-key': key }, signal: AbortSignal.timeout(10_000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+  const [v, sub]: any[] = await Promise.all([get('/voices'), get('/user/subscription')]);
+  if (!v) return { voices: [] };
+  elevenCache = { key, at: Date.now(), voices: Array.isArray(v.voices) ? v.voices : [], tier: typeof sub?.tier === 'string' ? sub.tier : undefined };
+  return elevenCache;
+}
+
+/** default ElevenLabs voice: the account's first premade voice (usable on every plan) */
+async function defaultElevenVoice(): Promise<string> {
+  const { voices } = await elevenVoices();
+  return voices.find((x) => x.category === 'premade')?.voice_id ?? TTS_DEFAULT_VOICE.elevenlabs!;
+}
+
+export async function listVoices(): Promise<{ id: string; name: string; hint?: string; disabled?: boolean }[]> {
   const c = voiceCfg().tts;
   if (c.provider === 'elevenlabs') {
-    const { key } = resolveKey('elevenlabs');
-    if (!key) return [];
-    const res = await fetch(`${ELEVEN_BASE}/voices`, { headers: { 'xi-api-key': key }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
-    if (!res?.ok) return [];
-    const j: any = await res.json().catch(() => null);
-    return (j?.voices ?? []).map((x: any) => ({
-      id: String(x.voice_id),
-      name: String(x.name ?? x.voice_id),
-      hint: [x.labels?.gender, x.labels?.accent, x.labels?.age].filter(Boolean).join(' · ') || undefined,
-    }));
+    const { voices, tier } = await elevenVoices();
+    const free = tier === 'free';
+    const rows = voices.map((x) => {
+      const premade = x.category === 'premade';
+      const desc = [x.labels?.gender, x.labels?.accent, x.labels?.age].filter(Boolean).join(' · ');
+      const kind = premade ? 'premade' : x.category === 'cloned' || x.category === 'generated' ? x.category : 'library';
+      return {
+        id: String(x.voice_id),
+        name: String(x.name ?? x.voice_id),
+        hint: [kind, desc, free && !premade && kind === 'library' ? 'needs paid plan' : ''].filter(Boolean).join(' · ') || undefined,
+        // free plan: library voices are rejected by the API (402)
+        disabled: free && kind === 'library' ? true : undefined,
+        premade,
+      };
+    });
+    rows.sort((a, b) => Number(b.premade) - Number(a.premade) || a.name.localeCompare(b.name));
+    return rows.map(({ premade: _p, ...r }) => r);
   }
   if (c.provider === 'openai' || c.provider === 'custom') return OPENAI_VOICES.map((id) => ({ id, name: id }));
   return [];
