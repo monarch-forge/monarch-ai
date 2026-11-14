@@ -131,7 +131,17 @@ function ttsBase(c: VoiceTtsSettings): string {
 
 function side(provider: string, model: string, needsUrl: string | null): VoiceSideStatus {
   if (provider === 'none') return { provider, ready: false, keySet: false, model: '' };
-  if (provider === 'native') return { provider, ready: true, keySet: true, model: 'system' };
+  if (provider === 'native') {
+    let error: string | undefined;
+    if (process.platform === 'linux') {
+      const hasFestival = which('festival');
+      const hasEspeak = which('espeak') || which('espeak-ng');
+      if (!hasFestival && !hasEspeak) {
+        error = 'Missing speech engine: install festival or espeak-ng (sudo apt install festival)';
+      }
+    }
+    return { provider, ready: !error, keySet: true, model: 'system', error };
+  }
   const { key, source } = resolveKey(provider as VoiceKeyProvider);
   let error: string | undefined;
   if (needsUrl !== null && !needsUrl) error = 'Set the base URL';
