@@ -37,7 +37,7 @@
         "media-src": "'self' data: blob: http://127.0.0.1:7717",
         "font-src": "'self' data:",
         "style-src": "'self' 'unsafe-inline'",
-        "frame-src": "'self' about: blob: data:",
+        "frame-src": "'self' about: blob: http://127.0.0.1:20128",
         "worker-src": "'self' blob:",
         "object-src": "'none'",
         "base-uri": "'self'"
@@ -50,7 +50,7 @@
         "media-src": "'self' data: blob: http://127.0.0.1:7717",
         "font-src": "'self' data: http://localhost:5173",
         "style-src": "'self' 'unsafe-inline' http://localhost:5173",
-        "frame-src": "'self' about: blob: data:",
+        "frame-src": "'self' about: blob: http://127.0.0.1:20128",
         "worker-src": "'self' blob:",
         "object-src": "'none'",
         "base-uri": "'self'"
