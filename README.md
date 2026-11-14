@@ -6,6 +6,8 @@ calendar, tasks and automations, and watch your machine. Risky actions go throug
 
 It runs as a local web app (`http://localhost:5173`) or as a native desktop app built with Tauri v2.
 
+![Monarch Overview Dashboard](docs/pictures/home.png)
+
 ## Features
 
 - **HUD dashboard.** Clock, weather, agenda, unread counts, system telemetry, an activity log and the agent's state, laid out on a dense, low-key grid (no neon).
