@@ -21,6 +21,7 @@ const STT_PROVIDERS: { id: VoiceSttSettings['provider']; label: string; hint: st
 ];
 const TTS_PROVIDERS: { id: VoiceTtsSettings['provider']; label: string; hint: string }[] = [
   { id: 'none', label: 'Off', hint: '' },
+  { id: 'native', label: 'Native (say / speech synthesis)', hint: 'built-in macOS/Windows/Linux speech, British accent default' },
   { id: 'openai', label: 'OpenAI', hint: 'gpt-4o-mini-tts — natural voices' },
   { id: 'elevenlabs', label: 'ElevenLabs', hint: 'most lifelike voices' },
   { id: 'custom', label: 'OpenAI-compatible', hint: 'any …/v1/audio/speech endpoint' },
@@ -283,12 +284,14 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
                 <LazyInput mono value={c.baseUrl} placeholder="https://api.example.com/v1" onSave={(baseUrl) => set({ baseUrl })} />
               </Field>
             )}
-            <KeyField provider={c.provider as VoiceKeyProvider} status={props.status} />
+            {c.provider !== 'native' && <KeyField provider={c.provider as VoiceKeyProvider} status={props.status} />}
             <div class="grid grid-cols-2 gap-3">
               <Field
                 label="Voice"
                 hint={
-                  voices.find((x) => x.id === c.voice)?.disabled ? (
+                  c.provider === 'native' ? (
+                    <span class="text-fg-3">Default uses British voice (Oliver / George / en-GB).</span>
+                  ) : voices.find((x) => x.id === c.voice)?.disabled ? (
                     <span class="text-warning">This voice needs a paid ElevenLabs plan — pick a premade voice.</span>
                   ) : c.provider === 'elevenlabs' && voices.some((x) => x.disabled) ? (
                     'Free plan: premade voices only.'
@@ -297,7 +300,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
               >
                 {voices.length ? (
                   <select class={SELECT} value={c.voice} onChange={(e) => set({ voice: (e.target as HTMLSelectElement).value })}>
-                    <option value="">Default</option>
+                    <option value="">Default (British)</option>
                     {voices.map((x) => (
                       <option key={x.id} value={x.id} disabled={x.disabled && x.id !== c.voice}>
                         {x.name}
@@ -306,12 +309,14 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
                     ))}
                   </select>
                 ) : (
-                  <LazyInput mono value={c.voice} placeholder={c.provider === 'elevenlabs' ? 'voice id' : 'alloy'} onSave={(voice) => set({ voice })} />
+                  <LazyInput mono value={c.voice} placeholder={c.provider === 'native' ? 'Oliver / Microsoft George / en-gb' : c.provider === 'elevenlabs' ? 'voice id' : 'alloy'} onSave={(voice) => set({ voice })} />
                 )}
               </Field>
-              <Field label="Model" hint={props.status?.model ? `default: ${props.status.model}` : undefined}>
-                <LazyInput mono value={c.model} placeholder={props.status?.model || 'provider default'} onSave={(model) => set({ model })} />
-              </Field>
+              {c.provider !== 'native' && (
+                <Field label="Model" hint={props.status?.model ? `default: ${props.status.model}` : undefined}>
+                  <LazyInput mono value={c.model} placeholder={props.status?.model || 'provider default'} onSave={(model) => set({ model })} />
+                </Field>
+              )}
             </div>
             <Field label={`Speech rate · ${rate.toFixed(2)}×`}>
               <input

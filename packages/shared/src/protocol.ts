@@ -51,7 +51,7 @@ export interface CustomModel {
 /* ─────────────── voice (cloud speech) ─────────────── */
 
 export type VoiceSttProvider = 'none' | 'openai' | 'groq' | 'custom';
-export type VoiceTtsProvider = 'none' | 'openai' | 'elevenlabs' | 'custom';
+export type VoiceTtsProvider = 'none' | 'openai' | 'elevenlabs' | 'native' | 'custom';
 /** where a voice provider's API key comes from */
 export type VoiceKeyProvider = 'openai' | 'groq' | 'elevenlabs' | 'custom';
 

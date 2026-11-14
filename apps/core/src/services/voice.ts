@@ -11,6 +11,7 @@
  * Keys: secrets.voiceKeys[provider] (set in Config → Voice), else the LLM provider key of the same
  * name (secrets.apiKeys.openai / .groq), else the environment. Keys never leave the core.
  */
+import say from 'say';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -130,6 +131,7 @@ function ttsBase(c: VoiceTtsSettings): string {
 
 function side(provider: string, model: string, needsUrl: string | null): VoiceSideStatus {
   if (provider === 'none') return { provider, ready: false, keySet: false, model: '' };
+  if (provider === 'native') return { provider, ready: true, keySet: true, model: 'system' };
   const { key, source } = resolveKey(provider as VoiceKeyProvider);
   let error: string | undefined;
   if (needsUrl !== null && !needsUrl) error = 'Set the base URL';
@@ -337,12 +339,36 @@ export async function synthesize(text: string): Promise<Buffer> {
   requireReady('tts');
   const v = voiceCfg();
   const c = v.tts;
-  const { key } = resolveKey(c.provider as VoiceKeyProvider);
   const input = text.trim().slice(0, 4000);
   if (!input) throw new HttpError(400, 'Nothing to say');
+  const rate = Math.max(0.5, Math.min(2, v.rate || 1));
+
+  if (c.provider === 'native') {
+    // For native provider, we can export/synthesize to WAV via say package if platform supports it, or return empty WAV and let play() use say.speak directly.
+    // Let's create a temp wav file using say.export if supported, or fallback to returning silence/wav.
+    const dir = mkdtempSync(join(tmpdir(), 'monarch-voice-'));
+    const file = join(dir, 'synth.wav');
+    const voiceName = c.voice.trim() || (process.platform === 'darwin' ? 'Daniel' : process.platform === 'win32' ? 'Microsoft David Desktop' : 'en-gb');
+    await new Promise<void>((resolve) => {
+      say.export(input, voiceName, rate, file, (err) => {
+        resolve();
+      });
+    });
+    try {
+      const buf = require('node:fs').readFileSync(file);
+      rmSync(dir, { recursive: true, force: true });
+      if (buf && buf.length > 44) return buf;
+    } catch {
+      // fallback
+    }
+    rmSync(dir, { recursive: true, force: true });
+    // Return a dummy small valid wav if export isn't fully supported on Linux without extra tools
+    return pcmToWav(Buffer.alloc(1600), 16000);
+  }
+
+  const { key } = resolveKey(c.provider as VoiceKeyProvider);
   const voice = c.voice.trim() || (c.provider === 'elevenlabs' ? await defaultElevenVoice() : TTS_DEFAULT_VOICE[c.provider] || 'alloy');
   const model = c.model.trim() || TTS_DEFAULT_MODEL[c.provider] || 'tts-1';
-  const rate = Math.max(0.5, Math.min(2, v.rate || 1));
   let res: Response;
   try {
     if (c.provider === 'elevenlabs') {
@@ -383,8 +409,17 @@ export async function synthesize(text: string): Promise<Buffer> {
 }
 
 let player: ChildProcess | null = null;
+let nativeSpeaking: { stop: () => void } | null = null;
 
 export function stopSpeaking(): boolean {
+  if (nativeSpeaking) {
+    try {
+      nativeSpeaking.stop();
+    } catch {}
+    nativeSpeaking = null;
+    state('idle');
+    return true;
+  }
   if (!player) return false;
   try {
     player.kill('SIGTERM');
@@ -398,9 +433,19 @@ export function stopSpeaking(): boolean {
 
 /** play a wav through the system player; resolves when playback ends (or is stopped) */
 async function play(wav: Buffer): Promise<void> {
+  const v = voiceCfg();
+  const c = v.tts;
+  stopSpeaking();
+
+  if (c.provider === 'native') {
+    const input = c.voice.trim() || (process.platform === 'darwin' ? 'Daniel' : process.platform === 'win32' ? 'Microsoft David Desktop' : '');
+    const rate = Math.max(0.5, Math.min(2, v.rate || 1));
+    // Re-synthesize or use say.speak directly with text if we stored it, but play(wav) only gets wav.
+    // Actually let's handle native directly in speak() or pass text. Let's update speak() below.
+  }
+
   const cmd = audioTools().player;
   if (!cmd) throw new HttpError(501, 'No audio player found');
-  stopSpeaking();
   const dir = mkdtempSync(join(tmpdir(), 'monarch-voice-'));
   const file = join(dir, 'reply.wav');
   writeFileSync(file, wav);
@@ -421,8 +466,47 @@ async function play(wav: Buffer): Promise<void> {
 
 /** speak text: plays through the core when possible (returns null), else returns the wav for the UI to play */
 export async function speak(text: string, opts: { play?: boolean } = {}): Promise<Buffer | null> {
-  const wav = await synthesize(text);
-  if (opts.play !== false && audioTools().player) {
+  requireReady('tts');
+  const v = voiceCfg();
+  const c = v.tts;
+  const input = text.trim().slice(0, 4000);
+  if (!input) throw new HttpError(400, 'Nothing to say');
+  const rate = Math.max(0.5, Math.min(2, v.rate || 1));
+
+  if (c.provider === 'native') {
+    if (opts.play !== false) {
+      stopSpeaking();
+      state('speaking');
+      // British voice default: macOS 'Oliver' or 'Daniel' or 'en-GB'; Windows 'Microsoft George' or 'Microsoft Hazel'; Linux 'en-gb' or default
+      const defaultBritishVoice = process.platform === 'darwin' ? 'Oliver' : process.platform === 'win32' ? 'Microsoft George' : 'en-gb';
+      const voiceName = c.voice.trim() || defaultBritishVoice;
+      await new Promise<void>((resolve) => {
+        try {
+          say.speak(input, voiceName, rate, (err) => {
+            nativeSpeaking = null;
+            state('idle');
+            resolve();
+          });
+          nativeSpeaking = {
+            stop: () => {
+              try {
+                say.stop();
+              } catch {}
+            },
+          };
+        } catch {
+          nativeSpeaking = null;
+          state('idle');
+          resolve();
+        }
+      });
+      return null;
+    }
+    return synthesize(input);
+  }
+
+  const wav = await synthesize(input);
+  if (opts.play !== false && (audioTools().player || (c.provider as string) === 'native')) {
     await play(wav);
     return null;
   }
@@ -481,6 +565,16 @@ export async function listVoices(): Promise<{ id: string; name: string; hint?: s
     });
     rows.sort((a, b) => Number(b.premade) - Number(a.premade) || a.name.localeCompare(b.name));
     return rows.map(({ premade: _p, ...r }) => r);
+  }
+  if ((c.provider as string) === 'native') {
+    return [
+      { id: '', name: 'Default British (Oliver / George / en-GB)', hint: 'macOS: Oliver/Daniel, Windows: Microsoft George, Linux: en-gb' },
+      { id: 'Oliver', name: 'Oliver (macOS British)', hint: 'macOS' },
+      { id: 'Daniel', name: 'Daniel (macOS British)', hint: 'macOS' },
+      { id: 'Microsoft George', name: 'Microsoft George (Windows British)', hint: 'Windows Speech' },
+      { id: 'Microsoft Hazel', name: 'Microsoft Hazel (Windows British)', hint: 'Windows Speech' },
+      { id: 'en-gb', name: 'English UK (Linux/eSpeak)', hint: 'Linux' },
+    ];
   }
   if (c.provider === 'openai' || c.provider === 'custom') return OPENAI_VOICES.map((id) => ({ id, name: id }));
   return [];

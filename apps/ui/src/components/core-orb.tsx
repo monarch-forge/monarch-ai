@@ -241,8 +241,8 @@ export function CoreOrb(props: CoreOrbProps) {
             })}
 
           {/* rotating ring — turns only while working */}
-          <circle cx={cx} cy={cy} r={rSpin} fill="none" stroke={C.line} stroke-width="1" />
-          <g style={spinStyle}>
+          <circle cx={cx} cy={cy} r={rSpin} fill="none" stroke={C.line} stroke-width="1" class="spin-transition" />
+          <g style={spinStyle} class="spin-transition">
             <path d={arc(cx, cy, rSpin, -120, -62)} fill="none" stroke={state === 'offline' ? C.fg3 : C.red} stroke-opacity={working ? 1 : 0.6} stroke-width="2.5" />
             <path d={arc(cx, cy, rSpin, 60, 74)} fill="none" stroke={C.fg3} stroke-width="2.5" />
             <path d={arc(cx, cy, rSpin, 150, 153)} fill="none" stroke={C.fg3} stroke-width="2.5" />
@@ -254,9 +254,11 @@ export function CoreOrb(props: CoreOrbProps) {
             cy={cy}
             r={rDash}
             fill="none"
-            stroke={C.line}
+            stroke={state === 'idle' ? C.red : C.line}
+            stroke-opacity={state === 'idle' ? 0.35 : 1}
             stroke-width={Math.max(2, R * 0.012)}
             stroke-dasharray={`${(rDash * 0.06).toFixed(2)} ${(rDash * 0.045).toFixed(2)}`}
+            class={`spin-transition ${state === 'idle' ? 'orb-idle-ring' : ''}`}
           />
 
           {/* crosshair ticks between dashed ring and core */}
