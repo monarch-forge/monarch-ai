@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Network,
   Activity,
+  Route as RouteIcon,
   Dna,
   SlidersHorizontal,
   Bell,
@@ -30,6 +31,7 @@ import SlackPage from './pages/slack.tsx';
 import AgendaPage from './pages/agenda.tsx';
 import MemoryPage from './pages/memory.tsx';
 import SystemsPage from './pages/systems.tsx';
+import RouterPage from './pages/router.tsx';
 import EvolvePage from './pages/evolve.tsx';
 import ConfigPage from './pages/config.tsx';
 import { ApprovalDock, focusApprovals } from './components/approvals.tsx';
@@ -47,8 +49,9 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },
-  { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },
   { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
+  { id: 'router', label: '9Router', icon: RouteIcon, page: RouterPage },
+  { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },
   { id: 'config', label: 'Config', icon: SlidersHorizontal, page: ConfigPage },
 ];
 
