@@ -3,56 +3,87 @@
  * OWNED BY UI-A.
  */
 import { useEffect, useState } from 'preact/hooks';
-import { Panel, Stat, Tag, fmt } from '../components/ui.tsx';
+import { Panel, Stat, Tag } from '../components/ui.tsx';
 
-interface RouterStatus {
-  available: boolean;
-  version?: string;
-  models?: string[];
-  routes?: { path: string; target: string }[];
+interface ModelItem {
+  id: string;
+  object?: string;
+  owned_by?: string;
 }
 
 export default function RouterPage(_props: { params: string[] }) {
-  const [status, setStatus] = useState<RouterStatus | null>(null);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [models, setModels] = useState<ModelItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [testModel, setTestModel] = useState('');
+  const [testPrompt, setTestPrompt] = useState('Hello from Monarch');
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const checkRouter = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:20128/v1/models', { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.data ?? []);
+      setModels(list);
+      setAvailable(true);
+      if (list.length > 0 && !testModel) setTestModel(list[0].id);
+    } catch {
+      setAvailable(false);
+      setModels([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-    fetch('http://localhost:20128/health', { signal: AbortSignal.timeout(2000) })
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Not ok');
-        const data = await res.json().catch(() => ({}));
-        if (active) {
-          setStatus({ available: true, version: data.version ?? '1.0.0', models: data.models ?? ['claude-3-5-sonnet', 'gpt-4o', 'llama-3-70b'] });
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setStatus({ available: false });
-          setLoading(false);
-        }
-      });
-    return () => { active = false; };
+    checkRouter();
   }, []);
+
+  const runTest = async () => {
+    if (!testModel) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('http://localhost:20128/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: testModel,
+          messages: [{ role: 'user', content: testPrompt }],
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
+      setTestResult(reply);
+    } catch (e: any) {
+      setTestResult(`Error: ${e?.message ?? e}`);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   if (loading) {
     return (
       <div class="h-full flex items-center justify-center font-mono text-xs text-fg-3">
-        CHECKING 9ROUTER STATUS (LOCALHOST:20128)…
+        CONNECTING TO 9ROUTER (LOCALHOST:20128)…
       </div>
     );
   }
 
-  if (!status?.available) {
+  if (!available) {
     return (
       <div class="h-full flex items-center justify-center p-6">
         <div class="hud-panel max-w-md w-full p-6 space-y-4 text-center">
-          <div class="font-mono text-xs tracking-widest text-red uppercase">9Router Offline</div>
+          <div class="font-mono text-xs tracking-widest text-red uppercase">9Router Not Available</div>
           <div class="font-mono text-sm text-fg">9Router is not available on this device or has not been started.</div>
-          <div class="font-mono text-xs text-fg-3">Expected endpoint: <code class="text-fg">http://localhost:20128</code></div>
+          <div class="font-mono text-xs text-fg-3">Expected OpenAI-compatible proxy at <code class="text-fg">http://localhost:20128</code></div>
           <button
-            onClick={() => window.location.reload()}
+            onClick={checkRouter}
             class="px-4 py-2 font-mono text-xs uppercase border border-line bg-subtle hover:border-fg-2 text-fg transition"
           >
             Retry Connection
@@ -69,26 +100,64 @@ export default function RouterPage(_props: { params: string[] }) {
           <div class="p-4 space-y-4">
             <div class="flex items-center justify-between">
               <div>
-                <div class="font-mono text-sm text-fg">9Router Daemon Active</div>
-                <div class="font-mono text-[11px] text-fg-3 mt-0.5">Connected to localhost:20128 (v{status.version})</div>
+                <div class="font-mono text-sm text-fg">Proxy Gateway Active</div>
+                <div class="font-mono text-[11px] text-fg-3 mt-0.5">Connected to http://localhost:20128/v1</div>
               </div>
-              <Tag tone="ok">CONNECTED</Tag>
+              <Tag tone="ok">ONLINE</Tag>
             </div>
             <div class="grid grid-cols-3 gap-3 pt-2 border-t border-line">
-              <Stat label="Status" value="Healthy" />
-              <Stat label="Port" value="20128" />
-              <Stat label="Latency" value="12 ms" />
+              <Stat label="Loaded Models" value={String(models.length)} />
+              <Stat label="Protocol" value="OpenAI /v1" />
+              <Stat label="Status" value="Ready" />
             </div>
           </div>
         </Panel>
 
-        <Panel code="RTR.02" title="Available Models & Routes" class="lg:col-span-6 xl:col-span-6">
-          <div class="p-4 space-y-2 font-mono text-xs">
-            <div class="text-fg-3 mb-2">MANAGED UPSTREAM MODELS:</div>
-            {status.models?.map((m) => (
-              <div key={m} class="flex items-center justify-between p-2 border border-line bg-subtle">
-                <span class="text-fg">{m}</span>
-                <Tag tone="ok">READY</Tag>
+        <Panel code="RTR.02" title="Model Gateway Test" class="lg:col-span-6 xl:col-span-6">
+          <div class="p-4 space-y-3">
+            <div class="font-mono text-xs text-fg-3">TEST PROXY FORWARDING (/v1/chat/completions):</div>
+            <div class="flex gap-2">
+              <select
+                class="bg-surface border border-line px-2 py-1.5 font-mono text-xs text-fg flex-1"
+                value={testModel}
+                onChange={(e: any) => setTestModel(e.target.value)}
+              >
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.id}</option>
+                ))}
+              </select>
+              <button
+                disabled={testing || !testModel}
+                onClick={runTest}
+                class="px-4 py-1.5 font-mono text-xs uppercase border border-line bg-subtle hover:border-fg-2 text-fg transition disabled:opacity-50"
+              >
+                {testing ? 'Testing…' : 'Send Test'}
+              </button>
+            </div>
+            <input
+              type="text"
+              class="w-full bg-surface border border-line px-2.5 py-1.5 font-mono text-xs text-fg"
+              value={testPrompt}
+              onInput={(e: any) => setTestPrompt(e.target.value)}
+              placeholder="Prompt..."
+            />
+            {testResult && (
+              <div class="p-2.5 border border-line bg-surface font-mono text-[11px] text-fg-2 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                {testResult}
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        <Panel code="RTR.03" title="Available Models" class="lg:col-span-12 xl:col-span-12">
+          <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            {models.map((m) => (
+              <div key={m.id} class="p-3 border border-line bg-subtle flex items-center justify-between font-mono text-xs">
+                <div>
+                  <div class="text-fg font-medium truncate max-w-[280px]" title={m.id}>{m.id}</div>
+                  <div class="text-[10px] text-fg-3 mt-0.5">{m.owned_by ?? 'upstream proxy'}</div>
+                </div>
+                <Tag tone="ok">ACTIVE</Tag>
               </div>
             ))}
           </div>
