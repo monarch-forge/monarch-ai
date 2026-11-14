@@ -344,25 +344,6 @@ export async function synthesize(text: string): Promise<Buffer> {
   const rate = Math.max(0.5, Math.min(2, v.rate || 1));
 
   if (c.provider === 'native') {
-    // For native provider, we can export/synthesize to WAV via say package if platform supports it, or return empty WAV and let play() use say.speak directly.
-    // Let's create a temp wav file using say.export if supported, or fallback to returning silence/wav.
-    const dir = mkdtempSync(join(tmpdir(), 'monarch-voice-'));
-    const file = join(dir, 'synth.wav');
-    const voiceName = c.voice.trim() || (process.platform === 'darwin' ? 'Daniel' : process.platform === 'win32' ? 'Microsoft David Desktop' : 'en-gb');
-    await new Promise<void>((resolve) => {
-      say.export(input, voiceName, rate, file, (err) => {
-        resolve();
-      });
-    });
-    try {
-      const buf = require('node:fs').readFileSync(file);
-      rmSync(dir, { recursive: true, force: true });
-      if (buf && buf.length > 44) return buf;
-    } catch {
-      // fallback
-    }
-    rmSync(dir, { recursive: true, force: true });
-    // Return a dummy small valid wav if export isn't fully supported on Linux without extra tools
     return pcmToWav(Buffer.alloc(1600), 16000);
   }
 
