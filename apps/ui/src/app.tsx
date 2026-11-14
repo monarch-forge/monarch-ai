@@ -17,8 +17,11 @@ import {
   SlidersHorizontal,
   Bell,
 } from 'lucide-preact';
-import { route, conn, health, phase, metrics, settings, toasts, unreadNotifications, navigate } from './lib/store.ts';
+import { route, conn, health, phase, metrics, settings, toasts, toast, unreadNotifications } from './lib/store.ts';
 import { useNow, fmt, Dot } from './components/ui.tsx';
+import { ModelPicker, defaultChoice, type ModelChoice } from './components/chat/model-picker.tsx';
+import { api } from './lib/api.ts';
+import type { Settings } from '@monarch/shared';
 import OverviewPage from './pages/overview.tsx';
 import CommsPage from './pages/comms.tsx';
 import WorkshopPage from './pages/workshop.tsx';
@@ -72,9 +75,8 @@ function TopBar(props: { active: string }) {
   const now = useNow();
   const h = health.value;
   const s = settings.value;
-  const engineLabel = s ? (s.engine === 'claude-sdk' ? `CLAUDE · ${s.claudeSdk.model}` : `PI · ${s.pi.provider}/${s.pi.model}`) : h ? h.model : '—';
   return (
-    <header class="h-14 shrink-0 flex items-stretch border-b border-line bg-[#121213]/90 backdrop-blur-sm" data-tauri-drag-region>
+    <header class="relative z-40 h-14 shrink-0 flex items-stretch border-b border-line bg-[#121213]/90 backdrop-blur-sm" data-tauri-drag-region>
       <div class="flex flex-col justify-center px-5 min-w-[200px]" data-tauri-drag-region>
         <div class="font-mono text-[13px] tracking-[0.28em] text-fg flex items-center gap-2">
           <span class="inline-block w-2 h-2 bg-red" />
@@ -96,14 +98,7 @@ function TopBar(props: { active: string }) {
         })}
       </nav>
       <div class="ml-auto flex items-center gap-4 pr-5 pl-4" data-tauri-drag-region>
-        <button
-          class="hidden lg:flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase text-fg-2 border border-line px-2 py-1 hover:border-fg-3"
-          onClick={() => navigate('config')}
-          title="Model engine"
-        >
-          <Dot tone={conn.value === 'open' ? (phase.value === 'idle' ? 'ok' : 'red') : 'warn'} pulse={phase.value !== 'idle'} />
-          <span class="max-w-[220px] truncate">{engineLabel}</span>
-        </button>
+        <EngineSwitch />
         <button class="relative text-fg-2 hover:text-fg" onClick={() => (notificationsOpen.value = !notificationsOpen.value)} title="Notifications">
           <Bell size={16} strokeWidth={1.5} />
           {unreadNotifications.value > 0 && <span class="absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-0.5 bg-red text-[9px] font-mono leading-3.5 text-center text-fg">{unreadNotifications.value}</span>}
@@ -116,6 +111,52 @@ function TopBar(props: { active: string }) {
         </div>
       </div>
     </header>
+  );
+}
+
+/** top-right engine/model badge: a dropdown that sets the default engine + model for new sessions */
+function EngineSwitch() {
+  const s = settings.value;
+  const h = health.value;
+  const dot = <Dot tone={conn.value === 'open' ? (phase.value === 'idle' ? 'ok' : 'red') : 'warn'} pulse={phase.value !== 'idle'} />;
+  if (!s) {
+    return (
+      <span class="hidden lg:flex items-center gap-2 font-mono text-[10px] tracking-widest uppercase text-fg-2 border border-line px-2 py-1">
+        {dot}
+        <span class="max-w-[220px] truncate">{h ? h.model : '—'}</span>
+      </span>
+    );
+  }
+  const onChange = async (c: ModelChoice | null) => {
+    if (!c) return;
+    let patch: Record<string, unknown>;
+    if (c.engine === 'claude-sdk') patch = { engine: 'claude-sdk', claudeSdk: { model: c.model } };
+    else {
+      const i = c.model.indexOf('/');
+      patch = { engine: 'pi', pi: { provider: c.model.slice(0, i), model: c.model.slice(i + 1) } };
+    }
+    try {
+      settings.value = await api.put<Settings>('/settings', patch);
+      toast(`Default model: ${c.engine === 'claude-sdk' ? `Claude · ${c.model}` : `pi · ${c.model}`}`, 'success');
+    } catch (e: any) {
+      toast(`Could not switch model: ${e?.message ?? e}`, 'error');
+    }
+  };
+  return (
+    <ModelPicker
+      class="hidden lg:block"
+      value={defaultChoice()}
+      onChange={(c) => void onChange(c)}
+      noDefault
+      placement="down"
+      title="Default engine and model — click to switch"
+      leading={dot}
+      buttonClass="!h-auto py-1 !text-[10px] !tracking-widest uppercase !max-w-[230px]"
+      renderLabel={(info, c) => {
+        if ((c?.engine ?? s.engine) === 'claude-sdk') return `CLAUDE · ${s.claudeSdk.model}`;
+        return `PI · ${info?.name ?? s.pi.model}`;
+      }}
+    />
   );
 }
 

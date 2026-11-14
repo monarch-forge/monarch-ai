@@ -18,6 +18,9 @@ import {
   startLogin,
   submitOAuthCode,
   discoverCustomModels,
+  createCustomProvider,
+  updateCustomProvider,
+  deleteCustomProvider,
 } from '../agent/providers.ts';
 
 async function body(c: { req: { json(): Promise<any> } }): Promise<Record<string, any>> {
@@ -34,7 +37,13 @@ const KINDS: SessionKind[] = ['chat', 'coding', 'automation'];
 export function register(app: Hono): void {
   /* providers */
   app.get('/api/providers', async (c) => c.json(await listProviders()));
-  app.get('/api/providers/custom/discover', async (c) => c.json(await discoverCustomModels(c.req.query('baseUrl'))));
+  app.get('/api/providers/:id/discover', async (c) => c.json(await discoverCustomModels(c.req.param('id'), c.req.query('baseUrl'))));
+  app.post('/api/custom-providers', async (c) => c.json(createCustomProvider((await c.req.json().catch(() => ({}))) ?? {})));
+  app.patch('/api/custom-providers/:id', async (c) => c.json(updateCustomProvider(c.req.param('id'), (await c.req.json().catch(() => ({}))) ?? {})));
+  app.delete('/api/custom-providers/:id', (c) => {
+    deleteCustomProvider(c.req.param('id'));
+    return c.json({ ok: true });
+  });
   app.put('/api/providers/:id/key', async (c) => {
     const b = await body(c);
     return c.json(await setProviderKey(c.req.param('id'), String(b.apiKey ?? '')));

@@ -64,8 +64,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.3.1/monarch-ai-bin-0.3.1-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.3.1-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.3.2/monarch-ai-bin-0.3.2-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.3.2-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -90,30 +90,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.3.1_amd64.deb
+sudo apt install ./Monarch_0.3.2_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.3.1-1.x86_64.rpm
+sudo dnf install ./Monarch-0.3.2-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.3.1_amd64.AppImage && ./Monarch_0.3.1_amd64.AppImage
+chmod +x Monarch_0.3.2_amd64.AppImage && ./Monarch_0.3.2_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.3.1_aarch64.dmg` (Apple Silicon) or `Monarch_0.3.1_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.3.2_aarch64.dmg` (Apple Silicon) or `Monarch_0.3.2_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.3.1_x64-setup.exe`, or `Monarch_0.3.1_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.3.2_x64-setup.exe`, or `Monarch_0.3.2_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 
@@ -236,7 +236,8 @@ The `pi` engine (`@earendil-works/pi-ai` and `pi-agent-core`) works with many pr
 
 - **API keys:** Anthropic, OpenAI, Google Gemini, OpenRouter, Groq, xAI, Mistral and others. Keys are stored in `~/.monarch-ai/secrets.json`, or read from the usual environment variables (`OPENAI_API_KEY`, …).
 - **OAuth logins:** providers that pi supports through device or browser login, such as GitHub Copilot. Press *Login* and follow the flow.
-- **Local / OpenAI-compatible:** add a custom model with a base URL, for example Ollama at `http://localhost:11434/v1`, LM Studio at `http://localhost:1234/v1`, or vLLM. The API key is optional.
+- **Custom OpenAI-compatible providers:** in **Config → Providers → + Custom provider**, add as many as you like (OpenRouter, Together, Groq, a vLLM box, Ollama at `http://localhost:11434/v1`, LM Studio at `http://localhost:1234/v1`…). Each one has its own name, base URL and API key (optional for local servers). **Discover models** reads the endpoint's `/models` list so you can add models in one click.
+- **Switching models:** the engine badge at the top right is a dropdown. Pick any model from any configured provider to make it the default for new sessions. Each chat also has its own model picker.
 
 ## Integrations
 

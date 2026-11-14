@@ -39,13 +39,23 @@ export interface CustomModel {
   /** id used in requests, e.g. "llama3.1:8b" */
   id: string;
   name: string;
-  /** OpenAI-compatible base URL, e.g. http://localhost:11434/v1 ('' = use Settings.pi.customBaseUrl) */
+  /** per-model base URL override ('' = the provider's base URL) */
   baseUrl: string;
   /** optional API key (stored server side) */
   apiKey?: string;
   contextWindow?: number;
   maxTokens?: number;
   reasoning?: boolean;
+}
+
+/** an OpenAI-compatible endpoint the user added (several allowed); its API key lives in secrets under its id */
+export interface CustomProvider {
+  /** provider id used in model specs ("<id>/<model>"): "custom" or "custom-<slug>" */
+  id: string;
+  name: string;
+  /** e.g. https://api.together.xyz/v1 or http://localhost:11434/v1 */
+  baseUrl: string;
+  models: CustomModel[];
 }
 
 export interface Settings {
@@ -76,9 +86,12 @@ export interface Settings {
     provider: string; // pi-ai provider id, e.g. "anthropic", "openai", "google", "openrouter", "custom"
     model: string; // pi-ai model id
     thinkingLevel: ThinkingLevel;
-    customModels: CustomModel[];
-    /** default base URL of the custom OpenAI-compatible provider (models may override it) */
-    customBaseUrl: string;
+    /** OpenAI-compatible providers added by the user */
+    customProviders: CustomProvider[];
+    /** @deprecated pre-0.3.2 single custom provider; migrated into customProviders on startup */
+    customModels?: CustomModel[];
+    /** @deprecated see customModels */
+    customBaseUrl?: string;
   };
   permissions: {
     mode: PermissionMode; // ask = approve sensitive+dangerous; auto-safe = approve dangerous only; auto-all = never ask
@@ -125,7 +138,9 @@ export interface ProviderStatus {
   /** last measured round-trip in ms (from /api/providers/:id/ping), if any */
   latencyMs?: number;
   error?: string;
-  /** custom provider only: its default base URL */
+  /** user-added OpenAI-compatible provider (editable / removable) */
+  custom?: boolean;
+  /** custom providers: base URL */
   baseUrl?: string;
 }
 
@@ -792,7 +807,10 @@ export type ClientCommand =
  * POST   /api/oauth/:flowId/code {code}      -> OAuthFlowState  (paste-code step)
  * POST   /api/oauth/:flowId/cancel           -> { ok }
  * DELETE /api/providers/:id/login            -> ProviderStatus  (logout)
- * GET    /api/providers/custom/discover?baseUrl= -> { id: string; ownedBy?: string }[]  (GET <baseUrl>/models with the stored custom key)
+ * POST   /api/custom-providers {name, baseUrl} -> ProviderStatus      (adds an OpenAI-compatible provider)
+ * PATCH  /api/custom-providers/:id {name?, baseUrl?, models?} -> ProviderStatus
+ * DELETE /api/custom-providers/:id          -> { ok }   (also forgets its API key)
+ * GET    /api/providers/:id/discover?baseUrl= -> { id: string; ownedBy?: string }[]  (custom providers: GET <baseUrl>/models with its key)
  * GET    /api/models?engine=pi&provider=x    -> ModelInfo[]
  * GET    /api/models/available           -> ModelInfo[]  (all models of every configured provider)
  *

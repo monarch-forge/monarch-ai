@@ -2,15 +2,15 @@
  * Provider auth & model catalog for the REST surface:
  *  - 'claude-sdk'  Claude Code (subscription login owned by the CLI, or a stored Anthropic API key)
  *  - every pi-ai provider (API key / OAuth / env)
- *  - 'custom'      OpenAI-compatible endpoints from settings.pi.customModels
+ *  - custom        user-added OpenAI-compatible providers (settings.pi.customProviders), managed here too
  * Secrets never leave the core; only status metadata is returned.
  */
-import type { ModelInfo, OAuthFlowState, ProviderAuthKind, ProviderStatus } from '@monarch/shared';
+import type { CustomModel, CustomProvider, ModelInfo, OAuthFlowState, ProviderAuthKind, ProviderStatus } from '@monarch/shared';
 import type { Api, AuthInteraction, AuthPrompt, Model } from '@earendil-works/pi-ai';
 import { activity, bus, changed, HttpError, newId, secrets } from '../kernel.ts';
-import { getSettings } from '../settings.ts';
+import { getSettings, updateSettings } from '../settings.ts';
 import { claudeModelCount, claudeModels, claudeStatus, invalidateClaudeStatus } from './claude.ts';
-import { CUSTOM_PROVIDER, customModelToPi, piModels, usableCustomModels } from './pi-models.ts';
+import { customModelToPi, customProviders, getCustomProvider, isCustomProvider, piModels, usableCustomModels } from './pi-models.ts';
 import { errorText } from './toolset.ts';
 
 export const CLAUDE_SDK = 'claude-sdk';
@@ -53,25 +53,27 @@ async function claudeProviderStatus(fresh = false): Promise<ProviderStatus> {
   return { ...base, source: 'none', error: 'API-key mode selected but no Anthropic API key is stored.' };
 }
 
-function customStatus(): ProviderStatus {
-  const list = usableCustomModels();
-  const baseUrl = getSettings().pi.customBaseUrl?.trim() || undefined;
+function customStatus(prov: CustomProvider): ProviderStatus {
+  const usable = usableCustomModels(prov);
+  const total = (prov.models ?? []).length;
   return {
-    id: CUSTOM_PROVIDER,
-    name: 'Custom (OpenAI-compatible)',
+    id: prov.id,
+    name: prov.name || prov.id,
     engine: 'pi',
     authKinds: ['local', 'api-key'],
-    configured: list.length > 0,
-    source: secrets.get().apiKeys[CUSTOM_PROVIDER] ? 'stored-key' : undefined,
-    modelCount: list.length,
-    latencyMs: latency.get(CUSTOM_PROVIDER),
-    baseUrl,
-    error: !list.length && (getSettings().pi.customModels ?? []).length ? 'Models need a base URL — set one here or per model.' : undefined,
+    configured: usable.length > 0,
+    source: secrets.get().apiKeys[prov.id] ? 'stored-key' : undefined,
+    modelCount: usable.length,
+    latencyMs: latency.get(prov.id),
+    custom: true,
+    baseUrl: prov.baseUrl || undefined,
+    error: !prov.baseUrl?.trim() && total > usable.length ? 'Set a base URL for this provider.' : undefined,
   };
 }
 
 async function piProviderStatus(id: string): Promise<ProviderStatus> {
-  if (id === CUSTOM_PROVIDER) return customStatus();
+  const custom = getCustomProvider(id);
+  if (custom) return customStatus(custom);
   const models = piModels();
   const p = models.getProvider(id);
   if (!p) throw new HttpError(404, `Unknown provider: ${id}`);
@@ -120,7 +122,7 @@ export async function listProviders(): Promise<ProviderStatus[]> {
   const ids = models
     .getProviders()
     .map((p) => p.id)
-    .filter((id) => id !== CUSTOM_PROVIDER && id !== 'faux');
+    .filter((id) => id !== 'faux' && !isCustomProvider(id));
   const [claude, ...pis] = await Promise.all([
     claudeProviderStatus().catch(
       (e): ProviderStatus => ({
@@ -136,7 +138,7 @@ export async function listProviders(): Promise<ProviderStatus[]> {
     ...ids.map((id) => piProviderStatus(id)),
   ]);
   pis.sort((a, b) => Number(b.configured) - Number(a.configured) || a.name.localeCompare(b.name));
-  return [claude, ...pis, customStatus()];
+  return [claude, ...pis, ...customProviders().map(customStatus)];
 }
 
 /* ─────────────── keys ─────────────── */
@@ -145,7 +147,7 @@ export async function listProviders(): Promise<ProviderStatus[]> {
 const keySlot = (id: string) => (id === CLAUDE_SDK ? 'anthropic' : id);
 
 function assertKnown(id: string): void {
-  if (id === CLAUDE_SDK || id === CUSTOM_PROVIDER) return;
+  if (id === CLAUDE_SDK || isCustomProvider(id)) return;
   if (!piModels().getProvider(id)) throw new HttpError(404, `Unknown provider: ${id}`);
 }
 
@@ -177,9 +179,11 @@ export async function deleteProviderKey(id: string): Promise<ProviderStatus> {
 
 /* ─────────────── custom endpoint discovery ─────────────── */
 
-/** list the models an OpenAI-compatible endpoint serves (GET <baseUrl>/models), using the stored custom key */
-export async function discoverCustomModels(baseUrlArg?: string): Promise<{ id: string; ownedBy?: string }[]> {
-  const base = (baseUrlArg?.trim() || getSettings().pi.customBaseUrl?.trim() || '').replace(/\/+$/, '');
+/** list the models a custom provider's endpoint serves (GET <baseUrl>/models), using its stored key */
+export async function discoverCustomModels(id: string, baseUrlArg?: string): Promise<{ id: string; ownedBy?: string }[]> {
+  const prov = getCustomProvider(id);
+  if (!prov) throw new HttpError(404, `Not a custom provider: ${id}`);
+  const base = (baseUrlArg?.trim() || prov.baseUrl?.trim() || '').replace(/\/+$/, '');
   if (!base) throw new HttpError(400, 'Set a base URL first');
   let url: URL;
   try {
@@ -188,7 +192,7 @@ export async function discoverCustomModels(baseUrlArg?: string): Promise<{ id: s
     throw new HttpError(400, `Invalid base URL: ${base}`);
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new HttpError(400, 'Base URL must be http(s)');
-  const key = secrets.get().apiKeys[CUSTOM_PROVIDER];
+  const key = secrets.get().apiKeys[id];
   let res: Response;
   try {
     res = await fetch(url, { headers: { accept: 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) }, signal: AbortSignal.timeout(10_000) });
@@ -205,13 +209,101 @@ export async function discoverCustomModels(baseUrlArg?: string): Promise<{ id: s
   return out;
 }
 
+/* ─────────────── custom provider CRUD ─────────────── */
+
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+
+function cleanUrl(u: unknown): string {
+  const v = typeof u === 'string' ? u.trim().replace(/\/+$/, '') : '';
+  if (v && !/^https?:\/\/[^\s]+$/i.test(v)) throw new HttpError(400, 'Base URL must start with http:// or https://');
+  return v;
+}
+
+function cleanModels(list: unknown, prev: CustomModel[]): CustomModel[] {
+  if (!Array.isArray(list)) throw new HttpError(400, 'models must be an array');
+  const seen = new Set<string>();
+  const out: CustomModel[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') continue;
+    const m = raw as Record<string, unknown>;
+    const id = typeof m.id === 'string' ? m.id.trim() : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const old = prev.find((x) => x.id === id);
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined);
+    out.push({
+      id,
+      name: typeof m.name === 'string' && m.name.trim() ? m.name.trim() : id,
+      baseUrl: m.baseUrl === undefined ? (old?.baseUrl ?? '') : cleanUrl(m.baseUrl),
+      // per-model keys are write-only: the masked value (or omission) keeps the stored one
+      apiKey: typeof m.apiKey === 'string' && m.apiKey && !m.apiKey.startsWith('••') ? m.apiKey : m.apiKey === '' ? undefined : old?.apiKey,
+      contextWindow: num(m.contextWindow) ?? old?.contextWindow,
+      maxTokens: num(m.maxTokens) ?? old?.maxTokens,
+      reasoning: typeof m.reasoning === 'boolean' ? m.reasoning : old?.reasoning,
+    });
+  }
+  return out;
+}
+
+function saveCustomProviders(list: CustomProvider[]): void {
+  updateSettings({ pi: { customProviders: list } });
+  changed('providers');
+}
+
+export function createCustomProvider(input: { name?: unknown; baseUrl?: unknown }): ProviderStatus {
+  const name = typeof input.name === 'string' && input.name.trim() ? input.name.trim().slice(0, 60) : 'Custom';
+  const baseUrl = cleanUrl(input.baseUrl);
+  const list = customProviders();
+  const taken = new Set([...list.map((p) => p.id), ...piModels().getProviders().map((p) => p.id), CLAUDE_SDK]);
+  const stem = `custom-${slug(name) || 'provider'}`;
+  let id = stem;
+  for (let i = 2; taken.has(id); i++) id = `${stem}-${i}`;
+  const prov: CustomProvider = { id, name, baseUrl, models: [] };
+  saveCustomProviders([...list, prov]);
+  activity('SYS', `Custom provider added: ${name} (${id})`);
+  return customStatus(prov);
+}
+
+export function updateCustomProvider(id: string, patch: { name?: unknown; baseUrl?: unknown; models?: unknown }): ProviderStatus {
+  const list = customProviders();
+  const prov = list.find((p) => p.id === id);
+  if (!prov) throw new HttpError(404, `Not a custom provider: ${id}`);
+  const next: CustomProvider = {
+    ...prov,
+    name: typeof patch.name === 'string' && patch.name.trim() ? patch.name.trim().slice(0, 60) : prov.name,
+    baseUrl: patch.baseUrl === undefined ? prov.baseUrl : cleanUrl(patch.baseUrl),
+    models: patch.models === undefined ? prov.models : cleanModels(patch.models, prov.models ?? []),
+  };
+  saveCustomProviders(list.map((p) => (p.id === id ? next : p)));
+  latency.delete(id);
+  return customStatus(next);
+}
+
+export function deleteCustomProvider(id: string): void {
+  const list = customProviders();
+  if (!list.some((p) => p.id === id)) throw new HttpError(404, `Not a custom provider: ${id}`);
+  saveCustomProviders(list.filter((p) => p.id !== id));
+  secrets.update((s) => {
+    delete s.apiKeys[id];
+  });
+  secrets.flush();
+  latency.delete(id);
+  activity('SYS', `Custom provider removed: ${id}`);
+}
+
 /* ─────────────── ping ─────────────── */
 
 function pingModel(id: string): Model<Api> | undefined {
   const models = piModels();
-  if (id === CUSTOM_PROVIDER) {
-    const first = usableCustomModels()[0];
-    return first ? customModelToPi(first) : undefined;
+  const custom = getCustomProvider(id);
+  if (custom) {
+    const first = usableCustomModels(custom)[0];
+    return first ? customModelToPi(custom, first) : undefined;
   }
   const s = getSettings().pi;
   if (s.provider === id) {
@@ -450,7 +542,7 @@ export async function listModels(engine?: string, provider?: string): Promise<Mo
   if (provider === CLAUDE_SDK || (engine === 'claude-sdk' && !provider)) return claudeModels({ wait: true });
   const models = piModels();
   if (provider) {
-    if (provider !== CUSTOM_PROVIDER && !models.getProvider(provider)) throw new HttpError(404, `Unknown provider: ${provider}`);
+    if (!isCustomProvider(provider) && !models.getProvider(provider)) throw new HttpError(404, `Unknown provider: ${provider}`);
     return models.getModels(provider).map(piModelInfo);
   }
   const pi = models.getModels(getSettings().pi.provider).map(piModelInfo);

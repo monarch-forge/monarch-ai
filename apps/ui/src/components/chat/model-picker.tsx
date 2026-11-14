@@ -7,6 +7,7 @@
  *  - pi:         `model` is "<provider>/<model-id>"
  * `null` means "use the default from Config".
  */
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Check, ChevronUp, Search } from 'lucide-preact';
 import type { EngineId, ModelInfo, ProviderStatus } from '@monarch/shared';
@@ -52,6 +53,14 @@ export function ModelPicker(props: {
   /** hide the "Default" entry (existing sessions) */
   noDefault?: boolean;
   class?: string;
+  /** where the menu opens (default up: composers sit at the bottom) */
+  placement?: 'up' | 'down';
+  /** replaces the default trigger label */
+  renderLabel?: (info: ModelInfo | undefined, choice: ModelChoice | null) => ComponentChildren;
+  /** extra content before the label (e.g. a status dot) */
+  leading?: ComponentChildren;
+  buttonClass?: string;
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -116,19 +125,19 @@ export function ModelPicker(props: {
         type="button"
         class={`flex items-center gap-1.5 max-w-[240px] h-7 px-2 border font-mono text-[10.5px] tracking-[0.06em] transition-colors ${
           open ? 'border-fg-3 text-fg' : 'border-line text-fg-2 hover:text-fg hover:border-fg-3'
-        }`}
+        } ${props.buttonClass ?? ''}`}
         onClick={() => setOpen(!open)}
-        title="Model for this session"
+        title={props.title ?? 'Model for this session'}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span class={`inline-block w-1.5 h-1.5 shrink-0 ${props.value ? 'bg-red' : 'bg-fg-3'}`} />
-        <span class="truncate">{label}</span>
-        <ChevronUp size={11} strokeWidth={1.75} class={`shrink-0 transition-transform ${open ? '' : 'rotate-180'}`} />
+        {props.leading ?? <span class={`inline-block w-1.5 h-1.5 shrink-0 ${props.value ? 'bg-red' : 'bg-fg-3'}`} />}
+        <span class="truncate">{props.renderLabel ? props.renderLabel(shownInfo, shown) : label}</span>
+        <ChevronUp size={11} strokeWidth={1.75} class={`shrink-0 transition-transform ${(props.placement === 'down') !== open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div class="absolute bottom-full right-0 mb-1.5 z-40 w-[340px] max-w-[80vw] border border-line bg-surface shadow-[0_8px_24px_rgb(0_0_0/0.45)] flex flex-col">
+        <div class={`absolute ${props.placement === 'down' ? 'top-full mt-1.5' : 'bottom-full mb-1.5'} right-0 z-50 w-[340px] max-w-[80vw] border border-line bg-surface shadow-[0_8px_24px_rgb(0_0_0/0.45)] flex flex-col`}>
           <label class="flex items-center gap-2 px-2.5 border-b border-line">
             <Search size={12} strokeWidth={1.75} class="text-fg-3 shrink-0" />
             <input
@@ -172,6 +181,11 @@ export function ModelPicker(props: {
               );
             })}
           </div>
+          {props.placement === 'down' && !props.lockEngine && (
+            <div class="px-3 py-1.5 border-t border-line text-[10.5px] text-fg-3">
+              Default for new sessions. Open sessions keep their own model.
+            </div>
+          )}
           {props.lockEngine && (
             <div class="px-3 py-1.5 border-t border-line text-[10.5px] text-fg-3">
               Switching applies from your next message. Other engines need a new session.

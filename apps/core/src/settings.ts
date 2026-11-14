@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   engine: 'claude-sdk',
   claudeSdk: { model: 'sonnet', executablePath: '', useSubscription: true, effort: 'medium' },
-  pi: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'low', customModels: [], customBaseUrl: '' },
+  pi: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'low', customProviders: [] },
   permissions: { mode: 'ask' },
   coding: { defaultWorkspace: homedir(), workspaces: [] },
   memory: { vaultDir: paths.vault },
@@ -20,6 +20,23 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 const store = dataStore<Settings>('settings', DEFAULT_SETTINGS);
+migrateCustomProvider();
+
+/** pre-0.3.2: one implicit "custom" provider (pi.customModels + pi.customBaseUrl) → pi.customProviders[0] */
+function migrateCustomProvider(): void {
+  const pi = store.get().pi as Settings['pi'];
+  if (!('customModels' in pi) && !('customBaseUrl' in pi)) return;
+  const models = pi.customModels ?? [];
+  const baseUrl = (pi.customBaseUrl ?? '').trim();
+  if (!Array.isArray(pi.customProviders)) pi.customProviders = [];
+  if ((models.length || baseUrl) && !pi.customProviders.some((p) => p.id === 'custom')) {
+    // keep the id "custom" so existing sessions and the stored API key (secrets.apiKeys.custom) keep working
+    pi.customProviders.unshift({ id: 'custom', name: 'Custom', baseUrl, models });
+  }
+  delete pi.customModels;
+  delete pi.customBaseUrl;
+  store.save();
+}
 
 export function getSettings(): Settings {
   return store.get();

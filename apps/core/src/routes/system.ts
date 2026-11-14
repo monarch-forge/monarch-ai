@@ -14,22 +14,30 @@ const MASK = '••••••••';
 
 /** never ship stored custom-model API keys to the UI */
 function publicSettings(s: Settings): Settings {
-  return {
-    ...s,
-    pi: { ...s.pi, customModels: s.pi.customModels.map((m) => (m.apiKey ? { ...m, apiKey: MASK } : m)) },
-  };
+  const pi = { ...s.pi };
+  pi.customProviders = (s.pi.customProviders ?? []).map((p) => ({
+    ...p,
+    models: (p.models ?? []).map((m) => (m.apiKey ? { ...m, apiKey: MASK } : m)),
+  }));
+  delete pi.customModels;
+  delete pi.customBaseUrl;
+  return { ...s, pi };
 }
 
-/** keep existing keys when the UI echoes the mask back */
+/** keep existing per-model keys when the UI echoes the mask back */
 function restoreMaskedKeys(patch: Record<string, any>): Record<string, any> {
-  const models = patch?.pi?.customModels;
-  if (!Array.isArray(models)) return patch;
-  const existing = new Map(getSettings().pi.customModels.map((m) => [m.id, m.apiKey]));
+  const provs = patch?.pi?.customProviders;
+  if (!Array.isArray(provs)) return patch;
+  const existing = new Map((getSettings().pi.customProviders ?? []).map((p) => [p.id, new Map((p.models ?? []).map((m) => [m.id, m.apiKey]))]));
   return {
     ...patch,
     pi: {
       ...patch.pi,
-      customModels: models.map((m: any) => (isPlainObject(m) && m.apiKey === MASK ? { ...m, apiKey: existing.get(m.id) } : m)),
+      customProviders: provs.map((p: any) =>
+        isPlainObject(p) && Array.isArray(p.models)
+          ? { ...p, models: p.models.map((m: any) => (isPlainObject(m) && m.apiKey === MASK ? { ...m, apiKey: existing.get(p.id)?.get(m.id) } : m)) }
+          : p,
+      ),
     },
   };
 }

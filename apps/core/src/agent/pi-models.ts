@@ -1,14 +1,14 @@
 /**
  * pi-ai runtime: one `Models` collection with every built-in provider, a credential store backed by
- * Monarch's secrets.json, and a "custom" provider built from settings.pi.customModels
- * (OpenAI-compatible endpoints such as Ollama / LM Studio / vLLM).
+ * Monarch's secrets.json, and one provider per entry of settings.pi.customProviders
+ * (OpenAI-compatible endpoints: OpenAI-style clouds, OpenRouter, Ollama, LM Studio, vLLM…).
  *
  * Credential precedence per provider (pi-ai: a stored credential owns its provider):
  *   secrets.piOAuth[id] (OAuth, refreshed + persisted by pi-ai under the store lock)
  *   → secrets.apiKeys[id] (stored API key)
  *   → provider env vars (ANTHROPIC_API_KEY, OPENAI_API_KEY, ...) resolved by pi-ai itself.
  */
-import type { CustomModel } from '@monarch/shared';
+import type { CustomModel, CustomProvider } from '@monarch/shared';
 import {
   createProvider,
   type Credential,
@@ -24,7 +24,6 @@ import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completio
 import { secrets } from '../kernel.ts';
 import { getSettings, onSettingsChanged } from '../settings.ts';
 
-export const CUSTOM_PROVIDER = 'custom';
 
 type ProviderEnvMap = Record<string, Record<string, string>>;
 
@@ -109,23 +108,38 @@ export const credentialStore = new SecretsCredentialStore();
 
 let models: MutableModels | null = null;
 
-/** a custom model's endpoint: its own base URL, else the provider default (Settings.pi.customBaseUrl) */
-export function customBaseUrl(m: Pick<CustomModel, 'baseUrl'>): string {
-  return (m.baseUrl?.trim() || getSettings().pi.customBaseUrl?.trim() || '').replace(/\/+$/, '');
+/* ─────────────── custom OpenAI-compatible providers ─────────────── */
+
+/** user-added OpenAI-compatible providers (Settings.pi.customProviders) */
+export function customProviders(): CustomProvider[] {
+  return getSettings().pi.customProviders ?? [];
 }
 
-/** custom models that are usable (have an id and a resolvable base URL) */
-export function usableCustomModels(): CustomModel[] {
-  return (getSettings().pi.customModels ?? []).filter((m) => m.id?.trim() && customBaseUrl(m));
+export function getCustomProvider(id: string): CustomProvider | undefined {
+  return customProviders().find((p) => p.id === id);
 }
 
-export function customModelToPi(m: CustomModel): Model<'openai-completions'> {
+export function isCustomProvider(id: string): boolean {
+  return !!getCustomProvider(id);
+}
+
+/** a model's endpoint: its own base URL, else its provider's */
+export function customBaseUrl(prov: Pick<CustomProvider, 'baseUrl'>, m?: Pick<CustomModel, 'baseUrl'>): string {
+  return (m?.baseUrl?.trim() || prov.baseUrl?.trim() || '').replace(/\/+$/, '');
+}
+
+/** a provider's usable models (id + resolvable base URL) */
+export function usableCustomModels(prov: CustomProvider): CustomModel[] {
+  return (prov.models ?? []).filter((m) => m.id?.trim() && customBaseUrl(prov, m));
+}
+
+export function customModelToPi(prov: CustomProvider, m: CustomModel): Model<'openai-completions'> {
   return {
     id: m.id,
     name: m.name || m.id,
     api: 'openai-completions',
-    provider: CUSTOM_PROVIDER,
-    baseUrl: customBaseUrl(m),
+    provider: prov.id,
+    baseUrl: customBaseUrl(prov, m),
     reasoning: !!m.reasoning,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -141,20 +155,45 @@ export function customModelToPi(m: CustomModel): Model<'openai-completions'> {
   };
 }
 
-function customProvider() {
+function buildCustomProvider(prov: CustomProvider) {
   return createProvider<'openai-completions'>({
-    id: CUSTOM_PROVIDER,
-    name: 'Custom (OpenAI-compatible)',
-    // keyless local servers: always "configured"; per-model keys travel as model headers
+    id: prov.id,
+    name: prov.name || prov.id,
+    // keyless local servers: always "configured"; the provider's stored key (secrets.apiKeys[id]) is sent as Bearer
     auth: {
       apiKey: {
-        name: 'Local endpoint',
+        name: 'API key (optional for local servers)',
         resolve: async ({ credential }) => ({ auth: { apiKey: credential?.key || 'local' }, source: credential?.key ? 'stored credential' : 'local' }),
       },
     },
-    models: usableCustomModels().map(customModelToPi),
+    models: usableCustomModels(prov).map((m) => customModelToPi(prov, m)),
     api: openAICompletionsApi(),
   });
+}
+
+/** custom provider ids currently registered in the Models collection */
+const registeredCustom = new Set<string>();
+
+function syncCustomProviders(m: MutableModels): void {
+  const want = customProviders();
+  const ids = new Set(want.map((p) => p.id));
+  for (const id of [...registeredCustom]) {
+    if (ids.has(id)) continue;
+    try {
+      m.deleteProvider(id);
+    } catch {
+      /* already gone */
+    }
+    registeredCustom.delete(id);
+  }
+  for (const p of want) {
+    try {
+      m.setProvider(buildCustomProvider(p));
+      registeredCustom.add(p.id);
+    } catch (e) {
+      console.error(`[pi] custom provider "${p.id}" failed`, e);
+    }
+  }
 }
 
 /** the shared pi-ai Models collection (lazy: importing every catalog costs ~0.5s once) */
@@ -164,13 +203,9 @@ export function piModels(): MutableModels {
     credentials: credentialStore,
     identity: { attribution: null, userAgent: 'short' },
   });
-  models.setProvider(customProvider());
+  syncCustomProviders(models);
   onSettingsChanged(() => {
-    try {
-      models?.setProvider(customProvider());
-    } catch (e) {
-      console.error('[pi] custom provider rebuild failed', e);
-    }
+    if (models) syncCustomProviders(models);
   });
   return models;
 }
