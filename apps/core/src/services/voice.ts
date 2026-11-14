@@ -428,11 +428,39 @@ async function play(wav: Buffer): Promise<void> {
   const c = v.tts;
   stopSpeaking();
 
+  // Native playback path (Linux)
+  if (c.provider === 'native' && !audioTools().player) {
+    if (process.platform === 'linux') {
+      throw new HttpError(501, 'Missing audio player: install pulseaudio-utils or pipewire-pulseaudio (e.g., sudo apt install pulseaudio-utils)');
+    }
+    throw new HttpError(501, 'No suitable audio player found on this platform');
+  }
   if (c.provider === 'native') {
-    const input = c.voice.trim() || (process.platform === 'darwin' ? 'Daniel' : process.platform === 'win32' ? 'Microsoft David Desktop' : '');
+    const input = c.voice.trim() || (process.platform === 'darwin' ? 'Daniel' : process.platform === 'win32' ? 'Microsoft David Desktop' : 'en-gb');
     const rate = Math.max(0.5, Math.min(2, v.rate || 1));
-    // Re-synthesize or use say.speak directly with text if we stored it, but play(wav) only gets wav.
-    // Actually let's handle native directly in speak() or pass text. Let's update speak() below.
+    await new Promise<void>((resolve) => {
+      try {
+        say.speak(input, input, rate, (err) => {
+          nativeSpeaking = null;
+          state('idle');
+          resolve();
+        });
+        nativeSpeaking = {
+          stop: () => {
+            try {
+              say.stop();
+            } catch { /* no-op */ }
+            nativeSpeaking = null;
+            state('idle');
+          },
+        };
+      } catch {
+        nativeSpeaking = null;
+        state('idle');
+        resolve();
+      }
+    });
+    return;
   }
 
   const cmd = audioTools().player;
@@ -443,10 +471,20 @@ async function play(wav: Buffer): Promise<void> {
   state('speaking');
   try {
     await new Promise<void>((resolve) => {
-      const p = spawn(cmd, [file], { stdio: 'ignore' });
+      const p = spawn(cmd, [file], { stdio: 'pipe' });
       player = p;
-      p.on('error', () => resolve());
-      p.on('close', () => resolve());
+      let stdout = '';
+      let stderr = '';
+      p.stdout!.on('data', (d: Buffer) => (stdout += d.toString()));
+      p.stderr!.on('data', (d: Buffer) => (stderr += d.toString()));
+      p.on('error', () => {
+        if (stderr.trim()) console.warn('[voice] Playback error pulse:', stderr.trim());
+        resolve();
+      });
+      p.on('close', () => {
+        if (stderr.trim()) console.warn('[voice] Playback close stderr:', stderr.trim());
+        resolve();
+      });
     });
   } finally {
     player = null;
