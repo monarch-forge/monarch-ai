@@ -50,8 +50,8 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },
   { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
-  { id: 'router', label: '9Router', icon: RouteIcon, page: RouterPage },
   { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },
+  { id: 'router', label: '9Router', icon: RouteIcon, page: RouterPage },
   { id: 'config', label: 'Config', icon: SlidersHorizontal, page: ConfigPage },
 ];
 
