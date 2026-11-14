@@ -87,7 +87,7 @@ export function ModelsSection() {
 
   const save = async () => {
     setSaving(true);
-    const pi = { ...draft.pi, customModels: draft.pi.customModels.filter((m) => m.id.trim() && m.baseUrl.trim()) };
+    const pi = { ...draft.pi, customModels: draft.pi.customModels.filter((m) => m.id.trim() && (m.baseUrl.trim() || draft.pi.customBaseUrl?.trim())) };
     const ok = await saveSettings({ engine: draft.engine, claudeSdk: draft.claudeSdk, pi });
     setSaving(false);
     if (ok) reset();
@@ -216,17 +216,18 @@ export function ModelsSection() {
           </div>
         )}
 
-        <CustomModels models={p.customModels} onChange={(m) => setP({ customModels: m })} />
+        <CustomModels models={p.customModels} baseUrl={p.customBaseUrl ?? ''} onBaseUrl={(v) => setP({ customBaseUrl: v })} onChange={(m) => setP({ customModels: m })} />
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
     </div>
   );
 }
 
-function CustomModels(props: { models: CustomModel[]; onChange: (m: CustomModel[]) => void }) {
+function CustomModels(props: { models: CustomModel[]; baseUrl: string; onBaseUrl: (v: string) => void; onChange: (m: CustomModel[]) => void }) {
+  const inherit = props.baseUrl.trim();
   const upd = (i: number, p: Partial<CustomModel>) => props.onChange(props.models.map((m, j) => (j === i ? { ...m, ...p } : m)));
   const add = (preset?: Partial<CustomModel>) =>
-    props.onChange([...props.models, { id: '', name: '', baseUrl: 'http://localhost:11434/v1', contextWindow: 32768, ...preset }]);
+    props.onChange([...props.models, { id: '', name: '', baseUrl: inherit ? '' : 'http://localhost:11434/v1', contextWindow: 32768, ...preset }]);
   return (
     <div class="mt-6">
       <div class="flex items-center gap-2 mb-2">
@@ -242,6 +243,16 @@ function CustomModels(props: { models: CustomModel[]; onChange: (m: CustomModel[
             <Plus size={11} /> Add
           </button>
         </span>
+      </div>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 shrink-0">Provider base URL</span>
+        <input
+          class={`${INPUT} font-mono input-xs`}
+          value={props.baseUrl}
+          placeholder="https://api.example.com/v1 — used by models with an empty base URL"
+          spellcheck={false}
+          onInput={(e) => props.onBaseUrl((e.target as HTMLInputElement).value)}
+        />
       </div>
       {props.models.length === 0 ? (
         <div class="border border-dashed border-line px-3 py-3 text-[12px] text-fg-3">
@@ -270,7 +281,7 @@ function CustomModels(props: { models: CustomModel[]; onChange: (m: CustomModel[
                     <input class={`${INPUT} input-xs`} value={m.name} placeholder="Display name" onInput={(e) => upd(i, { name: (e.target as HTMLInputElement).value })} />
                   </td>
                   <td>
-                    <input class={`${INPUT} font-mono input-xs min-w-[200px]`} value={m.baseUrl} placeholder="http://localhost:11434/v1" onInput={(e) => upd(i, { baseUrl: (e.target as HTMLInputElement).value })} spellcheck={false} />
+                    <input class={`${INPUT} font-mono input-xs min-w-[200px]`} value={m.baseUrl} placeholder={inherit ? `inherit · ${inherit}` : 'http://localhost:11434/v1'} onInput={(e) => upd(i, { baseUrl: (e.target as HTMLInputElement).value })} spellcheck={false} />
                   </td>
                   <td>
                     <input class={`${INPUT} font-mono input-xs`} type="password" value={m.apiKey ?? ''} placeholder="optional" autoComplete="off" onInput={(e) => upd(i, { apiKey: (e.target as HTMLInputElement).value || undefined })} />
@@ -299,7 +310,7 @@ function CustomModels(props: { models: CustomModel[]; onChange: (m: CustomModel[
           </table>
         </div>
       )}
-      {props.models.some((m) => !m.id.trim() || !m.baseUrl.trim()) && <div class="text-[11px] text-warning mt-1.5">Rows without a model id or base URL are skipped on save.</div>}
+      {props.models.some((m) => !m.id.trim() || !(m.baseUrl.trim() || inherit)) && <div class="text-[11px] text-warning mt-1.5">Rows without a model id or base URL (own or provider) are skipped on save.</div>}
     </div>
   );
 }

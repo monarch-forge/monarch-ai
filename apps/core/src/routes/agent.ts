@@ -17,6 +17,7 @@ import {
   setProviderKey,
   startLogin,
   submitOAuthCode,
+  discoverCustomModels,
 } from '../agent/providers.ts';
 
 async function body(c: { req: { json(): Promise<any> } }): Promise<Record<string, any>> {
@@ -33,6 +34,7 @@ const KINDS: SessionKind[] = ['chat', 'coding', 'automation'];
 export function register(app: Hono): void {
   /* providers */
   app.get('/api/providers', async (c) => c.json(await listProviders()));
+  app.get('/api/providers/custom/discover', async (c) => c.json(await discoverCustomModels(c.req.query('baseUrl'))));
   app.put('/api/providers/:id/key', async (c) => {
     const b = await body(c);
     return c.json(await setProviderKey(c.req.param('id'), String(b.apiKey ?? '')));

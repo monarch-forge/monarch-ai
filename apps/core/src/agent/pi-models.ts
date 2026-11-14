@@ -109,13 +109,23 @@ export const credentialStore = new SecretsCredentialStore();
 
 let models: MutableModels | null = null;
 
+/** a custom model's endpoint: its own base URL, else the provider default (Settings.pi.customBaseUrl) */
+export function customBaseUrl(m: Pick<CustomModel, 'baseUrl'>): string {
+  return (m.baseUrl?.trim() || getSettings().pi.customBaseUrl?.trim() || '').replace(/\/+$/, '');
+}
+
+/** custom models that are usable (have an id and a resolvable base URL) */
+export function usableCustomModels(): CustomModel[] {
+  return (getSettings().pi.customModels ?? []).filter((m) => m.id?.trim() && customBaseUrl(m));
+}
+
 export function customModelToPi(m: CustomModel): Model<'openai-completions'> {
   return {
     id: m.id,
     name: m.name || m.id,
     api: 'openai-completions',
     provider: CUSTOM_PROVIDER,
-    baseUrl: m.baseUrl.replace(/\/+$/, ''),
+    baseUrl: customBaseUrl(m),
     reasoning: !!m.reasoning,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -132,7 +142,6 @@ export function customModelToPi(m: CustomModel): Model<'openai-completions'> {
 }
 
 function customProvider() {
-  const list = getSettings().pi.customModels ?? [];
   return createProvider<'openai-completions'>({
     id: CUSTOM_PROVIDER,
     name: 'Custom (OpenAI-compatible)',
@@ -143,7 +152,7 @@ function customProvider() {
         resolve: async ({ credential }) => ({ auth: { apiKey: credential?.key || 'local' }, source: credential?.key ? 'stored credential' : 'local' }),
       },
     },
-    models: list.filter((m) => m.id && m.baseUrl).map(customModelToPi),
+    models: usableCustomModels().map(customModelToPi),
     api: openAICompletionsApi(),
   });
 }

@@ -2,11 +2,11 @@
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import type { OAuthFlowState, ProviderStatus } from '@monarch/shared';
-import { ChevronRight, Activity, KeyRound, LogIn, LogOut, RefreshCw } from 'lucide-preact';
+import { ChevronRight, Activity, KeyRound, LogIn, LogOut, RefreshCw, Link2, Search, Plus, Check } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
-import { oauthFlows, toast, useResource } from '../../lib/store.ts';
+import { oauthFlows, settings, toast, useResource } from '../../lib/store.ts';
 import { Panel, Tag, Spinner, ErrorLine, Empty } from '../ui.tsx';
-import { INPUT, Kbd } from './fields.tsx';
+import { INPUT, Kbd, saveSettings } from './fields.tsx';
 import { OAuthFlowView } from './oauth-flow.tsx';
 
 const BTN = 'btn btn-xs rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]';
@@ -203,7 +203,7 @@ function ProviderDetail(props: { p: ProviderStatus; onChanged: (p?: ProviderStat
           Uses your Claude Code login{p.account ? <> ({p.account})</> : null}. {p.configured ? 'Signed in.' : <>Run <Kbd>claude auth login</Kbd> in a terminal to sign in.</>}
         </div>
       )}
-      {p.authKinds.includes('local') && <div class="text-[12.5px] text-fg-2">Local endpoint — no credentials needed. Configure models under Models → Custom models.</div>}
+      {p.id === 'custom' && <CustomEndpoint onChanged={() => props.onChanged()} />}
 
       {hasKey && (
         <div>
@@ -268,6 +268,117 @@ function ProviderDetail(props: { p: ProviderStatus; onChanged: (p?: ProviderStat
               />
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** custom OpenAI-compatible provider: default base URL + model discovery (GET <baseUrl>/models) */
+function CustomEndpoint(props: { onChanged: () => void }) {
+  const saved = settings.value?.pi.customBaseUrl ?? '';
+  const [url, setUrl] = useState(saved);
+  const [busy, setBusy] = useState<'save' | 'discover' | null>(null);
+  const [found, setFound] = useState<{ id: string; ownedBy?: string }[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [filter, setFilter] = useState('');
+  const models = settings.value?.pi.customModels ?? [];
+  const have = new Set(models.map((m) => m.id));
+  const clean = url.trim().replace(/\/+$/, '');
+  const dirty = clean !== saved;
+
+  const save = async () => {
+    if (clean && !/^https?:\/\/.+/i.test(clean)) {
+      toast('Base URL must start with http:// or https://', 'warn');
+      return;
+    }
+    setBusy('save');
+    const ok = await saveSettings({ pi: { customBaseUrl: clean } }, clean ? 'Base URL saved' : 'Base URL cleared');
+    setBusy(null);
+    if (ok) {
+      setUrl(clean);
+      props.onChanged();
+    }
+  };
+  const discover = async () => {
+    setBusy('discover');
+    setErr(null);
+    try {
+      setFound(await api.get<{ id: string; ownedBy?: string }[]>(`/providers/custom/discover?baseUrl=${encodeURIComponent(clean)}`));
+    } catch (e: any) {
+      setFound(null);
+      setErr(e?.message ?? String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const add = async (ids: string[]) => {
+    const fresh = ids.filter((id) => !have.has(id));
+    if (!fresh.length) return;
+    if (dirty && clean) await saveSettings({ pi: { customBaseUrl: clean } }, false);
+    const next = [...models, ...fresh.map((id) => ({ id, name: id, baseUrl: '', contextWindow: 32768 }))];
+    const ok = await saveSettings({ pi: { customModels: next } }, fresh.length === 1 ? `Added ${fresh[0]}` : `Added ${fresh.length} models`);
+    if (ok) props.onChanged();
+  };
+
+  const shown = (found ?? []).filter((m) => !filter || m.id.toLowerCase().includes(filter.toLowerCase()));
+  return (
+    <div class="flex flex-col gap-2">
+      <div class="hud-label text-[10px] flex items-center gap-1.5">
+        <Link2 size={11} /> Base URL
+      </div>
+      <div class="flex gap-2">
+        <input
+          class={`${INPUT} font-mono`}
+          placeholder="https://api.example.com/v1  ·  http://localhost:11434/v1"
+          value={url}
+          spellcheck={false}
+          onInput={(e) => setUrl((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => e.key === 'Enter' && dirty && void save()}
+        />
+        <button class={`${BTN} btn-primary h-8`} disabled={!dirty || busy === 'save'} onClick={() => void save()}>
+          {busy === 'save' && <span class="loading loading-spinner loading-xs" />}Save
+        </button>
+        <button class={`${BTN_OUT} h-8`} disabled={!clean || busy === 'discover'} onClick={() => void discover()} title="List the models this endpoint serves">
+          {busy === 'discover' ? <span class="loading loading-spinner loading-xs" /> : <Search size={11} />} Discover
+        </button>
+      </div>
+      <div class="text-[11px] text-fg-3">
+        Any OpenAI-compatible endpoint (OpenAI, Together, Groq, OpenRouter, vLLM, Ollama, LM Studio…) — usually ends in <span class="font-mono">/v1</span>. Models without their own URL use this
+        one; the API key below is sent as a Bearer token. {models.length ? `${models.length} model${models.length === 1 ? '' : 's'} configured (Models → Custom models).` : 'Discover models to add them.'}
+      </div>
+      {err && <div class="font-mono text-[11.5px] text-red">{err}</div>}
+      {found && (
+        <div class="border border-line">
+          <div class="flex items-center gap-2 px-2.5 py-1.5 border-b border-line">
+            <span class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3">{found.length} models</span>
+            {found.length > 8 && (
+              <input class={`${INPUT} input-xs font-mono max-w-[220px]`} placeholder="Filter…" value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
+            )}
+            {shown.some((m) => !have.has(m.id)) && shown.length <= 50 && (
+              <button class={`${BTN_OUT} ml-auto`} onClick={() => void add(shown.map((m) => m.id))}>
+                <Plus size={11} /> Add all{filter ? ' shown' : ''}
+              </button>
+            )}
+          </div>
+          <div class="max-h-[240px] overflow-y-auto">
+            {shown.length === 0 && <div class="px-2.5 py-2 text-[12px] text-fg-3">No models.</div>}
+            {shown.map((m) => (
+              <div key={m.id} class="flex items-center gap-2 px-2.5 py-1 border-b border-line/50 last:border-b-0">
+                <span class="font-mono text-[12px] text-fg truncate">{m.id}</span>
+                {m.ownedBy && <span class="font-mono text-[10px] text-fg-3 truncate">{m.ownedBy}</span>}
+                {have.has(m.id) ? (
+                  <span class="ml-auto flex items-center gap-1 font-mono text-[10px] uppercase text-fg-3">
+                    <Check size={11} /> Added
+                  </span>
+                ) : (
+                  <button class={`${BTN_OUT} ml-auto`} onClick={() => void add([m.id])}>
+                    <Plus size={11} /> Add
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

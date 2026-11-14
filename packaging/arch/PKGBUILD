@@ -3,7 +3,7 @@
 # CI sets pkgver from the release tag and fills in the checksum (see .github/workflows/arch.yml).
 
 pkgname=monarch-ai-bin
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=1
 pkgdesc='Monarch — a calm, Jarvis-style agentic personal OS'
 arch=('x86_64')

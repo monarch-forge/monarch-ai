@@ -39,7 +39,7 @@ export interface CustomModel {
   /** id used in requests, e.g. "llama3.1:8b" */
   id: string;
   name: string;
-  /** OpenAI-compatible base URL, e.g. http://localhost:11434/v1 */
+  /** OpenAI-compatible base URL, e.g. http://localhost:11434/v1 ('' = use Settings.pi.customBaseUrl) */
   baseUrl: string;
   /** optional API key (stored server side) */
   apiKey?: string;
@@ -77,6 +77,8 @@ export interface Settings {
     model: string; // pi-ai model id
     thinkingLevel: ThinkingLevel;
     customModels: CustomModel[];
+    /** default base URL of the custom OpenAI-compatible provider (models may override it) */
+    customBaseUrl: string;
   };
   permissions: {
     mode: PermissionMode; // ask = approve sensitive+dangerous; auto-safe = approve dangerous only; auto-all = never ask
@@ -123,6 +125,8 @@ export interface ProviderStatus {
   /** last measured round-trip in ms (from /api/providers/:id/ping), if any */
   latencyMs?: number;
   error?: string;
+  /** custom provider only: its default base URL */
+  baseUrl?: string;
 }
 
 export interface ModelInfo {
@@ -788,6 +792,7 @@ export type ClientCommand =
  * POST   /api/oauth/:flowId/code {code}      -> OAuthFlowState  (paste-code step)
  * POST   /api/oauth/:flowId/cancel           -> { ok }
  * DELETE /api/providers/:id/login            -> ProviderStatus  (logout)
+ * GET    /api/providers/custom/discover?baseUrl= -> { id: string; ownedBy?: string }[]  (GET <baseUrl>/models with the stored custom key)
  * GET    /api/models?engine=pi&provider=x    -> ModelInfo[]
  * GET    /api/models/available           -> ModelInfo[]  (all models of every configured provider)
  *

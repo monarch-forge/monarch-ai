@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   engine: 'claude-sdk',
   claudeSdk: { model: 'sonnet', executablePath: '', useSubscription: true, effort: 'medium' },
-  pi: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'low', customModels: [] },
+  pi: { provider: 'anthropic', model: 'claude-sonnet-4-5', thinkingLevel: 'low', customModels: [], customBaseUrl: '' },
   permissions: { mode: 'ask' },
   coding: { defaultWorkspace: homedir(), workspaces: [] },
   memory: { vaultDir: paths.vault },

@@ -10,7 +10,7 @@ import type { Api, AuthInteraction, AuthPrompt, Model } from '@earendil-works/pi
 import { activity, bus, changed, HttpError, newId, secrets } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { claudeModelCount, claudeModels, claudeStatus, invalidateClaudeStatus } from './claude.ts';
-import { CUSTOM_PROVIDER, customModelToPi, piModels } from './pi-models.ts';
+import { CUSTOM_PROVIDER, customModelToPi, piModels, usableCustomModels } from './pi-models.ts';
 import { errorText } from './toolset.ts';
 
 export const CLAUDE_SDK = 'claude-sdk';
@@ -54,7 +54,8 @@ async function claudeProviderStatus(fresh = false): Promise<ProviderStatus> {
 }
 
 function customStatus(): ProviderStatus {
-  const list = getSettings().pi.customModels ?? [];
+  const list = usableCustomModels();
+  const baseUrl = getSettings().pi.customBaseUrl?.trim() || undefined;
   return {
     id: CUSTOM_PROVIDER,
     name: 'Custom (OpenAI-compatible)',
@@ -64,6 +65,8 @@ function customStatus(): ProviderStatus {
     source: secrets.get().apiKeys[CUSTOM_PROVIDER] ? 'stored-key' : undefined,
     modelCount: list.length,
     latencyMs: latency.get(CUSTOM_PROVIDER),
+    baseUrl,
+    error: !list.length && (getSettings().pi.customModels ?? []).length ? 'Models need a base URL — set one here or per model.' : undefined,
   };
 }
 
@@ -172,12 +175,42 @@ export async function deleteProviderKey(id: string): Promise<ProviderStatus> {
   return providerStatus(id);
 }
 
+/* ─────────────── custom endpoint discovery ─────────────── */
+
+/** list the models an OpenAI-compatible endpoint serves (GET <baseUrl>/models), using the stored custom key */
+export async function discoverCustomModels(baseUrlArg?: string): Promise<{ id: string; ownedBy?: string }[]> {
+  const base = (baseUrlArg?.trim() || getSettings().pi.customBaseUrl?.trim() || '').replace(/\/+$/, '');
+  if (!base) throw new HttpError(400, 'Set a base URL first');
+  let url: URL;
+  try {
+    url = new URL(`${base}/models`);
+  } catch {
+    throw new HttpError(400, `Invalid base URL: ${base}`);
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new HttpError(400, 'Base URL must be http(s)');
+  const key = secrets.get().apiKeys[CUSTOM_PROVIDER];
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { accept: 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) }, signal: AbortSignal.timeout(10_000) });
+  } catch (e) {
+    throw new HttpError(502, `Could not reach ${url.origin}: ${errorText(e)}`);
+  }
+  const body: any = await res.json().catch(() => null);
+  if (!res.ok) throw new HttpError(502, `${url.href} → HTTP ${res.status}${body?.error?.message ? `: ${body.error.message}` : ''}`);
+  const rows: any[] = Array.isArray(body?.data) ? body.data : Array.isArray(body?.models) ? body.models : Array.isArray(body) ? body : [];
+  const out = rows
+    .map((r) => (typeof r === 'string' ? { id: r } : { id: String(r?.id ?? r?.name ?? r?.model ?? ''), ownedBy: r?.owned_by ? String(r.owned_by) : undefined }))
+    .filter((r) => r.id);
+  out.sort((a, b) => a.id.localeCompare(b.id));
+  return out;
+}
+
 /* ─────────────── ping ─────────────── */
 
 function pingModel(id: string): Model<Api> | undefined {
   const models = piModels();
   if (id === CUSTOM_PROVIDER) {
-    const first = getSettings().pi.customModels?.[0];
+    const first = usableCustomModels()[0];
     return first ? customModelToPi(first) : undefined;
   }
   const s = getSettings().pi;
