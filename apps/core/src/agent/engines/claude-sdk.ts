@@ -24,7 +24,10 @@ import { emptyUsage, addUsage } from '../sessions.ts';
 import {
   SDK_CHAT_BUILTINS,
   SDK_CODING_BUILTINS,
+  SDK_TOOL_SEARCH,
   builtinRisk,
+  deferToolsEnabled,
+  loadsUpFront,
   builtinSummary,
   errorText,
   runToolDef,
@@ -51,7 +54,15 @@ function toolResultOutput(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
-      .map((b: any) => (b?.type === 'text' ? b.text : b?.type === 'image' ? '[image]' : ''))
+      .map((b: any) =>
+        b?.type === 'text'
+          ? b.text
+          : b?.type === 'image'
+            ? '[image]'
+            : b?.type === 'tool_reference' // ToolSearch result: the tools it loaded
+              ? `loaded ${displayName(String(b.tool_name ?? ''))}`
+              : '',
+      )
       .filter(Boolean)
       .join('\n');
   }
@@ -66,6 +77,12 @@ function usageFromModel(m: any): Usage {
     cacheWriteTokens: m?.cacheCreationInputTokens ?? 0,
     costUsd: m?.costUSD ?? 0,
   };
+}
+
+/** extra ToolSearch matching terms (group + keywords) for a deferred tool */
+function searchHint(def: ToolDef): string | undefined {
+  const parts = [def.group, ...(def.keywords ?? [])].filter(Boolean);
+  return parts.length ? parts.join(', ') : undefined;
 }
 
 export const claudeSdkEngine: Engine = {
@@ -88,6 +105,8 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
   const coding = rec.kind === 'coding';
   const exe = resolveClaudeExecutable();
   const defs = sdkToolDefs();
+  // deferred loading: core tools always in the prompt, the rest behind Claude Code's ToolSearch
+  const defer = deferToolsEnabled();
   const defByName = new Map<string, ToolDef>(defs.map((d) => [d.name, d]));
 
   // MCP handlers don't receive the tool_use id; match them FIFO per tool name.
@@ -109,7 +128,8 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
     mcpServer = createSdkMcpServer({
       name: MCP_KEY,
       version: '0.1.0',
-      alwaysLoad: true,
+      // server-wide flag off; core tools opt in per tool (everything when deferral is disabled)
+      alwaysLoad: !defer,
       tools: defs.map((def) =>
         tool(
           def.name,
@@ -129,7 +149,11 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
               return { content: [{ type: 'text' as const, text: errorText(e) }], isError: true };
             }
           },
-          { annotations: { readOnlyHint: def.risk === 'safe', destructiveHint: def.risk === 'dangerous' } },
+          {
+            annotations: { readOnlyHint: def.risk === 'safe', destructiveHint: def.risk === 'dangerous' },
+            alwaysLoad: loadsUpFront(def, defer),
+            searchHint: searchHint(def),
+          },
         ),
       ),
     });
@@ -188,10 +212,12 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
     strictMcpConfig: true,
     permissionMode: 'default',
     includePartialMessages: true,
-    env: claudeEnv(),
+    // 'true' (not auto): defer regardless of size, and keep it on for sessions resumed from a
+    // conversation that ran without ToolSearch. 'false' = every tool schema in every prompt.
+    env: { ...claudeEnv(), ENABLE_TOOL_SEARCH: defer ? 'true' : 'false' },
     abortController: abort,
     maxTurns: coding ? 200 : 40,
-    tools: coding ? SDK_CODING_BUILTINS : SDK_CHAT_BUILTINS,
+    tools: [...(coding ? SDK_CODING_BUILTINS : SDK_CHAT_BUILTINS), ...(defer ? [SDK_TOOL_SEARCH] : [])],
     systemPrompt: coding ? { type: 'preset', preset: 'claude_code', append: ctx.systemPrompt } : ctx.systemPrompt,
     mcpServers: mcpServer ? { [MCP_KEY]: mcpServer } : {},
     canUseTool,

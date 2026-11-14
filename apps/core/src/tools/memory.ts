@@ -10,6 +10,9 @@ function fmtSummary(n: MemoryNoteSummary): string {
 
 const memorySearch = defineTool({
   name: 'memory_search',
+  loading: 'always',
+  group: 'memory',
+  keywords: ['vault', 'notes', 'remember', 'recall', 'knowledge', 'obsidian'],
   description: [
     "Search Monarch's long-term memory (the user's markdown vault) by keywords. Ranks title matches, tags and body text.",
     'Use "#tag" terms to filter by tag (e.g. "#person pepper", "#project"). Search memory before asking the user for facts they may have told you before (people, preferences, projects).',
@@ -29,6 +32,9 @@ const memorySearch = defineTool({
 
 const memoryRead = defineTool({
   name: 'memory_read',
+  loading: 'always',
+  group: 'memory',
+  keywords: ['vault', 'note', 'obsidian'],
   description: 'Read a memory note in full (markdown body, tags, outgoing [[links]] and backlinks). `note` is a note id/path like "People/Pepper Potts" or just its title.',
   risk: 'safe',
   tag: 'MEM',
@@ -51,6 +57,9 @@ const memoryRead = defineTool({
 
 const memoryWrite = defineTool({
   name: 'memory_write',
+  loading: 'always',
+  group: 'memory',
+  keywords: ['vault', 'note', 'remember', 'save fact', 'obsidian'],
   description: [
     "Remember something in the user's long-term memory vault (markdown, Obsidian-compatible). Use it freely and proactively whenever you learn durable facts:",
     'preferences, people and relationships, projects, decisions, recurring context. Keep notes concise and factual; link related notes with [[Note Name]] and use #tags.',
@@ -87,6 +96,8 @@ const memoryWrite = defineTool({
 
 const memoryLink = defineTool({
   name: 'memory_link',
+  group: 'memory',
+  keywords: ['vault', 'wikilink', 'backlink', 'relate notes'],
   description:
     'Link two memory notes: appends "- [[to]] — context" under a "## Related" section of the `from` note (no-op if already linked). The target may not exist yet (it becomes an unresolved link until written).',
   risk: 'safe',
@@ -106,6 +117,8 @@ const memoryLink = defineTool({
 
 const memoryListRecent = defineTool({
   name: 'memory_list_recent',
+  group: 'memory',
+  keywords: ['vault', 'recent notes'],
   description: 'List the most recently updated memory notes (title, id, tags, excerpt).',
   risk: 'safe',
   tag: 'MEM',
@@ -118,6 +131,8 @@ const memoryListRecent = defineTool({
 
 const memoryDelete = defineTool({
   name: 'memory_delete',
+  group: 'memory',
+  keywords: ['vault', 'remove note', 'forget'],
   description: "Delete a memory note (moved to the vault's .trash folder, recoverable). Only when the user asks or a note is clearly wrong/duplicated.",
   risk: 'sensitive',
   tag: 'MEM',

@@ -35,8 +35,10 @@ export const paths = {
   vault: join(HOME, 'vault'), // default memory vault (overridable in settings.memory.vaultDir)
   secrets: join(HOME, 'secrets.json'),
   logs: join(HOME, 'logs'),
+  extensions: join(HOME, 'extensions'), // self-written extensions: <id>/{extension.json,index.mjs,.history/}
+  skills: join(HOME, 'skills'), // learned procedures: <id>.md
 };
-for (const p of [paths.home, paths.data, paths.sessions, paths.vault, paths.logs]) mkdirSync(p, { recursive: true });
+for (const p of [paths.home, paths.data, paths.sessions, paths.vault, paths.logs, paths.extensions, paths.skills]) mkdirSync(p, { recursive: true });
 
 export const newId = (): string => randomUUID();
 export const nowIso = (): string => new Date().toISOString();
@@ -226,6 +228,21 @@ export interface ToolDef<S extends z.ZodObject<any> = z.ZodObject<any>> {
   /** log tag used for the activity log when the tool runs */
   tag?: LogTag;
   run: (input: z.infer<S>, ctx: ToolContext) => Promise<unknown> | unknown;
+  /**
+   * 'always' = schema is in every prompt (core tools). Anything else (default) is deferred:
+   * the model discovers it with tool search, keeping the prompt lean. See isAlwaysLoaded().
+   */
+  loading?: 'always' | 'deferred';
+  /** catalog grouping + tool-search hint, e.g. 'mail', 'slack', 'evolve', 'ext:hacker-news' */
+  group?: string;
+  /** extra search terms for tool search */
+  keywords?: string[];
+  /** set for tools contributed by an extension */
+  extensionId?: string;
+}
+
+export function isAlwaysLoaded(def: Pick<ToolDef, 'loading'>): boolean {
+  return def.loading === 'always';
 }
 
 export function defineTool<S extends z.ZodObject<any>>(def: ToolDef<S>): ToolDef<S> {

@@ -11,6 +11,8 @@ import {
   Bell,
   CalendarDays,
   CornerDownLeft,
+  Dna,
+  Hammer,
   Hash,
   LayoutGrid,
   Mail,
@@ -52,6 +54,7 @@ const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[]
   { id: 'slack', label: 'Slack', icon: Hash, keywords: 'channels messages' },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, keywords: 'calendar tasks events automations schedule' },
   { id: 'memory', label: 'Memory', icon: Network, keywords: 'vault notes graph obsidian' },
+  { id: 'evolve', label: 'Evolve', icon: Dna, keywords: 'extensions skills proposals self evolution tools reflect forge' },
   { id: 'systems', label: 'Systems', icon: Activity, keywords: 'cpu memory processes telemetry machine' },
   { id: 'config', label: 'Config', icon: SlidersHorizontal, keywords: 'settings providers models accounts preferences' },
 ];
@@ -195,6 +198,19 @@ export function CommandPalette() {
         run: () => {
           close();
           navigate('workshop');
+        },
+      },
+      {
+        id: 'act:forge',
+        group: 'Actions',
+        label: 'Forge a capability',
+        hint: 'Evolve',
+        keywords: 'build extension tool skill evolve self',
+        icon: Hammer,
+        run: () => {
+          close();
+          navigate('evolve/extensions');
+          window.setTimeout(() => document.getElementById('evolve-forge')?.focus(), 60);
         },
       },
       {

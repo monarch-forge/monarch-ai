@@ -49,6 +49,9 @@ async function hasRg(): Promise<boolean> {
 
 const fsList = defineTool({
   name: 'fs_list',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['ls', 'directory', 'files'],
   description: 'List files and directories (directories end with "/"). Skips .git/node_modules and similar. depth 1-4.',
   risk: 'safe',
   tag: 'CODE',
@@ -90,6 +93,9 @@ const fsList = defineTool({
 
 const fsRead = defineTool({
   name: 'fs_read',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['cat', 'open file'],
   description: 'Read a text file with line numbers. Use offset/limit (1-based lines) for large files.',
   risk: 'safe',
   tag: 'CODE',
@@ -131,6 +137,9 @@ const fsRead = defineTool({
 
 const fsWrite = defineTool({
   name: 'fs_write',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['create file', 'save file'],
   description: 'Create or overwrite a file with the given content (creates parent directories).',
   risk: 'sensitive',
   tag: 'CODE',
@@ -157,6 +166,9 @@ const fsWrite = defineTool({
 
 const fsEdit = defineTool({
   name: 'fs_edit',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['replace', 'patch', 'modify file'],
   description:
     'Replace an exact string in a file. old_string must match exactly (including whitespace) and be unique unless replace_all is true. Read the file first.',
   risk: 'sensitive',
@@ -233,6 +245,9 @@ function globToRegex(glob: string): RegExp {
 
 const grep = defineTool({
   name: 'grep',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['search code', 'ripgrep', 'find text'],
   description: 'Search file contents with a regular expression (ripgrep when available). Returns path:line:text matches.',
   risk: 'safe',
   tag: 'CODE',
@@ -273,6 +288,9 @@ const grep = defineTool({
 
 const shellExec = defineTool({
   name: 'shell_exec',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['bash', 'terminal', 'command', 'run'],
   description:
     'Run a shell command (bash -lc) in the session working directory. Output (stdout+stderr) is captured and capped. Default timeout 120s, max 1800s. Avoid interactive commands.',
   risk: 'dangerous',
@@ -358,6 +376,9 @@ const shellExec = defineTool({
 
 const gitStatus = defineTool({
   name: 'git_status',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['git', 'branch', 'changes'],
   description: 'Show git branch and working tree status (porcelain) for the session directory.',
   risk: 'safe',
   tag: 'CODE',
@@ -372,6 +393,9 @@ const gitStatus = defineTool({
 
 const gitDiff = defineTool({
   name: 'git_diff',
+  loading: 'always',
+  group: 'coding',
+  keywords: ['git', 'changes', 'patch'],
   description: 'Show git diff (unstaged by default; staged=true for the index). Optionally limit to a path.',
   risk: 'safe',
   tag: 'CODE',

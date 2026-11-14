@@ -3,6 +3,8 @@ import type { SessionKind } from '@monarch/shared';
 import { secrets } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { memoryPromptContext } from '../integrations/memory/index.ts';
+import { skillsPromptContext } from '../extensions/index.ts';
+import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs } from './toolset.ts';
 
 export interface PromptOptions {
   kind: SessionKind;
@@ -84,6 +86,16 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     ...caps.map((c) => `- ${c}`),
   ];
 
+  lines.push('', ...toolsSection(opts), '', ...evolutionSection(s.evolution?.enabled !== false, opts.engine));
+
+  let skills = '';
+  try {
+    skills = skillsPromptContext()?.trim() ?? '';
+  } catch {
+    skills = '';
+  }
+  if (skills) lines.push('', '## Skills (read with skill_read before doing these tasks)', skills.slice(0, 3000));
+
   if (memory.trim()) {
     lines.push('', '## What you know about the user (memory vault)', memory.trim().slice(0, 4000));
   }
@@ -91,6 +103,37 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     lines.push('', '## Standing instructions from the user', s.assistant.persona.trim());
   }
   return lines.filter((l, i, a) => !(l === '' && a[i - 1] === '')).join('\n');
+}
+
+/** "## Tools": core tools are loaded; the rest are found with tool search (index by group) */
+function toolsSection(opts: PromptOptions): string[] {
+  if (!deferToolsEnabled()) return ['## Tools', '- All of your tools are loaded.'];
+  const claude = opts.engine === 'claude-sdk';
+  const search = claude ? 'ToolSearch' : 'tool_search';
+  let index = '';
+  try {
+    index = deferredToolIndex(claude ? sdkToolDefs() : piToolDefs(opts.kind));
+  } catch {
+    index = '';
+  }
+  return [
+    '## Tools',
+    `- Only core tools are loaded. Many more exist (sending/drafting mail, Slack, calendar and task edits, automations, processes, extensions, self-evolution…): find them with \`${search}\` (keywords like "send email", or "select:<name>") before saying you cannot do something. Loaded tools stay available for the rest of the session.`,
+    claude ? '- Monarch tools are named `mcp__monarch__<name>` (e.g. select:mcp__monarch__slack_post).' : '',
+    ...(index ? ['- Deferred tools by group:', index] : []),
+  ].filter(Boolean);
+}
+
+function evolutionSection(enabled: boolean, engine: PromptOptions['engine']): string[] {
+  const search = engine === 'claude-sdk' ? 'ToolSearch' : 'tool_search';
+  if (!enabled) {
+    return ['## Self-evolution', '- Self-modification is disabled in settings (evolution.enabled = false): do not write skills or extensions; if asked, say it is turned off in Config.'];
+  }
+  return [
+    '## Self-evolution',
+    `- You can extend yourself. When a capability is missing or a task recurs, write a skill (a reusable procedure) or build an extension (new tools, panels, background jobs) with the evolve tools (${search} "extension" / "skill").`,
+    '- Before writing an extension, always read extension_api_docs; then test it with extension_test before relying on it. Keep changes small and tell the user what you added.',
+  ];
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {

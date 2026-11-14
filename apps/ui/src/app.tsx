@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Network,
   Activity,
+  Dna,
   SlidersHorizontal,
   Bell,
 } from 'lucide-preact';
@@ -26,6 +27,7 @@ import SlackPage from './pages/slack.tsx';
 import AgendaPage from './pages/agenda.tsx';
 import MemoryPage from './pages/memory.tsx';
 import SystemsPage from './pages/systems.tsx';
+import EvolvePage from './pages/evolve.tsx';
 import ConfigPage from './pages/config.tsx';
 import { ApprovalDock, focusApprovals } from './components/approvals.tsx';
 import { CommandPalette } from './components/command-palette.tsx';
@@ -42,6 +44,7 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },
+  { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },
   { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
   { id: 'config', label: 'Config', icon: SlidersHorizontal, page: ConfigPage },
 ];

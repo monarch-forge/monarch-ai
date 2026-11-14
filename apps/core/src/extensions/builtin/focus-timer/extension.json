@@ -1,0 +1,7 @@
+{
+  "id": "focus-timer",
+  "name": "Focus Timer",
+  "version": "1.0.0",
+  "description": "Pomodoro-style focus sessions: start/stop/status tools, a notification when a session ends, and a panel with today's focus time.",
+  "permissions": []
+}

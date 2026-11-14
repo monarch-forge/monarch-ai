@@ -40,6 +40,8 @@ function fmtMsg(m: SlackMessage, opts: { channelName?: string } = {}): string {
 
 const slackWorkspaces = defineTool({
   name: 'slack_workspaces',
+  group: 'slack',
+  keywords: ['slack teams', 'workspace list'],
   description: 'List connected Slack workspaces (name, team id, user, token type user/bot, connection errors).',
   risk: 'safe',
   tag: 'SLK',
@@ -52,6 +54,8 @@ const slackWorkspaces = defineTool({
 
 const slackChannels = defineTool({
   name: 'slack_channels',
+  group: 'slack',
+  keywords: ['slack', 'channel list', 'dm', 'conversations'],
   description:
     'List Slack conversations the connected user (or bot) is a member of: public/private channels, DMs (named after the person) and group DMs. Returns ids usable with slack_read / slack_post.',
   risk: 'safe',
@@ -78,6 +82,8 @@ const slackChannels = defineTool({
 
 const slackRead = defineTool({
   name: 'slack_read',
+  group: 'slack',
+  keywords: ['slack', 'channel history', 'messages', 'thread'],
   description:
     'Read recent messages of a Slack channel or DM (oldest → newest), or the replies of one thread when threadTs is given. `channel` accepts an id (C…/D…/G…), "#channel-name", or a person\'s name for their DM.',
   risk: 'safe',
@@ -101,6 +107,8 @@ const slackRead = defineTool({
 
 const slackSearch = defineTool({
   name: 'slack_search',
+  group: 'slack',
+  keywords: ['slack', 'find messages'],
   description:
     'Search Slack messages (newest first) with Slack search syntax, e.g. "deploy in:#eng from:@alice after:2025-01-01", "has:link budget". Requires a user token (xoxp-); bot-token workspaces cannot search.',
   risk: 'safe',
@@ -122,6 +130,8 @@ const slackSearch = defineTool({
 
 const slackPost = defineTool({
   name: 'slack_post',
+  group: 'slack',
+  keywords: ['slack', 'send message', 'reply', 'chat', 'dm'],
   description:
     'Post a message to a Slack channel or DM (optionally as a thread reply via threadTs). ALWAYS requires the user\'s approval. With a user token the message is sent as the user. Slack mrkdwn formatting is supported (*bold*, _italic_, `code`, <@U123> mentions).',
   risk: 'dangerous',

@@ -52,6 +52,8 @@ function fmtSummary(t: MailThreadSummary, multi: boolean): string {
 
 const mailAccounts = defineTool({
   name: 'mail_accounts',
+  group: 'mail',
+  keywords: ['gmail', 'email accounts', 'inbox'],
   description: 'List the Gmail accounts connected to Monarch (email, display name, id, and any connection error). Use the email as the `account` argument of other mail tools.',
   risk: 'safe',
   tag: 'MAIL',
@@ -64,6 +66,9 @@ const mailAccounts = defineTool({
 
 const mailSearch = defineTool({
   name: 'mail_search',
+  loading: 'always',
+  group: 'mail',
+  keywords: ['gmail', 'email', 'inbox', 'unread', 'messages'],
   description: [
     'Search or list email threads using Gmail search syntax. Searches ALL connected accounts (merged, newest first) unless `account` is given.',
     'Query examples: "is:unread in:inbox", "from:alice@example.com newer_than:7d", "subject:invoice has:attachment", "label:work is:starred", "in:sent to:bob".',
@@ -94,6 +99,8 @@ const mailSearch = defineTool({
 
 const mailReadThread = defineTool({
   name: 'mail_read_thread',
+  group: 'mail',
+  keywords: ['gmail', 'email', 'open message', 'conversation'],
   description:
     'Read a full email thread (all messages, plain text bodies, headers incl. Message-ID). Get the threadId from mail_search. Long bodies are truncated per message.',
   risk: 'safe',
@@ -138,6 +145,8 @@ const sendSchema = z.object({
 
 const mailSend = defineTool({
   name: 'mail_send',
+  group: 'mail',
+  keywords: ['gmail', 'email', 'reply', 'compose', 'send message'],
   description:
     'Send an email (or a reply when threadId is given) from a connected Gmail account. ALWAYS requires the user\'s approval. Prefer mail_draft when the user has not explicitly asked to send. Confirm the recipient and content are what the user wants.',
   risk: 'dangerous',
@@ -154,6 +163,8 @@ const mailSend = defineTool({
 
 const mailDraft = defineTool({
   name: 'mail_draft',
+  group: 'mail',
+  keywords: ['gmail', 'email', 'compose', 'reply draft'],
   description:
     'Save an email (or reply, with threadId) as a Gmail DRAFT without sending it. The user can review and send it from Gmail. Use this by default when composing on the user\'s behalf.',
   risk: 'sensitive',
@@ -172,6 +183,8 @@ const actions = Object.keys(MAIL_ACTIONS) as [MailAction, ...MailAction[]];
 
 const mailModify = defineTool({
   name: 'mail_modify',
+  group: 'mail',
+  keywords: ['gmail', 'archive', 'label', 'mark read', 'unread', 'trash', 'star'],
   description:
     'Change the state of one or more email threads: read (mark read), unread, archive (remove from inbox), unarchive, star, unstar. Nothing is deleted.',
   risk: 'sensitive',

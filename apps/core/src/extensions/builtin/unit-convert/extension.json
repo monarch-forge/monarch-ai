@@ -1,0 +1,7 @@
+{
+  "id": "unit-convert",
+  "name": "Unit Convert",
+  "version": "1.0.0",
+  "description": "Exact unit conversions (length, mass, volume, temperature, speed, area, data, time, pressure, energy) and time-zone math. Fully offline.",
+  "permissions": []
+}

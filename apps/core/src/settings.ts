@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   permissions: { mode: 'ask' },
   coding: { defaultWorkspace: homedir(), workspaces: [] },
   memory: { vaultDir: paths.vault },
+  evolution: { enabled: true, autoEnable: true, reflect: 'off', deferTools: true },
 };
 
 const store = dataStore<Settings>('settings', DEFAULT_SETTINGS);

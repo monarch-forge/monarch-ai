@@ -21,6 +21,8 @@ export interface EngineState {
   sdkCwd?: string;
   piProvider?: string;
   piMessages?: unknown[];
+  /** pi: deferred tools activated by tool_search, kept across turns/restarts */
+  activatedTools?: string[];
 }
 
 export interface SessionRecord extends SessionDetail {

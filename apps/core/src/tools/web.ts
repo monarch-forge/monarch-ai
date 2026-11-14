@@ -210,6 +210,9 @@ export async function webSearch(query: string, max = 8, signal?: AbortSignal): P
 
 const webSearchTool = defineTool({
   name: 'web_search',
+  loading: 'always',
+  group: 'web',
+  keywords: ['google', 'internet', 'lookup', 'news', 'search engine'],
   description:
     'Search the web (DuckDuckGo, falling back to Bing) and return up to 8 results with title, URL and snippet. Use for current events, facts you are unsure of, documentation, prices, etc. Follow up with web_fetch to read a result.',
   risk: 'safe',
@@ -230,6 +233,9 @@ const webSearchTool = defineTool({
 
 const webFetchTool = defineTool({
   name: 'web_fetch',
+  loading: 'always',
+  group: 'web',
+  keywords: ['url', 'http', 'download page', 'read website', 'scrape'],
   description:
     'Fetch a URL (HTTP GET) and return its readable text: HTML is stripped to text (scripts/styles/navigation removed), JSON is pretty-printed, plain text is returned as-is. Output is capped at ~20k characters; use `offset` to page through long documents.',
   risk: 'safe',
@@ -284,6 +290,8 @@ const webFetchTool = defineTool({
 
 const openUrlTool = defineTool({
   name: 'open_url',
+  group: 'web',
+  keywords: ['browser', 'open link', 'launch website'],
   description: "Open a URL in the user's default web browser (or mail client for mailto:). Use when the user asks to open/show a page.",
   risk: 'sensitive',
   tag: 'NET',

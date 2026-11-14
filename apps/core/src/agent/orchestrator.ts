@@ -556,6 +556,33 @@ export async function runPrompt(opts: {
   }
 }
 
+/**
+ * Like runPrompt, but returns as soon as the session exists (the turn keeps running in the background).
+ * `done` settles when the turn finishes; it never rejects. Used by self-evolution (forge / reflection).
+ */
+export function startPrompt(opts: {
+  text: string;
+  kind: SessionKind;
+  title?: string;
+  engine?: EngineId;
+  model?: string;
+  cwd?: string;
+}): { sessionId: string; done: Promise<{ text: string; error?: string }> } {
+  const rec = newSession({ kind: opts.kind, engine: opts.engine, model: opts.model, cwd: opts.cwd, title: opts.title });
+  broadcastSession(rec);
+  const text = (opts.text ?? '').trim();
+  if (!text) return { sessionId: rec.id, done: Promise.resolve({ text: '', error: 'empty prompt' }) };
+  const keepTitle = rec.title;
+  appendUser(rec, text);
+  if (opts.title) {
+    rec.title = keepTitle;
+    saveSession(rec);
+    broadcastSession(rec);
+  }
+  const done = startTurn(rec, text).catch((e) => ({ text: '', error: errorText(e) }));
+  return { sessionId: rec.id, done };
+}
+
 /** called once at startup */
 export async function initAgent(): Promise<void> {
   listSessions(); // index session files

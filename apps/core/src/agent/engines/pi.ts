@@ -9,13 +9,13 @@
  * see pi-models.ts — no `getApiKey` hook needed.
  */
 import { z } from 'zod';
-import { Agent, type AgentEvent, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
+import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core';
 import { clampThinkingLevel, cleanupSessionResources, type Api, type Model, type ModelThinkingLevel } from '@earendil-works/pi-ai';
 import type { Usage } from '@monarch/shared';
-import { truncate, type ToolDef } from '../../kernel.ts';
+import { defineTool, truncate, type ToolDef } from '../../kernel.ts';
 import { getSettings } from '../../settings.ts';
-import { emptyUsage, addUsage } from '../sessions.ts';
-import { errorText, piToolDefs, runToolDef, toolSummary } from '../toolset.ts';
+import { emptyUsage, addUsage, type SessionRecord } from '../sessions.ts';
+import { deferToolsEnabled, errorText, groupOf, loadsUpFront, piToolDefs, runToolDef, searchToolDefs, toolSummary } from '../toolset.ts';
 import { piModels, resolvePiModel } from '../pi-models.ts';
 import type { Engine, TurnContext, TurnResult } from './types.ts';
 
@@ -30,9 +30,23 @@ interface TurnState {
 interface Entry {
   agent: Agent;
   turn: TurnState | null;
+  /** deferred tools activated by tool_search (persisted in engineState.activatedTools) */
+  activated: Set<string>;
+  /** set when tool_search activated something mid-turn: the next model call gets the new tools */
+  toolsDirty: boolean;
+  /** every ToolDef the session could use right now (loaded or deferred), by name */
+  defs: Map<string, ToolDef>;
 }
 
+export const TOOL_SEARCH = 'tool_search';
+
+/** engineState.activatedTools (pi): names of deferred tools loaded by tool_search */
+const stateOf = (rec: SessionRecord) => rec.engineState;
+
 const agents = new Map<string, Entry>();
+
+/** test seam (scripts/tests only): a fixed model + stream function, skipping provider auth */
+export const piTestHooks: { model?: Model<Api>; streamFn?: StreamFn } = {};
 
 /** JSON schema for a ToolDef's zod schema, as plain JSON (pi validates plain JSON Schema) */
 function jsonSchema(def: ToolDef): Record<string, unknown> {
@@ -54,35 +68,94 @@ function resultText(result: any): string {
   return result == null ? '' : JSON.stringify(result);
 }
 
-function toolsFor(entry: Entry, sessionId: string, kind: TurnContext['session']['kind']): AgentTool<any>[] {
-  return piToolDefs(kind).map(
-    (def): AgentTool<any> => ({
-      name: def.name,
-      label: def.name,
-      description: def.description,
-      parameters: jsonSchema(def),
-      executionMode: 'sequential',
-      async execute(toolCallId, params, signal) {
-        const turn = entry.turn;
-        if (!turn) throw new Error('No active turn');
-        const ok = await turn.ctx.approve({
-          callId: toolCallId,
-          name: def.name,
-          input: params,
-          risk: def.risk,
-          summary: toolSummary(def, params),
-        });
-        if (!ok) throw new Error('The user declined this action. Do not retry it; ask how to proceed instead.');
-        const text = await runToolDef(def, params, {
-          sessionId,
-          cwd: turn.ctx.cwd,
-          signal: signal ?? turn.ctx.signal,
-          progress: (t) => turn.ctx.progress(toolCallId, def.name, t),
-        });
-        return { content: [{ type: 'text', text }], details: {} };
-      },
+/**
+ * The tool list for the next model call: core tools + tools activated by tool_search (+ the
+ * tool_search tool itself while anything is still deferred). With deferral off: everything.
+ */
+function toolsFor(entry: Entry, rec: SessionRecord): AgentTool<any>[] {
+  const all = piToolDefs(rec.kind);
+  const defer = deferToolsEnabled();
+  entry.defs = new Map(all.map((d) => [d.name, d]));
+  const loaded = all.filter((d) => loadsUpFront(d, defer) || entry.activated.has(d.name));
+  const list = loaded.map((def) => agentTool(entry, rec.id, def));
+  if (defer && loaded.length < all.length) {
+    const search = toolSearchDef(entry, rec);
+    entry.defs.set(search.name, search);
+    list.unshift(agentTool(entry, rec.id, search));
+  }
+  return list;
+}
+
+function agentTool(entry: Entry, sessionId: string, def: ToolDef): AgentTool<any> {
+  return {
+    name: def.name,
+    label: def.name,
+    description: def.description,
+    parameters: jsonSchema(def),
+    executionMode: 'sequential',
+    async execute(toolCallId, params, signal) {
+      const turn = entry.turn;
+      if (!turn) throw new Error('No active turn');
+      const ok = await turn.ctx.approve({
+        callId: toolCallId,
+        name: def.name,
+        input: params,
+        risk: def.risk,
+        summary: toolSummary(def, params),
+      });
+      if (!ok) throw new Error('The user declined this action. Do not retry it; ask how to proceed instead.');
+      const text = await runToolDef(def, params, {
+        sessionId,
+        cwd: turn.ctx.cwd,
+        signal: signal ?? turn.ctx.signal,
+        progress: (t) => turn.ctx.progress(toolCallId, def.name, t),
+      });
+      return { content: [{ type: 'text', text }], details: {} };
+    },
+  };
+}
+
+/**
+ * pi has no native tool search: this tool ranks the deferred tools and ACTIVATES the matches.
+ * Activation takes effect on the very next model call of the same turn (prepareNextTurn swaps
+ * the loop's tool list; pi-agent-core then declares the additions in the transcript).
+ */
+function toolSearchDef(entry: Entry, rec: SessionRecord): ToolDef {
+  return defineTool({
+    name: TOOL_SEARCH,
+    description:
+      'Find and load tools that are not loaded yet (mail sending/drafts, Slack, calendar edits, automations, processes, ' +
+      'extensions, self-evolution, …). Matching tools become callable right after this call. Query with keywords ' +
+      '("send email", "slack post") or exact names ("select:slack_post,mail_draft"). Search before saying you cannot do something.',
+    risk: 'safe',
+    group: 'meta',
+    loading: 'always',
+    schema: z.object({
+      query: z.string().min(1).describe('keywords, or "select:name1,name2" for exact tool names'),
+      limit: z.number().int().min(1).max(20).optional().describe('max tools to load (default 5)'),
     }),
-  );
+    summarize: (i) => `Find tools: ${i.query}`,
+    run: ({ query, limit }) => {
+      const defer = deferToolsEnabled();
+      const candidates = [...entry.defs.values()].filter((d) => d.name !== TOOL_SEARCH && !loadsUpFront(d, defer));
+      const hits = searchToolDefs(candidates, query, limit ?? 5);
+      if (!hits.length) {
+        const groups = [...new Set(candidates.map(groupOf))].join(', ');
+        return `No tools matched "${query}". Deferred tool groups: ${groups || '(none)'}. Try other keywords.`;
+      }
+      const fresh = hits.filter((d) => !entry.activated.has(d.name));
+      for (const d of fresh) entry.activated.add(d.name);
+      if (fresh.length) {
+        entry.toolsDirty = true;
+        stateOf(rec).activatedTools = [...entry.activated];
+      }
+      const lines = hits.map((d) => {
+        const desc = d.description.replace(/\s+/g, ' ').trim().split(/(?<=\.)\s/)[0] ?? '';
+        return `- ${d.name} [${d.risk}]: ${desc}\n  parameters: ${JSON.stringify(jsonSchema(d))}`;
+      });
+      return `Loaded ${hits.length} tool(s); call them directly now:\n${lines.join('\n')}`;
+    },
+  });
 }
 
 function onEvent(entry: Entry, ev: AgentEvent): void {
@@ -122,7 +195,7 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
       break;
     }
     case 'tool_execution_start': {
-      const def = piToolDefs(turn.ctx.session.kind).find((d) => d.name === ev.toolName);
+      const def = entry.defs.get(ev.toolName);
       emit({ type: 'tool-start', callId: ev.toolCallId, name: ev.toolName, input: ev.args, risk: def?.risk });
       break;
     }
@@ -158,7 +231,9 @@ export const piEngine: Engine = {
     const rec = ctx.session;
     const providerId = rec.engineState.piProvider || settings.provider;
     const modelSpec = rec.model || settings.model;
-    const { provider, model } = resolvePiModel(providerId, modelSpec);
+    const { provider, model } = piTestHooks.model
+      ? { provider: piTestHooks.model.provider, model: piTestHooks.model }
+      : resolvePiModel(providerId, modelSpec);
     if (!model) {
       return { usage: emptyUsage(), error: `Unknown model "${modelSpec}" for provider "${providerId}". Pick a model in Config.` };
     }
@@ -169,7 +244,7 @@ export const piEngine: Engine = {
 
     const models = piModels();
     try {
-      const auth = await models.checkAuth(provider);
+      const auth = piTestHooks.model ? true : await models.checkAuth(provider);
       if (!auth) {
         return {
           usage: emptyUsage(),
@@ -183,17 +258,34 @@ export const piEngine: Engine = {
 
     let entry = agents.get(rec.id);
     if (!entry) {
-      const fresh: Entry = { agent: null as unknown as Agent, turn: null };
+      const known = new Set(piToolDefs(rec.kind).map((d) => d.name));
+      const fresh: Entry = {
+        agent: null as unknown as Agent,
+        turn: null,
+        // tools that no longer exist (removed extension) are dropped; their old calls stay in history
+        activated: new Set((stateOf(rec).activatedTools ?? []).filter((n) => known.has(n))),
+        toolsDirty: false,
+        defs: new Map(),
+      };
       const restored = (rec.engineState.piMessages ?? []) as AgentMessage[];
       fresh.agent = new Agent({
         initialState: {
           systemPrompt: ctx.systemPrompt,
           model,
           thinkingLevel: thinkingFor(model),
-          tools: toolsFor(fresh, rec.id, rec.kind),
+          tools: toolsFor(fresh, rec),
           messages: restored,
         },
-        streamFn: (m, c, o) => models.streamSimple(m, c, o),
+        streamFn: (m, c, o) => (piTestHooks.streamFn ?? models.streamSimple.bind(models))(m, c, o),
+        // mid-turn tool activation: after a turn whose tool_search loaded new tools, hand the loop
+        // the refreshed list (same message array) so the next model call can use them
+        prepareNextTurnWithContext: (turnCtx) => {
+          if (!fresh.toolsDirty) return undefined;
+          fresh.toolsDirty = false;
+          const tools = toolsFor(fresh, rec);
+          fresh.agent.state.tools = tools;
+          return { context: { messages: turnCtx.context.messages, tools } };
+        },
         sessionId: rec.id,
         toolExecution: 'sequential',
         identity: { attribution: null, userAgent: 'short' },
@@ -204,7 +296,9 @@ export const piEngine: Engine = {
     } else {
       entry.agent.state.model = model;
       entry.agent.state.thinkingLevel = thinkingFor(model);
-      entry.agent.state.tools = toolsFor(entry, rec.id, rec.kind);
+      // extension tools come and go; activated tools stay; refresh every turn
+      entry.agent.state.tools = toolsFor(entry, rec);
+      entry.toolsDirty = false;
     }
 
     if (entry.agent.state.isStreaming) {

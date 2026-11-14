@@ -8,6 +8,9 @@ import { fmtBytes, getMetrics, systemInfo, topProcesses } from '../services/metr
 
 const getDatetime = defineTool({
   name: 'get_datetime',
+  loading: 'always',
+  group: 'system',
+  keywords: ['time', 'date', 'clock', 'timezone', 'today', 'now'],
   description:
     "Get the current local date and time, weekday, IANA timezone and UTC offset of the user's machine. Use before computing relative dates (\"tomorrow at 9\", \"next Friday\") for tasks, reminders and calendar events.",
   risk: 'safe',
@@ -23,6 +26,9 @@ const getDatetime = defineTool({
 
 const getWeatherTool = defineTool({
   name: 'get_weather',
+  loading: 'always',
+  group: 'system',
+  keywords: ['forecast', 'temperature', 'rain', 'climate'],
   description:
     "Current weather, next hours and a 5-day forecast (Open-Meteo). Without `location` it uses the user's saved home location; pass a place name (\"Tokyo\", \"Berlin, DE\") to look up somewhere else.",
   risk: 'safe',
@@ -46,6 +52,8 @@ const getWeatherTool = defineTool({
 
 const systemStatus = defineTool({
   name: 'system_status',
+  group: 'system',
+  keywords: ['cpu', 'memory usage', 'ram', 'disk', 'battery', 'uptime', 'load', 'host', 'machine', 'metrics'],
   description:
     "Snapshot of the user's computer: CPU load and temperature, memory, swap, disk usage per volume, network throughput, battery, uptime and load average, plus host/OS info.",
   risk: 'safe',
@@ -71,6 +79,8 @@ const systemStatus = defineTool({
 
 const listProcesses = defineTool({
   name: 'list_processes',
+  group: 'system',
+  keywords: ['ps', 'top', 'running programs', 'pid', 'kill', 'cpu hog'],
   description: 'List the top running processes on the user\'s machine, sorted by CPU (default) or memory usage. Read-only.',
   risk: 'safe',
   tag: 'SYS',
@@ -94,6 +104,9 @@ const listProcesses = defineTool({
 
 const sendNotification = defineTool({
   name: 'send_notification',
+  loading: 'always',
+  group: 'system',
+  keywords: ['notify', 'alert', 'desktop notification', 'remind', 'popup'],
   description:
     "Post a notification to the user's Monarch notification feed and their desktop. Use for things the user should notice later (e.g. results of a background check), not for normal chat replies.",
   risk: 'safe',

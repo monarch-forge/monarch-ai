@@ -51,6 +51,9 @@ const fmtAutomation = (a: Automation) =>
 
 const tasksList = defineTool({
   name: 'tasks_list',
+  loading: 'always',
+  group: 'productivity',
+  keywords: ['todo', 'to-do', 'reminders', 'tasks'],
   description:
     "List the user's tasks (to-dos). By default returns open tasks sorted by due date then priority. Each line includes the task id needed by task_update / task_complete / task_delete.",
   risk: 'safe',
@@ -88,6 +91,9 @@ const taskFields = {
 
 const taskAdd = defineTool({
   name: 'task_add',
+  loading: 'always',
+  group: 'productivity',
+  keywords: ['todo', 'reminder', 'remind me', 'create task'],
   description:
     'Create a task / to-do, optionally with a due date and a reminder. For "remind me to X at T" create a task with remindAt=T. Call get_datetime first if you need to resolve relative dates.',
   risk: 'sensitive',
@@ -99,6 +105,8 @@ const taskAdd = defineTool({
 
 const taskUpdate = defineTool({
   name: 'task_update',
+  group: 'productivity',
+  keywords: ['edit task', 'reschedule', 'due date', 'priority', 'todo'],
   description: 'Edit an existing task by id (get ids from tasks_list). Only the fields provided are changed.',
   risk: 'sensitive',
   tag: 'TSK',
@@ -114,6 +122,9 @@ const taskUpdate = defineTool({
 
 const taskComplete = defineTool({
   name: 'task_complete',
+  loading: 'always',
+  group: 'productivity',
+  keywords: ['done', 'finish', 'check off', 'todo'],
   description: 'Mark a task as done by id (get ids from tasks_list).',
   risk: 'sensitive',
   tag: 'TSK',
@@ -130,6 +141,8 @@ const taskComplete = defineTool({
 
 const taskDelete = defineTool({
   name: 'task_delete',
+  group: 'productivity',
+  keywords: ['remove task', 'todo'],
   description: 'Permanently delete a task by id. Prefer task_complete for finished tasks; only delete when the user asks.',
   risk: 'dangerous',
   tag: 'TSK',
@@ -148,6 +161,9 @@ const taskDelete = defineTool({
 
 const calendarList = defineTool({
   name: 'calendar_list',
+  loading: 'always',
+  group: 'productivity',
+  keywords: ['events', 'schedule', 'agenda', 'meetings', 'appointments', 'google calendar'],
   description:
     "List calendar events from the user's local Monarch calendar and all connected Google calendars in a time range (default: today through the next 7 days). Each line includes the event id and source.",
   risk: 'safe',
@@ -173,6 +189,8 @@ const calendarList = defineTool({
 
 const calendarAdd = defineTool({
   name: 'calendar_add',
+  group: 'productivity',
+  keywords: ['create event', 'schedule meeting', 'appointment', 'book', 'google calendar'],
   description:
     "Add a calendar event. Without accountId it goes to the local Monarch calendar; with accountId (a connected Google account id — see the source field in calendar_list output) it is created on that account's primary Google calendar.",
   risk: 'sensitive',
@@ -193,6 +211,8 @@ const calendarAdd = defineTool({
 
 const calendarDelete = defineTool({
   name: 'calendar_delete',
+  group: 'productivity',
+  keywords: ['cancel event', 'remove meeting', 'appointment'],
   description: 'Delete a calendar event by id (local or Google, ids from calendar_list). Only when the user asks.',
   risk: 'dangerous',
   tag: 'CAL',
@@ -208,6 +228,8 @@ const calendarDelete = defineTool({
 
 const automationsList = defineTool({
   name: 'automations_list',
+  group: 'productivity',
+  keywords: ['schedules', 'cron', 'recurring', 'scheduled prompts', 'jobs'],
   description: 'List scheduled automations (recurring prompts Monarch runs on its own) with schedule, next run and last status.',
   risk: 'safe',
   tag: 'AUTO',
@@ -220,6 +242,8 @@ const automationsList = defineTool({
 
 const automationCreate = defineTool({
   name: 'automation_create',
+  group: 'productivity',
+  keywords: ['schedule', 'cron', 'recurring', 'every day', 'every morning', 'routine', 'job'],
   description:
     'Create a recurring automation: Monarch will run `prompt` in its own session on `schedule` and (optionally) post the result as a notification. ' +
     'Schedule formats: 5-field cron in local time ("0 8 * * 1-5" = weekdays 08:00), or shorthand "every 30m", "every 2h", "every 1d", "daily 08:00", "weekdays 07:30", "hourly". ' +
@@ -242,6 +266,8 @@ const automationCreate = defineTool({
 
 const automationDelete = defineTool({
   name: 'automation_delete',
+  group: 'productivity',
+  keywords: ['remove schedule', 'cron', 'recurring', 'job'],
   description: 'Delete an automation by id (ids from automations_list).',
   risk: 'dangerous',
   tag: 'AUTO',

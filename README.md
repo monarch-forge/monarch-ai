@@ -17,6 +17,8 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Agenda.** Google Calendar, plus local tasks, reminders and cron-style automations.
 - **Systems.** Live CPU, memory, disk, network, battery and process telemetry.
 - **Voice.** Speech output and push-to-talk input through the webview's speech APIs, where they're available.
+- **Self-evolution.** Monarch extends itself. Ask it (or use **Evolve → Forge**) for a capability it lacks and it writes, sandboxes and tests a new extension (tools, dashboard panels, background jobs) or a skill (a learned procedure). Every change is versioned with rollback and logged on a timeline. An optional daily or weekly self-reflection turns friction into proposals you approve.
+- **Lean prompts.** Only about 14 core tools load into each prompt. The rest, including every extension tool, are found on demand through tool search (Claude Code's native ToolSearch, or `tool_search` on pi). That roughly halves the prompt.
 - **Command palette.** Press `Ctrl/⌘+K` for everything.
 
 ## Architecture
@@ -62,8 +64,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.2.0/monarch-ai-bin-0.2.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.2.0-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.3.0/monarch-ai-bin-0.3.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.3.0-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -88,30 +90,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.2.0_amd64.deb
+sudo apt install ./Monarch_0.3.0_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.2.0-1.x86_64.rpm
+sudo dnf install ./Monarch-0.3.0-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.2.0_amd64.AppImage && ./Monarch_0.2.0_amd64.AppImage
+chmod +x Monarch_0.3.0_amd64.AppImage && ./Monarch_0.3.0_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.2.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.2.0_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.3.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.3.0_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.2.0_x64-setup.exe`, or `Monarch_0.2.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.3.0_x64-setup.exe`, or `Monarch_0.3.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 
@@ -264,6 +266,20 @@ Messages are posted as you, and every send goes through approval.
 
 The default vault is `~/.monarch-ai/vault`. To use an existing Obsidian vault, point **Config → Memory → Vault directory** at it. Notes stay plain markdown with frontmatter, `[[links]]` and `#tags`, so Obsidian and Monarch can both edit them.
 
+### Extensions and skills
+
+An extension is a folder `~/.monarch-ai/extensions/<id>/` holding `extension.json` (manifest) and `index.mjs`, which exports `activate(api)`. With `api.tool`, `api.panel`, `api.job`, `api.store`, `api.secrets`, `api.notify` and `api.z` (zod) it adds tools the agent can call, panels for the Evolve page, and interval jobs. The full reference is in **Evolve → New → API reference**, and the agent reads it before writing one. Three builtin examples are seeded on first run: Hacker News, Unit Convert and Focus Timer.
+
+Each extension runs in its own Node child process under Node's permission model:
+
+- **Default:** it can read only its own folder, write only its `data/` dir, and has no network, child processes, or environment secrets.
+- **Opt-in permissions:** the manifest can grant `network`, `shell` (effectively unsandboxed), `fs` (your home dir, which includes Monarch's data, so treat it as high trust) and `secrets` (values you enter in Evolve).
+- **Node versions:** network blocking needs Node 25 or newer; on older Node it falls back to a `fetch` guard.
+
+Agent-written extensions go through the normal approval gates. With **Config → Evolution → Auto-enable** off, they wait in Evolve for your review. Turning off **Self-modification** blocks agent writes completely.
+
+Skills are markdown files in `~/.monarch-ai/skills/`. Their names are listed in the system prompt, and the agent reads one before doing that task.
+
 ## Data locations
 
 Everything lives under `~/.monarch-ai`. Set `MONARCH_HOME` to put it somewhere else.
@@ -274,6 +290,8 @@ Everything lives under `~/.monarch-ai`. Set `MONARCH_HOME` to put it somewhere e
 | `secrets.json` | API keys, OAuth tokens, Slack token (file mode `600`). Never sent to the UI |
 | `sessions/` | one JSON file per chat session |
 | `vault/` | default memory vault |
+| `extensions/` | extensions (with `.history/` revisions and per-extension `data/`) |
+| `skills/` | skills (markdown procedures) |
 | `logs/core.log` | core output when it was started by the desktop app (rotated at 5 MB) |
 
 ## Security model

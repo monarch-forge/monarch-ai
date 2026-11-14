@@ -3,7 +3,7 @@
  */
 import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
-import { UserRound, Cpu, KeyRound, Link2, ShieldCheck } from 'lucide-preact';
+import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna } from 'lucide-preact';
 import { conn, health, navigate, settings } from '../lib/store.ts';
 import { Panel, Tag, ErrorLine } from '../components/ui.tsx';
 import { SettingsGate } from '../components/config/fields.tsx';
@@ -12,6 +12,7 @@ import { ModelsSection } from '../components/config/models.tsx';
 import { ProvidersSection } from '../components/config/providers.tsx';
 import { AccountsSection } from '../components/config/accounts.tsx';
 import { PermissionsSection } from '../components/config/permissions.tsx';
+import { EvolutionSection } from '../components/config/evolution.tsx';
 
 const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
   { id: 'general', label: 'General', icon: UserRound, desc: 'Identity, location, persona, voice', page: GeneralSection, needsSettings: true },
@@ -19,6 +20,7 @@ const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: C
   { id: 'providers', label: 'Providers', icon: KeyRound, desc: 'API keys and logins', page: ProvidersSection, needsSettings: false },
   { id: 'accounts', label: 'Accounts', icon: Link2, desc: 'Google and Slack', page: AccountsSection, needsSettings: false },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'Approvals and folders', page: PermissionsSection, needsSettings: true },
+  { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'Self-extension and reflection', page: EvolutionSection, needsSettings: true },
 ];
 
 export default function ConfigPage(props: { params: string[] }) {

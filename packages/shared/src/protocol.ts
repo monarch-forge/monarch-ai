@@ -91,6 +91,17 @@ export interface Settings {
     /** Obsidian-compatible vault directory with markdown notes */
     vaultDir: string;
   };
+  /** self-evolution: extensions, skills, reflection, deferred tools */
+  evolution: {
+    /** the agent may write/modify its own extensions and skills (still approval-gated by risk) */
+    enabled: boolean;
+    /** extensions the agent writes are enabled immediately (false = they wait for the user in Evolve) */
+    autoEnable: boolean;
+    /** periodic self-review that turns friction into proposals */
+    reflect: 'off' | 'daily' | 'weekly';
+    /** only core tools are loaded up front; the rest are discovered with tool search (keeps the context lean) */
+    deferTools: boolean;
+  };
 }
 
 /* ────────────────────────────── providers / auth ────────────────────────────── */
@@ -453,7 +464,7 @@ export interface Weather {
   fetchedAt: ISODate;
 }
 
-export type LogTag = 'SYS' | 'AGT' | 'CAL' | 'TSK' | 'MEM' | 'MAIL' | 'SLK' | 'NET' | 'CODE' | 'AUTO' | 'ERR';
+export type LogTag = 'SYS' | 'AGT' | 'CAL' | 'TSK' | 'MEM' | 'MAIL' | 'SLK' | 'NET' | 'CODE' | 'AUTO' | 'EVO' | 'EXT' | 'ERR';
 
 export interface ActivityEntry {
   id: ID;
@@ -509,6 +520,196 @@ export interface HealthInfo {
   model: string;
 }
 
+
+/* ────────────────────────────── self-evolution ──────────────────────────────
+ *
+ * Monarch extends itself at runtime:
+ *  - Extensions: ~/.monarch-ai/extensions/<id>/{extension.json,index.mjs}. Each runs in its own
+ *    sandboxed Node child process (Node permission model) and contributes tools, panels and jobs.
+ *    Every write is versioned (revision history + rollback).
+ *  - Skills: ~/.monarch-ai/skills/<id>.md — learned procedures (markdown + frontmatter) the agent
+ *    reads on demand; their names/descriptions are listed in the system prompt.
+ *  - Proposals: ideas from reflection runs or the agent, reviewed by the user.
+ *  - Timeline: an audit log of every self-modification.
+ * Tools are split into always-loaded core tools and deferred tools found via tool search.
+ */
+
+export type ExtensionPermission =
+  /** outbound HTTP (fetch) */
+  | 'network'
+  /** spawn processes */
+  | 'shell'
+  /** read/write files outside the extension's own data dir */
+  | 'fs'
+  /** read secrets the user stored for this extension (api.secrets) */
+  | 'secrets';
+
+export type ExtensionOrigin = 'builtin' | 'user' | 'agent';
+export type ExtensionStatus = 'active' | 'disabled' | 'error' | 'starting';
+
+export interface ExtensionManifest {
+  /** kebab-case, unique: "hacker-news" */
+  id: string;
+  name: string;
+  version: string; // semver-ish "0.1.0"
+  description: string;
+  permissions: ExtensionPermission[];
+  /** names of secrets the extension expects (user fills them in Evolve; read via api.secrets.get) */
+  secrets?: string[];
+}
+
+export interface ExtensionToolInfo {
+  /** full tool name as the agent sees it: "<id_snake>_<tool>" */
+  name: string;
+  description: string;
+  risk: ToolRisk;
+}
+
+export interface ExtensionPanelInfo {
+  id: string;
+  title: string;
+}
+
+export interface ExtensionJobInfo {
+  id: string;
+  /** interval in minutes */
+  everyMinutes: number;
+  lastRunAt?: ISODate;
+  lastError?: string;
+}
+
+export interface ExtensionSummary {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  origin: ExtensionOrigin;
+  enabled: boolean;
+  status: ExtensionStatus;
+  error?: string;
+  permissions: ExtensionPermission[];
+  tools: ExtensionToolInfo[];
+  panels: ExtensionPanelInfo[];
+  jobs: ExtensionJobInfo[];
+  /** secret names declared in the manifest and whether each is set (values never leave the core) */
+  secrets: { name: string; set: boolean }[];
+  revision: number;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** total tool calls served */
+  calls: number;
+}
+
+export interface ExtensionLogLine {
+  ts: ISODate;
+  level: 'info' | 'warn' | 'error';
+  text: string;
+}
+
+export interface ExtensionRevision {
+  revision: number;
+  ts: ISODate;
+  actor: 'agent' | 'user' | 'system';
+  note: string;
+}
+
+export interface ExtensionDetail extends ExtensionSummary {
+  manifest: ExtensionManifest;
+  /** index.mjs source */
+  source: string;
+  logs: ExtensionLogLine[];
+  history: ExtensionRevision[];
+}
+
+/** what a panel's render() returns; the UI draws it in the Evolve page */
+export interface PanelContent {
+  title?: string;
+  markdown?: string;
+  stats?: { label: string; value: string; hint?: string }[];
+  items?: { title: string; sub?: string; href?: string }[];
+  updatedAt: ISODate;
+}
+
+export interface SkillSummary {
+  /** kebab-case file stem */
+  id: string;
+  name: string;
+  description: string;
+  origin: 'user' | 'agent';
+  updatedAt: ISODate;
+  /** how often the agent read it */
+  uses: number;
+}
+
+export interface Skill extends SkillSummary {
+  /** markdown body (without frontmatter) */
+  body: string;
+}
+
+export type EvolutionKind =
+  | 'extension.created'
+  | 'extension.updated'
+  | 'extension.removed'
+  | 'extension.enabled'
+  | 'extension.disabled'
+  | 'extension.rollback'
+  | 'extension.error'
+  | 'skill.created'
+  | 'skill.updated'
+  | 'skill.removed'
+  | 'proposal.created'
+  | 'proposal.accepted'
+  | 'proposal.dismissed'
+  | 'reflection';
+
+export interface EvolutionEntry {
+  id: ID;
+  ts: ISODate;
+  kind: EvolutionKind;
+  title: string;
+  detail?: string;
+  actor: 'agent' | 'user' | 'system';
+  sessionId?: ID;
+  /** extension id / skill id / proposal id */
+  ref?: string;
+}
+
+export interface EvolutionProposal {
+  id: ID;
+  ts: ISODate;
+  title: string;
+  /** why: the friction or opportunity observed */
+  rationale: string;
+  /** what to build, precise enough for an agent to implement */
+  plan: string;
+  kind: 'extension' | 'skill';
+  status: 'open' | 'accepted' | 'dismissed';
+  /** session that created it, and the build session after acceptance */
+  sessionId?: ID;
+  buildSessionId?: ID;
+}
+
+export interface ToolCatalogEntry {
+  name: string;
+  description: string;
+  risk: ToolRisk;
+  source: 'core' | 'extension';
+  extensionId?: string;
+  /** always = in every prompt; deferred = found via tool search */
+  loading: 'always' | 'deferred';
+  group: string;
+}
+
+export interface EvolutionStats {
+  extensions: { total: number; active: number; error: number };
+  tools: { always: number; deferred: number };
+  skills: number;
+  openProposals: number;
+  /** self-modifications in the last 7 days */
+  changes7d: number;
+  lastReflectionAt?: ISODate;
+}
+
 /* ────────────────────────────── WebSocket frames ────────────────────────────── */
 
 export type ServerEvent =
@@ -544,7 +745,10 @@ export type ServerEvent =
         | 'mail'
         | 'slack'
         | 'google'
-        | 'notifications';
+        | 'notifications'
+        | 'extensions'
+        | 'skills'
+        | 'evolution';
     }
   | { type: 'pong'; t: number };
 
@@ -637,4 +841,28 @@ export type ClientCommand =
  *
  * GET    /api/fs/dirs?path=                  -> { path: string; parent: string | null; dirs: string[] } (workspace picker)
  * GET    /api/coding/git?cwd=                -> { branch: string | null; dirty: number; ahead: number; behind: number; recent: { hash: string; subject: string; date: ISODate }[] } | { error }
+ *
+ * GET    /api/extensions                     -> ExtensionSummary[]
+ * GET    /api/extensions/:id                 -> ExtensionDetail
+ * PUT    /api/extensions/:id {manifest, source, note?} -> ExtensionDetail   (create or update; user edit)
+ * POST   /api/extensions/:id/toggle {enabled} -> ExtensionSummary
+ * POST   /api/extensions/:id/reload          -> ExtensionSummary
+ * POST   /api/extensions/:id/rollback {revision} -> ExtensionDetail
+ * PUT    /api/extensions/:id/secrets {name, value} -> ExtensionSummary   (value '' clears)
+ * DELETE /api/extensions/:id                 -> { ok }
+ * GET    /api/extensions/:id/panels/:panelId -> PanelContent
+ * POST   /api/extensions/:id/tools/:tool/test {args} -> { ok: boolean; output: string; durationMs: number }
+ * GET    /api/extension-api                  -> { markdown: string }   (extension authoring reference)
+ * GET    /api/skills                         -> SkillSummary[]
+ * GET    /api/skills/:id                     -> Skill
+ * PUT    /api/skills/:id {name, description, body} -> Skill
+ * DELETE /api/skills/:id                     -> { ok }
+ * GET    /api/evolution/stats                -> EvolutionStats
+ * GET    /api/evolution/timeline?limit=100   -> EvolutionEntry[]
+ * GET    /api/evolution/proposals            -> EvolutionProposal[]
+ * POST   /api/evolution/proposals/:id/accept -> { sessionId }   (starts a build session)
+ * POST   /api/evolution/proposals/:id/dismiss -> { ok }
+ * POST   /api/evolution/reflect              -> { sessionId }   (run a reflection now)
+ * POST   /api/evolution/forge {text}         -> { sessionId }   (ask the agent to build a capability)
+ * GET    /api/tools/catalog                  -> ToolCatalogEntry[]
  */

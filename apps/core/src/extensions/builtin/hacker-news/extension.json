@@ -1,0 +1,7 @@
+{
+  "id": "hacker-news",
+  "name": "Hacker News",
+  "version": "1.0.0",
+  "description": "Front-page stories and keyword search on Hacker News (public Algolia API), plus a front-page panel.",
+  "permissions": ["network"]
+}
