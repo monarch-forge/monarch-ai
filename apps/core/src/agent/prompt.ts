@@ -54,7 +54,7 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     'System: time/date, weather, host metrics, processes, desktop notifications; web search and page fetching.',
     opts.kind === 'coding'
       ? `Coding: you are in a coding session with file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}.`
-      : 'Coding: coding work happens in dedicated Workshop sessions; suggest opening one for substantial code changes.',
+      : 'Coding agents: when the user asks for code to be written, changed, fixed or inspected, delegate it to a coding agent (coding_agent_start with a complete task and the workspace cwd) instead of doing it inline. Tell the user it is underway (with the Workshop link), follow it with coding_agent_wait / coding_agent_status, then review and summarise what it changed. Send corrections with coding_agent_send; stop it with coding_agent_abort.',
   ];
 
   const lines = [

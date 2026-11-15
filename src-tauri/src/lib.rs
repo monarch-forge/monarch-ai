@@ -7,7 +7,7 @@
 //!      which also covers the shell crashing or being SIGKILLed),
 //!   3. logs core stdout/stderr to ~/.monarch-ai/logs/core.log,
 //!   4. stops it (EOF → SIGTERM → SIGKILL) and reaps it on exit,
-//!   5. exposes `open_external(url)` and `core_status()` to the UI.
+//!   5. exposes `open_external(url)`, `core_status()` and `open_router_window(url)` to the UI.
 
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -349,6 +349,40 @@ fn open_external(app: AppHandle, url: String) -> Result<(), String> {
     app.opener().open_url(trimmed, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// Open (or focus) the 9Router dashboard in its own top-level webview window.
+///
+/// Why not an <iframe> in the main window: the packaged UI is served from a custom scheme
+/// (tauri://localhost on Linux/macOS, http://tauri.localhost on Windows), so a frame on
+/// http://127.0.0.1:20128 is *cross-site*. 9Router's session cookie (`auth_token`, SameSite=Lax)
+/// is then never sent/stored inside the frame (WebKit also blocks third-party cookies outright),
+/// so its login can't stick. A top-level window makes 9Router first-party. Only loopback
+/// http(s) URLs are accepted; the window gets no capability, so the page has no IPC access.
+#[tauri::command]
+async fn open_router_window(app: AppHandle, url: String) -> Result<(), String> {
+    let parsed: tauri::Url = url.trim().parse().map_err(|e| format!("invalid URL: {e}"))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(format!("refusing non-http(s) URL: {}", parsed.scheme()));
+    }
+    if !matches!(parsed.host_str(), Some("127.0.0.1") | Some("localhost") | Some("[::1]")) {
+        return Err("refusing non-loopback 9Router URL".into());
+    }
+    if let Some(w) = app.get_webview_window("router") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    tauri::WebviewWindowBuilder::new(&app, "router", tauri::WebviewUrl::External(parsed))
+        .title("9Router — Monarch")
+        .inner_size(1280.0, 860.0)
+        .min_inner_size(800.0, 560.0)
+        .center()
+        .resizable(true)
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn core_status(state: State<'_, CoreState>) -> CoreStatus {
     let mut inner = state.0.lock().unwrap_or_else(|e| e.into_inner());
@@ -388,7 +422,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(CoreState(Mutex::new(CoreInner::default())))
-        .invoke_handler(tauri::generate_handler![open_external, core_status])
+        .invoke_handler(tauri::generate_handler![open_external, core_status, open_router_window])
         .setup(|app| {
             let handle = app.handle().clone();
             let state = app.state::<CoreState>();

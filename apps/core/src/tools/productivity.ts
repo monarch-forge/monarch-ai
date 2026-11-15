@@ -260,7 +260,7 @@ const automationCreate = defineTool({
   summarize: (i) => `Create automation "${i.name}" (${i.schedule})`,
   run: (i) => {
     parseSchedule(i.schedule);
-    return `Created: ${fmtAutomation(createAutomation(i))}`;
+    return `Created: ${fmtAutomation(createAutomation(i, { announce: true }))}`;
   },
 });
 

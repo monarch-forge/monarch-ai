@@ -202,7 +202,29 @@ export function getAutomation(id: string): Automation {
 
 export type AutomationInput = Partial<Pick<Automation, 'name' | 'schedule' | 'prompt' | 'enabled' | 'notify'>>;
 
-export function createAutomation(input: AutomationInput): Automation {
+/** human-readable schedule for notifications (mirrors the UI's describeSchedule for common forms) */
+function humanSchedule(expr: string): string {
+  const t = expr.trim();
+  let m = /^every\s+(\d+)\s*([mhd])/i.exec(t);
+  if (m) return `every ${m[1]}${m[2].toLowerCase()}`;
+  m = /^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+(\S+)$/.exec(t);
+  if (m) {
+    const time = `${m[2].padStart(2, '0')}:${m[1].padStart(2, '0')}`;
+    if (m[3] === '*') return `daily ${time}`;
+    if (m[3] === '1-5') return `weekdays ${time}`;
+    if (m[3] === '0,6' || m[3] === '6,0') return `weekends ${time}`;
+  }
+  return t;
+}
+
+/** href where an automation is listed in the UI (Comms → Automations → Active) */
+export const automationHref = (id: string) => `#/comms/automations/${encodeURIComponent(id)}`;
+
+/**
+ * createAutomation(input, { announce: true }) also posts a notification ("Automation registered: …") —
+ * used by the agent tool; the UI form already toasts on its own, so REST creates stay silent.
+ */
+export function createAutomation(input: AutomationInput, opts: { announce?: boolean } = {}): Automation {
   const name = input.name?.trim();
   const prompt = input.prompt?.trim();
   if (!name) throw new HttpError(400, 'name is required');
@@ -227,6 +249,10 @@ export function createAutomation(input: AutomationInput): Automation {
   });
   changed('automations');
   activity('AUTO', `Automation created: ${a.name} (${a.schedule})`);
+  if (opts.announce) {
+    const next = a.nextRunAt ? ` · next ${new Date(a.nextRunAt).toLocaleString()}` : '';
+    notify(`Automation registered: ${a.name}`, `${humanSchedule(a.schedule)}${next}`, 'success', automationHref(a.id));
+  }
   return a;
 }
 

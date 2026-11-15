@@ -257,6 +257,14 @@ export default function WorkshopPage(props: { params: string[] }) {
         right={chat.running ? <Tag tone="red">live</Tag> : session?.id ? <Tag>idle</Tag> : <Tag tone="plain">draft</Tag>}
       >
         <GitBar cwd={cwd} refreshKey={chat.running ? 1 : 0} />
+        {session?.parentSessionId && (
+          <div class="px-3 py-1 border-b border-line font-mono text-[10.5px] text-fg-3">
+            delegated from{' '}
+            <a href={`#/comms/${encodeURIComponent(session.parentSessionId)}`} class="text-fg-2 underline decoration-red underline-offset-2 hover:text-fg">
+              chat
+            </a>
+          </div>
+        )}
         {chat.loading && !session ? (
           <div class="flex-1 flex items-center justify-center">
             <Spinner />

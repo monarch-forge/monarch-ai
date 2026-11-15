@@ -3,7 +3,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { speak, stopSpeaking } from '../lib/voice.ts';
-import type { SessionKind } from '@monarch/shared';
+import type { Automation, SessionKind } from '@monarch/shared';
 import { Plus, Search, MessageSquare, Zap } from 'lucide-preact';
 import { Panel, Tag, Empty, Spinner, ErrorLine } from '../components/ui.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
@@ -14,6 +14,7 @@ import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.t
 import { useChatSession, useSessions, renameSession, totalTokens } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
 import { fmt } from '../components/ui.tsx';
+import { ActiveAutomations } from '../components/agenda/automations.tsx';
 
 const SUGGESTED = [
   { title: 'Morning brief', text: 'Give me a brief of my day: calendar, important unread email, open tasks and the weather.' },
@@ -53,12 +54,25 @@ function useStoredKind(): [SessionKind, (k: SessionKind) => void] {
 }
 
 export default function CommsPage(props: { params: string[] }) {
-  const routeId = props.params[0];
+  // "#/comms/automations/<id>?" = deep link to the Automations tab (Active list), e.g. from a notification
+  const autoLink = props.params[0] === 'automations';
+  const routeId = autoLink ? undefined : props.params[0];
   const isNew = routeId === 'new';
   const sessionId = routeId && !isNew ? routeId : null;
 
   const [kind, setKind] = useStoredKind();
   const [query, setQuery] = useState('');
+  // automation selected in the Active list → filters "Recent runs" (runs are titled with the automation name)
+  const [selAuto, setSelAuto] = useState<Automation | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!autoLink) return;
+    setKind('automation');
+    const id = props.params[1] || null;
+    setFlash(id);
+    if (id) setTimeout(() => setFlash((f) => (f === id ? null : f)), 4000);
+    location.replace('#/comms');
+  }, [autoLink, props.params[1]]);
   const [inject, setInject] = useState<{ text: string; n: number } | null>(null);
   const list = useSessions(kind);
   const chats = useSessions('chat');
@@ -70,16 +84,17 @@ export default function CommsPage(props: { params: string[] }) {
 
   // no id → open the most recent chat (or stay in "new" mode when there is none)
   useEffect(() => {
-    if (routeId || !chats.sessions) return;
+    if (routeId || autoLink || !chats.sessions) return;
     if (chats.sessions.length) location.replace(`#/comms/${encodeURIComponent(chats.sessions[0].id)}`);
     else location.replace('#/comms/new');
   }, [routeId, chats.sessions]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const all = list.sessions ?? [];
+    let all = list.sessions ?? [];
+    if (kind === 'automation' && selAuto) all = all.filter((x) => x.title === selAuto.name);
     return q ? all.filter((x) => x.title.toLowerCase().includes(q) || x.model.toLowerCase().includes(q)) : all;
-  }, [list.sessions, query]);
+  }, [list.sessions, query, kind, selAuto]);
 
   // a turn asked by voice gets its reply spoken (when spoken replies are on)
   const voiceTurn = useRef(false);
@@ -175,6 +190,19 @@ export default function CommsPage(props: { params: string[] }) {
           </label>
         </div>
         <div class="flex-1 min-h-0 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {kind === 'automation' && (
+            <>
+              <ActiveAutomations selected={selAuto?.id ?? null} onSelect={setSelAuto} highlight={flash} />
+              <div class="flex items-center gap-2 px-3 pt-2.5 pb-1">
+                <span class="hud-label">{selAuto ? 'Runs' : 'Recent runs'}</span>
+                {selAuto && (
+                  <button class="ml-auto font-mono text-[10px] text-fg-3 hover:text-fg truncate max-w-[60%]" onClick={() => setSelAuto(null)} title="Show all runs">
+                    {selAuto.name} ×
+                  </button>
+                )}
+              </div>
+            </>
+          )}
           {list.loading && !list.sessions ? (
             <div class="flex justify-center py-6">
               <Spinner />
@@ -184,7 +212,7 @@ export default function CommsPage(props: { params: string[] }) {
               <ErrorLine error={conn.value === 'open' ? list.error : 'Core offline'} />
             </div>
           ) : filtered.length === 0 ? (
-            <Empty>{query ? 'No matches' : kind === 'chat' ? 'No conversations yet' : 'No automation runs yet'}</Empty>
+            <Empty>{query ? 'No matches' : kind === 'chat' ? 'No conversations yet' : selAuto ? 'No runs of this automation yet' : 'No automation runs yet'}</Empty>
           ) : (
             filtered.map((x) => (
               <SessionRow

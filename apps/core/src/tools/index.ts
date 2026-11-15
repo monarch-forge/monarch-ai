@@ -8,6 +8,7 @@
  *  - slack.ts         (Core-C) slack across workspaces
  *  - memory.ts        (Core-C) vault notes: search/read/write/link
  *  - evolve.ts        (Evo)    self-evolution: extensions, skills, proposals (mostly deferred)
+ *  - delegate.ts      coding agents: delegate work to Workshop coding sessions (start/send/status/wait/list/abort)
  *  + extensionToolDefs()        live tools contributed by enabled extensions (always deferred)
  * Loading: ToolDef.loading === 'always' → in every prompt; otherwise deferred behind tool search.
  */
@@ -20,11 +21,12 @@ import { tools as mail } from './mail.ts';
 import { tools as slack } from './slack.ts';
 import { tools as memory } from './memory.ts';
 import { tools as evolve } from './evolve.ts';
+import { tools as delegate } from './delegate.ts';
 import { extensionToolDefs } from '../extensions/index.ts';
 
 /** tools available to every session */
 export function assistantTools(): ToolDef[] {
-  return [...system, ...productivity, ...web, ...mail, ...slack, ...memory, ...evolve, ...extensionToolDefs()];
+  return [...system, ...productivity, ...web, ...mail, ...slack, ...memory, ...evolve, ...delegate, ...extensionToolDefs()];
 }
 
 /** file/shell tools for the pi engine (claude-sdk engine uses Claude Code's own Read/Write/Edit/Bash/Grep/Glob instead) */

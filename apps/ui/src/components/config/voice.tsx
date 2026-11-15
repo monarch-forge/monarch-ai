@@ -21,7 +21,7 @@ const STT_PROVIDERS: { id: VoiceSttSettings['provider']; label: string; hint: st
 ];
 const TTS_PROVIDERS: { id: VoiceTtsSettings['provider']; label: string; hint: string }[] = [
   { id: 'none', label: 'Off', hint: '' },
-  { id: 'native', label: 'Native (say / speech synthesis)', hint: 'built-in macOS/Windows/Linux speech, British accent default' },
+  { id: 'native', label: 'Native (on-device)', hint: 'offline system speech: espeak-ng / flite / festival / piper (Linux), say (macOS), System.Speech (Windows)' },
   { id: 'openai', label: 'OpenAI', hint: 'gpt-4o-mini-tts — natural voices' },
   { id: 'elevenlabs', label: 'ElevenLabs', hint: 'most lifelike voices' },
   { id: 'custom', label: 'OpenAI-compatible', hint: 'any …/v1/audio/speech endpoint' },
@@ -64,7 +64,7 @@ export function VoiceSection() {
         <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-6">
           <ToggleRow
             label="Speak responses"
-            hint={ttsReady ? 'Read replies aloud (console, and Comms when you asked by voice).' : 'Set up a text-to-speech provider below first.'}
+            hint={ttsReady ? 'Read replies aloud (console, and Comms when you asked by voice).' : st?.tts.error ? `Text to speech not ready: ${st.tts.error}${st.tts.hint ? ` — ${st.tts.hint}` : ''}` : 'Set up a text-to-speech provider below first.'}
             checked={v.speak && ttsReady}
             disabled={!ttsReady}
             onChange={(on) => void patch({ speak: on }, on ? 'Spoken replies on' : 'Spoken replies off')}
@@ -92,6 +92,31 @@ function StatusTag(props: { s?: VoiceSideStatus }) {
   if (!s || s.provider === 'none') return <Tag>off</Tag>;
   if (s.ready) return <Tag tone="ok">ready</Tag>;
   return <Tag tone="warn">{s.error ?? 'not ready'}</Tag>;
+}
+
+/** native engine in use, or what to install when there is none */
+function NativeInfo(props: { s?: VoiceSideStatus }) {
+  const s = props.s;
+  if (!s) return null;
+  if (s.ready)
+    return (
+      <div class="text-[12px] text-fg-3">
+        Engine: <span class="font-mono text-fg-2">{s.engine}</span>
+        {s.hint ? ` · ${s.hint}` : ''}
+      </div>
+    );
+  return (
+    <div class="text-[12px] text-warning leading-relaxed">
+      {s.error ?? 'No speech engine'}
+      {s.hint && (
+        <>
+          {' — '}
+          <span class="font-mono select-all">{s.hint}</span>
+        </>
+      )}
+      <span class="text-fg-3"> · then reopen this page.</span>
+    </div>
+  );
 }
 
 function KeyField(props: { provider: VoiceKeyProvider; status?: VoiceSideStatus }) {
@@ -284,13 +309,14 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
                 <LazyInput mono value={c.baseUrl} placeholder="https://api.example.com/v1" onSave={(baseUrl) => set({ baseUrl })} />
               </Field>
             )}
+            {c.provider === 'native' && <NativeInfo s={props.status} />}
             {c.provider !== 'native' && <KeyField provider={c.provider as VoiceKeyProvider} status={props.status} />}
             <div class="grid grid-cols-2 gap-3">
               <Field
                 label="Voice"
                 hint={
                   c.provider === 'native' ? (
-                    <span class="text-fg-3">Default uses British voice (Oliver / George / en-GB).</span>
+                    <span class="text-fg-3">Default: the engine's British English voice where available.</span>
                   ) : voices.find((x) => x.id === c.voice)?.disabled ? (
                     <span class="text-warning">This voice needs a paid ElevenLabs plan — pick a premade voice.</span>
                   ) : c.provider === 'elevenlabs' && voices.some((x) => x.disabled) ? (
@@ -300,7 +326,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
               >
                 {voices.length ? (
                   <select class={SELECT} value={c.voice} onChange={(e) => set({ voice: (e.target as HTMLSelectElement).value })}>
-                    <option value="">Default (British)</option>
+                    <option value="">{c.provider === 'native' ? 'Default (engine default, en-GB)' : 'Default'}</option>
                     {voices.map((x) => (
                       <option key={x.id} value={x.id} disabled={x.disabled && x.id !== c.voice}>
                         {x.name}
@@ -309,7 +335,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
                     ))}
                   </select>
                 ) : (
-                  <LazyInput mono value={c.voice} placeholder={c.provider === 'native' ? 'Oliver / Microsoft George / en-gb' : c.provider === 'elevenlabs' ? 'voice id' : 'alloy'} onSave={(voice) => set({ voice })} />
+                  <LazyInput mono value={c.voice} placeholder={c.provider === 'native' ? 'en-gb' : c.provider === 'elevenlabs' ? 'voice id' : 'alloy'} onSave={(voice) => set({ voice })} />
                 )}
               </Field>
               {c.provider !== 'native' && (

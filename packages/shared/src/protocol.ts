@@ -83,6 +83,10 @@ export interface VoiceSideStatus {
   keySource?: 'voice' | 'provider' | 'env';
   model: string;
   error?: string;
+  /** native TTS: the engine in use (espeak-ng, flite, say, sapi…) */
+  engine?: string;
+  /** actionable advice, e.g. "Install espeak-ng: sudo pacman -S espeak-ng" */
+  hint?: string;
 }
 
 export interface VoiceStatus {
@@ -254,6 +258,8 @@ export interface SessionSummary {
   itemCount: number;
   usage: Usage;
   running: boolean;
+  /** set when this session was started by another session's agent (e.g. a coding agent delegated from a Comms chat) */
+  parentSessionId?: ID;
 }
 
 export type ToolStatus = 'pending-approval' | 'running' | 'ok' | 'error' | 'denied';

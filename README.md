@@ -66,8 +66,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.4.0/monarch-ai-bin-0.4.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.4.0-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.4.1/monarch-ai-bin-0.4.1-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.4.1-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -92,32 +92,41 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.4.0_amd64.deb
+sudo apt install ./Monarch_0.4.1_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.4.0-1.x86_64.rpm
+sudo dnf install ./Monarch-0.4.1-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.4.0_amd64.AppImage && ./Monarch_0.4.0_amd64.AppImage
+chmod +x Monarch_0.4.1_amd64.AppImage && ./Monarch_0.4.1_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.4.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.4.0_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.4.1_aarch64.dmg` (Apple Silicon) or `Monarch_0.4.1_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.4.0_x64-setup.exe`, or `Monarch_0.4.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.4.1_x64-setup.exe`, or `Monarch_0.4.1_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
+
+The version lives in one place, the root `package.json`. One command sets it and syncs every other file: workspace `package.json`s, `package-lock.json`, `Cargo.toml`/`Cargo.lock`, the PKGBUILD and the README links. `tauri.conf.json` reads `package.json` directly.
+
+```bash
+npm run set-version 0.4.2        # or: patch | minor | major
+git commit -am "Release v0.4.2" && git tag v0.4.2 && git push origin HEAD v0.4.2
+```
+
+`npm run set-version 0.4.2 -- --tag` does the commit and tag for you (it doesn't push). If you edit `package.json` by hand, run `npm run set-version` with no argument to sync the rest. CI refuses to build when the tag and `package.json` disagree or a file is out of sync.
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds Linux, macOS (arm64 and x64) and Windows
 with Tauri, publishes a GitHub release, and then `.github/workflows/arch.yml` attaches the Arch package and

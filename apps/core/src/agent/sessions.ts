@@ -64,6 +64,7 @@ export function toSummary(r: SessionRecord): SessionSummary {
     itemCount: r.items.length,
     usage: r.usage,
     running: r.running,
+    ...(r.parentSessionId ? { parentSessionId: r.parentSessionId } : {}),
   };
 }
 
@@ -104,6 +105,7 @@ function readRecord(id: string): SessionRecord | undefined {
       itemCount: raw.items?.length ?? 0,
       usage: { ...emptyUsage(), ...(raw.usage ?? {}) },
       running: false,
+      parentSessionId: raw.parentSessionId,
       items: (raw.items ?? []).map((it) =>
         // a crash mid-turn can leave streaming / running markers behind
         it.kind === 'assistant' && it.streaming
@@ -126,6 +128,7 @@ export function createSession(opts: {
   cwd?: string;
   title?: string;
   piProvider?: string;
+  parentSessionId?: string;
 }): SessionRecord {
   ensureIndex();
   const ts = nowIso();
@@ -141,6 +144,7 @@ export function createSession(opts: {
     itemCount: 0,
     usage: emptyUsage(),
     running: false,
+    parentSessionId: opts.parentSessionId,
     items: [],
     engineState: opts.piProvider ? { piProvider: opts.piProvider } : {},
   };

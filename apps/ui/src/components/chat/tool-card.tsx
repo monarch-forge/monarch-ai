@@ -289,6 +289,15 @@ function Details(props: { item: ToolItem }) {
   );
 }
 
+/** coding_agent_* tools: the delegated Workshop session id (from input, else from the JSON output) */
+function codingAgentSession(item: ToolItem): string | undefined {
+  if (!/coding_agent_/.test(item.name)) return undefined;
+  const fromInput = str(rec(item.input).sessionId);
+  if (fromInput) return fromInput;
+  const m = /"sessionId"\s*:\s*"([A-Za-z0-9_-]{1,80})"/.exec(item.output ?? '');
+  return m?.[1];
+}
+
 export function ToolCard(props: { item: ToolItem; sessionId?: string | null; defaultOpen?: boolean }) {
   const { item } = props;
   const [open, setOpen] = useState(!!props.defaultOpen);
@@ -298,6 +307,7 @@ export function ToolCard(props: { item: ToolItem; sessionId?: string | null; def
   const approval = pendingApproval ? findApproval(props.sessionId, item.name, item.input, approvals.value) : undefined;
   const bad = item.status === 'error' || item.status === 'denied';
   const fam = family(item.name);
+  const agentSession = codingAgentSession(item);
 
   return (
     <div
@@ -326,6 +336,13 @@ export function ToolCard(props: { item: ToolItem; sessionId?: string | null; def
           <span class="font-mono text-[10px] text-fg-3 tabular-nums shrink-0">{fmtDuration(item.durationMs)}</span>
         )}
       </button>
+      {agentSession && (
+        <div class="px-2.5 pb-1.5 -mt-0.5">
+          <a href={`#/workshop/${encodeURIComponent(agentSession)}`} class="font-mono text-[10.5px] tracking-wider text-fg-2 underline decoration-red underline-offset-2 hover:text-fg">
+            Open coding agent in Workshop →
+          </a>
+        </div>
+      )}
       {pendingApproval && (
         <div class="flex items-center gap-2 px-2.5 pb-2 -mt-0.5 flex-wrap">
           <span class="font-mono text-[10px] uppercase tracking-[0.12em] text-warning">Awaiting approval</span>

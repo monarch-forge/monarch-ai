@@ -1,19 +1,20 @@
 /**
- * Cloud voice: speech-to-text and text-to-speech through hosted APIs, with microphone capture and
+ * Voice: speech-to-text and text-to-speech through hosted APIs, with microphone capture and
  * audio playback done by the core itself (the Linux webview, WebKitGTK, ships no speech engines).
  *
  *  STT: OpenAI / Groq / any OpenAI-compatible  POST <base>/audio/transcriptions (multipart, wav)
  *  TTS: OpenAI / any OpenAI-compatible          POST <base>/audio/speech  (response_format wav)
  *       ElevenLabs                              POST /v1/text-to-speech/<voice>?output_format=pcm_24000
  *  Capture: pw-record | parecord | arecord → 16 kHz mono s16 on stdout, simple energy VAD ends the take.
+ *  Native TTS: on-device engines (espeak-ng/espeak/flite/pico2wave/festival/piper/spd-say, macOS say,
+ *       Windows System.Speech) rendered to wav — see "native (on-device) text-to-speech" below.
  *  Playback: pw-play | paplay | aplay | afplay (wav), else the UI plays the returned audio.
  *
  * Keys: secrets.voiceKeys[provider] (set in Config → Voice), else the LLM provider key of the same
  * name (secrets.apiKeys.openai / .groq), else the environment. Keys never leave the core.
  */
-import say from 'say';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { VoiceKeyProvider, VoiceSideStatus, VoiceStatus, VoiceSttSettings, VoiceTtsSettings } from '@monarch/shared';
@@ -131,17 +132,7 @@ function ttsBase(c: VoiceTtsSettings): string {
 
 function side(provider: string, model: string, needsUrl: string | null): VoiceSideStatus {
   if (provider === 'none') return { provider, ready: false, keySet: false, model: '' };
-  if (provider === 'native') {
-    let error: string | undefined;
-    if (process.platform === 'linux') {
-      const hasFestival = which('festival');
-      const hasEspeak = which('espeak') || which('espeak-ng');
-      if (!hasFestival && !hasEspeak) {
-        error = 'Missing speech engine: install festival or espeak-ng (sudo apt install festival)';
-      }
-    }
-    return { provider, ready: !error, keySet: true, model: 'system', error };
-  }
+  if (provider === 'native') return { provider, keySet: true, model: 'system', ...nativeSide() };
   const { key, source } = resolveKey(provider as VoiceKeyProvider);
   let error: string | undefined;
   if (needsUrl !== null && !needsUrl) error = 'Set the base URL';
@@ -164,7 +155,7 @@ export function voiceStatus(): VoiceStatus {
 
 function requireReady(which: 'stt' | 'tts'): void {
   const s = voiceStatus()[which];
-  if (!s.ready) throw new HttpError(409, `Voice ${which === 'stt' ? 'input' : 'output'} is not set up${s.error ? `: ${s.error}` : ''} (Config → Voice)`);
+  if (!s.ready) throw new HttpError(409, `Voice ${which === 'stt' ? 'input' : 'output'} is not set up${s.error ? `: ${s.error}` : ''}${s.hint && !s.ready ? ` — ${s.hint}` : ''} (Config → Voice)`);
 }
 
 function state(phase: 'idle' | 'listening' | 'transcribing' | 'speaking', level?: number): void {
@@ -342,6 +333,288 @@ export function stopListening(mode: 'stop' | 'cancel' = 'stop'): boolean {
   return true;
 }
 
+/* ─────────────── native (on-device) text-to-speech ─────────────── */
+/*
+ * Engines, in preference order per platform. Each renders to a wav file that the normal player
+ * chain plays (or the UI plays when the core has no player); spd-say can only speak directly.
+ *   Linux:   piper (needs a .onnx model) · espeak-ng · espeak · flite · pico2wave · festival/text2wave (needs a voice) · spd-say
+ *   macOS:   say -o file.wav
+ *   Windows: PowerShell System.Speech
+ * A voice id may be "<engine>:<voice>" to pick a non-default engine; a bare id goes to the default engine.
+ */
+type NativeEngine = 'piper' | 'espeak-ng' | 'espeak' | 'flite' | 'pico2wave' | 'festival' | 'spd-say' | 'say' | 'sapi';
+interface NativeProbe {
+  at: number;
+  engines: { id: NativeEngine; cmd: string }[];
+  /** engines found but unusable, with the reason */
+  broken: string[];
+}
+let nativeCache: NativeProbe | null = null;
+
+function festivalHasVoice(): boolean {
+  for (const dir of ['/usr/share/festival/voices', '/usr/lib/festival/voices', '/usr/local/share/festival/voices']) {
+    try {
+      for (const lang of readdirSync(dir)) if (readdirSync(join(dir, lang)).length) return true;
+    } catch {
+      /* missing */
+    }
+  }
+  return false;
+}
+
+function piperModel(voice?: string): string | undefined {
+  const v = voice?.trim();
+  if (v && v.endsWith('.onnx') && existsSync(v)) return v;
+  const env = process.env.PIPER_MODEL;
+  if (env && existsSync(env)) return env;
+  return undefined;
+}
+
+function probeNative(): NativeProbe {
+  if (nativeCache && Date.now() - nativeCache.at < 15_000) return nativeCache;
+  const engines: NativeProbe['engines'] = [];
+  const broken: string[] = [];
+  if (process.platform === 'darwin') {
+    if (which('say')) engines.push({ id: 'say', cmd: 'say' });
+  } else if (process.platform === 'win32') {
+    const ps = which('powershell') || which('pwsh');
+    if (ps) engines.push({ id: 'sapi', cmd: ps });
+  } else {
+    const piper = which('piper') || which('piper-tts');
+    if (piper) {
+      if (piperModel(voiceCfg().tts.voice)) engines.push({ id: 'piper', cmd: piper });
+      else broken.push('piper has no model (set the voice to a .onnx path or PIPER_MODEL)');
+    }
+    for (const id of ['espeak-ng', 'espeak', 'flite', 'pico2wave'] as const) {
+      const p = which(id);
+      if (p) engines.push({ id, cmd: p });
+    }
+    const t2w = which('text2wave');
+    if (t2w) {
+      if (festivalHasVoice()) engines.push({ id: 'festival', cmd: t2w });
+      else broken.push('festival has no voice installed');
+    }
+    const spd = which('spd-say');
+    if (spd) engines.push({ id: 'spd-say', cmd: spd });
+  }
+  nativeCache = { at: Date.now(), engines, broken };
+  return nativeCache;
+}
+
+function linuxInstallHint(): string {
+  let id = '';
+  try {
+    const os = readFileSync('/etc/os-release', 'utf8');
+    id = `${os.match(/^ID=(.*)$/m)?.[1] ?? ''} ${os.match(/^ID_LIKE=(.*)$/m)?.[1] ?? ''}`.replace(/"/g, '');
+  } catch {
+    /* unknown */
+  }
+  if (/arch|manjaro|endeavour/.test(id)) return 'sudo pacman -S espeak-ng';
+  if (/fedora|rhel|centos/.test(id)) return 'sudo dnf install espeak-ng';
+  if (/suse/.test(id)) return 'sudo zypper install espeak-ng';
+  return 'sudo apt install espeak-ng';
+}
+
+function nativeSide(): Pick<VoiceSideStatus, 'ready' | 'error' | 'hint' | 'engine'> {
+  const p = probeNative();
+  const engine = p.engines[0]?.id;
+  if (engine) return { ready: true, engine, hint: p.broken.length ? p.broken.join('; ') : undefined };
+  if (process.platform === 'win32') return { ready: false, error: 'PowerShell not found (needed for Windows speech)' };
+  if (process.platform === 'darwin') return { ready: false, error: 'macOS `say` not found' };
+  const cmd = linuxInstallHint();
+  return {
+    ready: false,
+    error: 'No speech engine installed',
+    hint: `Install espeak-ng: ${cmd}${p.broken.length ? ` (found: ${p.broken.join('; ')})` : ''}`,
+  };
+}
+
+/** split "<engine>:<voice>" into the engine to use and its voice ('' = engine default) */
+function pickEngine(raw: string): { id: NativeEngine; cmd: string; voice: string } {
+  const p = probeNative();
+  if (!p.engines.length) {
+    const s = nativeSide();
+    throw new HttpError(409, `${s.error}${s.hint ? ` — ${s.hint}` : ''}`);
+  }
+  const m = raw.match(/^([a-z0-9-]+):(.*)$/);
+  if (m) {
+    const e = p.engines.find((x) => x.id === m[1]);
+    if (e) return { ...e, voice: m[2]!.trim() };
+  }
+  return { ...p.engines[0]!, voice: raw.trim() };
+}
+
+function run(cmd: string, args: string[], opts: { input?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: ['pipe', 'ignore', 'pipe'], env: opts.env ?? process.env });
+    let stderr = '';
+    const timer = setTimeout(() => p.kill('SIGKILL'), opts.timeoutMs ?? 60_000);
+    p.stderr!.on('data', (d: Buffer) => (stderr = (stderr + d.toString()).slice(-600)));
+    p.on('error', (e) => {
+      clearTimeout(timer);
+      reject(new HttpError(500, `${cmd} failed to start: ${e.message}`));
+    });
+    p.on('close', (code, sig) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new HttpError(500, `${cmd.split(/[\\/]/).pop()} exited ${code ?? sig}${stderr.trim() ? `: ${stderr.trim()}` : ''}`));
+    });
+    p.stdin!.on('error', () => {});
+    p.stdin!.end(opts.input ?? '');
+  });
+}
+
+/** text arguments must not be mistaken for flags */
+const argText = (t: string) => t.replace(/^[-\s]+/, '');
+
+/** render text to a wav with the native engine; null for engines that can only speak directly (spd-say) */
+async function nativeSynth(input: string, rate: number): Promise<Buffer | null> {
+  const e = pickEngine(voiceCfg().tts.voice);
+  if (e.id === 'spd-say') return null;
+  const dir = mkdtempSync(join(tmpdir(), 'monarch-tts-'));
+  const out = join(dir, 'speech.wav');
+  const txt = join(dir, 'speech.txt');
+  writeFileSync(txt, input);
+  try {
+    switch (e.id) {
+      case 'espeak-ng':
+      case 'espeak':
+        await run(e.cmd, ['-w', out, '-s', String(Math.round(175 * rate)), '-v', e.voice || 'en-gb', '--stdin'], { input });
+        break;
+      case 'flite':
+        await run(e.cmd, ['-voice', e.voice || 'slt', '--setf', `duration_stretch=${(1 / rate).toFixed(3)}`, '-f', txt, '-o', out]);
+        break;
+      case 'pico2wave':
+        await run(e.cmd, ['-l', e.voice || 'en-GB', '-w', out, argText(input)]);
+        break;
+      case 'festival':
+        await run(e.cmd, [
+          '-o',
+          out,
+          ...(e.voice ? ['-eval', `(voice_${e.voice.replace(/[^\w]/g, '')})`] : []),
+          '-eval',
+          `(Parameter.set 'Duration_Stretch ${(1 / rate).toFixed(3)})`,
+          txt,
+        ]);
+        break;
+      case 'piper':
+        await run(e.cmd, ['--model', piperModel(e.voice)!, '--length_scale', (1 / rate).toFixed(3), '--output_file', out], { input });
+        break;
+      case 'say':
+        await run(e.cmd, [...(e.voice ? ['-v', e.voice] : []), '-r', String(Math.round(175 * rate)), '--file-format=WAVE', '--data-format=LEI16@22050', '-o', out, '-f', txt]);
+        break;
+      case 'sapi': {
+        const script =
+          'Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; ' +
+          'if ($env:MONARCH_TTS_VOICE) { $s.SelectVoice($env:MONARCH_TTS_VOICE) }; $s.Rate = [int]$env:MONARCH_TTS_RATE; ' +
+          '$s.SetOutputToWaveFile($env:MONARCH_TTS_OUT); $s.Speak([IO.File]::ReadAllText($env:MONARCH_TTS_TXT)); $s.Dispose()';
+        await run(e.cmd, ['-NoProfile', '-NonInteractive', '-Command', script], {
+          env: {
+            ...process.env,
+            MONARCH_TTS_VOICE: e.voice,
+            MONARCH_TTS_RATE: String(Math.max(-10, Math.min(10, Math.round((rate - 1) * 10)))),
+            MONARCH_TTS_OUT: out,
+            MONARCH_TTS_TXT: txt,
+          },
+        });
+        break;
+      }
+    }
+    const wav = existsSync(out) ? readFileSync(out) : Buffer.alloc(0);
+    if (wav.length <= 44) throw new HttpError(500, `${e.id} produced no audio`);
+    return wav;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** spd-say: speech-dispatcher speaks directly (no wav export) */
+async function spdSay(input: string, rate: number): Promise<void> {
+  const e = pickEngine(voiceCfg().tts.voice);
+  const args = ['-w', '-r', String(Math.max(-100, Math.min(100, Math.round((rate - 1) * 100))))];
+  if (e.voice) args.push('-l', e.voice);
+  stopSpeaking();
+  state('speaking');
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn(e.cmd, [...args, argText(input)], { stdio: ['ignore', 'ignore', 'pipe'] });
+      player = p;
+      let stderr = '';
+      p.stderr!.on('data', (d: Buffer) => (stderr += d.toString()));
+      p.on('error', (err) => reject(new HttpError(500, `spd-say failed: ${err.message}`)));
+      p.on('close', (code, sig) => (code === 0 || sig ? resolve() : reject(new HttpError(500, `spd-say exited ${code}: ${stderr.trim()}`))));
+    });
+  } finally {
+    if (player) spawn(e.cmd, ['-S'], { stdio: 'ignore' }).on('error', () => {});
+    player = null;
+    state('idle');
+  }
+}
+
+function capture(cmd: string, args: string[]): string {
+  try {
+    const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 8000 });
+    return r.status === 0 ? `${r.stdout}` : '';
+  } catch {
+    return '';
+  }
+}
+
+type VoiceRow = { id: string; name: string; hint?: string; disabled?: boolean };
+
+/** real voices of every detected engine; ids of non-default engines are "<engine>:<voice>" */
+function nativeVoices(): VoiceRow[] {
+  const p = probeNative();
+  const rows: VoiceRow[] = [];
+  p.engines.forEach((e, i) => {
+    const pre = i === 0 ? '' : `${e.id}:`;
+    const add = (id: string, name: string, hint?: string) => rows.push({ id: pre + id, name, hint: [e.id, hint].filter(Boolean).join(' · ') });
+    if (e.id === 'espeak-ng' || e.id === 'espeak') {
+      const lines = capture(e.cmd, ['--voices']).split('\n').slice(1);
+      for (const l of lines) {
+        const c = l.trim().split(/\s+/);
+        if (c.length >= 4) add(c[1]!, `${c[3]!.replace(/_/g, ' ')} (${c[1]})`, c[2]);
+      }
+    } else if (e.id === 'flite') {
+      const out = capture(e.cmd, ['-lv']);
+      for (const v of out.replace(/^.*?:/s, '').trim().split(/\s+/).filter(Boolean)) add(v, v);
+    } else if (e.id === 'pico2wave') {
+      for (const v of ['en-GB', 'en-US', 'de-DE', 'es-ES', 'fr-FR', 'it-IT']) add(v, v);
+    } else if (e.id === 'festival') {
+      for (const dir of ['/usr/share/festival/voices', '/usr/lib/festival/voices']) {
+        try {
+          for (const lang of readdirSync(dir)) for (const v of readdirSync(join(dir, lang))) add(v, v, lang);
+        } catch {
+          /* missing */
+        }
+      }
+    } else if (e.id === 'spd-say') {
+      for (const l of capture(e.cmd, ['-L']).split('\n').slice(1)) {
+        const name = l.trim().split(/\s{2,}/)[0];
+        if (name) add(name, name);
+      }
+    } else if (e.id === 'say') {
+      for (const l of capture(e.cmd, ['-v', '?']).split('\n')) {
+        const m = l.match(/^(.+?)\s+([a-z]{2}[_-][A-Z]{2})\s/);
+        if (m) add(m[1]!.trim(), m[1]!.trim(), m[2]);
+      }
+    } else if (e.id === 'sapi') {
+      const out = capture(e.cmd, [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).GetInstalledVoices() | % { $_.VoiceInfo.Name + "|" + $_.VoiceInfo.Culture }',
+      ]);
+      for (const l of out.split(/\r?\n/)) {
+        const [n, cult] = l.split('|');
+        if (n?.trim()) add(n.trim(), n.trim(), cult?.trim());
+      }
+    } else if (e.id === 'piper') {
+      add('', `piper model ${piperModel(voiceCfg().tts.voice) ?? ''}`);
+    }
+  });
+  return rows;
+}
+
 /* ─────────────── text-to-speech ─────────────── */
 
 /** synthesize speech; returns a wav buffer */
@@ -354,7 +627,9 @@ export async function synthesize(text: string): Promise<Buffer> {
   const rate = Math.max(0.5, Math.min(2, v.rate || 1));
 
   if (c.provider === 'native') {
-    return pcmToWav(Buffer.alloc(1600), 16000);
+    const wav = await nativeSynth(input, rate);
+    if (!wav) throw new HttpError(501, 'spd-say can only speak through the system (no audio export); install espeak-ng for in-app playback');
+    return wav;
   }
 
   const { key } = resolveKey(c.provider as VoiceKeyProvider);
@@ -400,17 +675,8 @@ export async function synthesize(text: string): Promise<Buffer> {
 }
 
 let player: ChildProcess | null = null;
-let nativeSpeaking: { stop: () => void } | null = null;
 
 export function stopSpeaking(): boolean {
-  if (nativeSpeaking) {
-    try {
-      nativeSpeaking.stop();
-    } catch {}
-    nativeSpeaking = null;
-    state('idle');
-    return true;
-  }
   if (!player) return false;
   try {
     player.kill('SIGTERM');
@@ -424,45 +690,7 @@ export function stopSpeaking(): boolean {
 
 /** play a wav through the system player; resolves when playback ends (or is stopped) */
 async function play(wav: Buffer): Promise<void> {
-  const v = voiceCfg();
-  const c = v.tts;
   stopSpeaking();
-
-  // Native playback path (Linux)
-  if (c.provider === 'native' && !audioTools().player) {
-    if (process.platform === 'linux') {
-      throw new HttpError(501, 'Missing audio player: install pulseaudio-utils or pipewire-pulseaudio (e.g., sudo apt install pulseaudio-utils)');
-    }
-    throw new HttpError(501, 'No suitable audio player found on this platform');
-  }
-  if (c.provider === 'native') {
-    const input = c.voice.trim() || (process.platform === 'darwin' ? 'Daniel' : process.platform === 'win32' ? 'Microsoft David Desktop' : 'en-gb');
-    const rate = Math.max(0.5, Math.min(2, v.rate || 1));
-    await new Promise<void>((resolve) => {
-      try {
-        say.speak(input, input, rate, (err) => {
-          nativeSpeaking = null;
-          state('idle');
-          resolve();
-        });
-        nativeSpeaking = {
-          stop: () => {
-            try {
-              say.stop();
-            } catch { /* no-op */ }
-            nativeSpeaking = null;
-            state('idle');
-          },
-        };
-      } catch {
-        nativeSpeaking = null;
-        state('idle');
-        resolve();
-      }
-    });
-    return;
-  }
-
   const cmd = audioTools().player;
   if (!cmd) throw new HttpError(501, 'No audio player found');
   const dir = mkdtempSync(join(tmpdir(), 'monarch-voice-'));
@@ -470,20 +698,16 @@ async function play(wav: Buffer): Promise<void> {
   writeFileSync(file, wav);
   state('speaking');
   try {
-    await new Promise<void>((resolve) => {
-      const p = spawn(cmd, [file], { stdio: 'pipe' });
+    await new Promise<void>((resolve, reject) => {
+      const p = spawn(cmd, [file], { stdio: ['ignore', 'ignore', 'pipe'] });
       player = p;
-      let stdout = '';
       let stderr = '';
-      p.stdout!.on('data', (d: Buffer) => (stdout += d.toString()));
-      p.stderr!.on('data', (d: Buffer) => (stderr += d.toString()));
-      p.on('error', () => {
-        if (stderr.trim()) console.warn('[voice] Playback error pulse:', stderr.trim());
-        resolve();
-      });
-      p.on('close', () => {
-        if (stderr.trim()) console.warn('[voice] Playback close stderr:', stderr.trim());
-        resolve();
+      p.stderr!.on('data', (d: Buffer) => (stderr = (stderr + d.toString()).slice(-600)));
+      p.on('error', (e) => reject(new HttpError(500, `Playback failed (${cmd}): ${e.message}`)));
+      p.on('close', (code, sig) => {
+        // killed by stopSpeaking → fine; a non-zero exit is a real playback error
+        if (code === 0 || sig) resolve();
+        else reject(new HttpError(500, `Playback failed (${cmd} exited ${code})${stderr.trim() ? `: ${stderr.trim()}` : ''}`));
       });
     });
   } finally {
@@ -502,40 +726,14 @@ export async function speak(text: string, opts: { play?: boolean } = {}): Promis
   if (!input) throw new HttpError(400, 'Nothing to say');
   const rate = Math.max(0.5, Math.min(2, v.rate || 1));
 
-  if (c.provider === 'native') {
-    if (opts.play !== false) {
-      stopSpeaking();
-      state('speaking');
-      // British voice default: macOS 'Oliver' or 'Daniel' or 'en-GB'; Windows 'Microsoft George' or 'Microsoft Hazel'; Linux 'en-gb' or default
-      const defaultBritishVoice = process.platform === 'darwin' ? 'Oliver' : process.platform === 'win32' ? 'Microsoft George' : 'en-gb';
-      const voiceName = c.voice.trim() || defaultBritishVoice;
-      await new Promise<void>((resolve) => {
-        try {
-          say.speak(input, voiceName, rate, (err) => {
-            nativeSpeaking = null;
-            state('idle');
-            resolve();
-          });
-          nativeSpeaking = {
-            stop: () => {
-              try {
-                say.stop();
-              } catch {}
-            },
-          };
-        } catch {
-          nativeSpeaking = null;
-          state('idle');
-          resolve();
-        }
-      });
-      return null;
-    }
-    return synthesize(input);
+  if (c.provider === 'native' && pickEngine(c.voice).id === 'spd-say') {
+    if (opts.play === false) throw new HttpError(501, 'spd-say cannot export audio; install espeak-ng');
+    await spdSay(input, rate);
+    return null;
   }
 
   const wav = await synthesize(input);
-  if (opts.play !== false && (audioTools().player || (c.provider as string) === 'native')) {
+  if (opts.play !== false && audioTools().player) {
     await play(wav);
     return null;
   }
@@ -595,16 +793,7 @@ export async function listVoices(): Promise<{ id: string; name: string; hint?: s
     rows.sort((a, b) => Number(b.premade) - Number(a.premade) || a.name.localeCompare(b.name));
     return rows.map(({ premade: _p, ...r }) => r);
   }
-  if ((c.provider as string) === 'native') {
-    return [
-      { id: '', name: 'Default British (Oliver / George / en-GB)', hint: 'macOS: Oliver/Daniel, Windows: Microsoft George, Linux: en-gb' },
-      { id: 'Oliver', name: 'Oliver (macOS British)', hint: 'macOS' },
-      { id: 'Daniel', name: 'Daniel (macOS British)', hint: 'macOS' },
-      { id: 'Microsoft George', name: 'Microsoft George (Windows British)', hint: 'Windows Speech' },
-      { id: 'Microsoft Hazel', name: 'Microsoft Hazel (Windows British)', hint: 'Windows Speech' },
-      { id: 'en-gb', name: 'English UK (Linux/eSpeak)', hint: 'Linux' },
-    ];
-  }
+  if (c.provider === 'native') return nativeVoices();
   if (c.provider === 'openai' || c.provider === 'custom') return OPENAI_VOICES.map((id) => ({ id, name: id }));
   return [];
 }

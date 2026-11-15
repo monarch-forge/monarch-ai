@@ -8,7 +8,7 @@
 import { computed, signal } from '@preact/signals';
 import type { VoiceStatus } from '@monarch/shared';
 import { api, ApiError, CORE_URL, socket } from './api.ts';
-import { onCollectionChanged, settings } from './store.ts';
+import { onCollectionChanged, settings, toast } from './store.ts';
 
 export const UNSUPPORTED_LISTEN = 'Voice input is not set up — choose a speech-to-text provider in Config → Voice';
 export const UNSUPPORTED_SPEAK = 'Voice output is not set up — choose a text-to-speech provider in Config → Voice';
@@ -126,6 +126,15 @@ export function stopSpeaking(): void {
   speaking.value = false;
 }
 
+let lastSpeakErr = { text: '', at: 0 };
+/** toast a speech failure (same message at most every 30 s, so a chat full of replies doesn't spam) */
+function reportSpeakError(text: string): void {
+  const now = Date.now();
+  if (text === lastSpeakErr.text && now - lastSpeakErr.at < 30_000) return;
+  lastSpeakErr = { text, at: now };
+  toast(text, 'error');
+}
+
 /**
  * Speak text aloud through the cloud voice. Respects settings.assistant.voice.speak unless `force`
  * (e.g. the "Test voice" button). Resolves when finished; rejects only when `force` is set.
@@ -135,7 +144,10 @@ export async function speak(text: string, opts: { force?: boolean } = {}): Promi
   if (!opts.force && !cfg?.speak) return;
   if (!voiceStatus.value) await refreshVoiceStatus();
   if (!ttsReady.value) {
-    if (opts.force) throw new Error(UNSUPPORTED_SPEAK);
+    const st = voiceStatus.value?.tts;
+    const why = st?.error ? `Voice output unavailable: ${st.error}${st.hint ? ` — ${st.hint}` : ''}` : UNSUPPORTED_SPEAK;
+    if (opts.force) throw new Error(why);
+    reportSpeakError(why);
     return;
   }
   const clean = stripMarkdown(text);
@@ -158,16 +170,18 @@ export async function speak(text: string, opts: { force?: boolean } = {}): Promi
       // no player in the core: play it here
       audioUrl = URL.createObjectURL(await res.blob());
       audioEl = new Audio(audioUrl);
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         audioEl!.onended = () => resolve();
-        audioEl!.onerror = () => resolve();
-        audioEl!.play().catch(() => resolve());
+        audioEl!.onerror = () => reject(new Error('The app window could not play the speech audio'));
+        audioEl!.play().catch((err) => reject(new Error(`The app window could not play the speech audio: ${err?.message ?? err}`)));
       });
       dropAudio();
     }
   } catch (e) {
+    if (seq !== speakSeq) return; // superseded / stopped
     if (opts.force) throw e;
     console.warn('[voice] speak failed', e);
+    reportSpeakError(`Speech failed: ${(e as any)?.message ?? e}`);
   } finally {
     if (seq === speakSeq) speaking.value = false;
   }

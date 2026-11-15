@@ -1,7 +1,7 @@
 {
   "name": "monarch-ai",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
@@ -13,7 +13,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "bundle:core": "node scripts/bundle-core.mjs"
+    "bundle:core": "node scripts/bundle-core.mjs",
+    "set-version": "node scripts/version.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",

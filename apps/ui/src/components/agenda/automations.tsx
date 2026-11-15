@@ -180,7 +180,7 @@ export function AutomationsPanel(props: { class?: string }) {
   );
 }
 
-function AutomationModal(props: { value: Partial<Automation> | null; onClose: () => void; onSaved: () => void }) {
+export function AutomationModal(props: { value: Partial<Automation> | null; onClose: () => void; onSaved: () => void }) {
   const v = props.value;
   const [f, setF] = useState({ name: '', schedule: '', prompt: '', notify: true, enabled: true });
   const [preset, setPreset] = useState('custom');
@@ -332,5 +332,109 @@ function AutomationModal(props: { value: Partial<Automation> | null; onClose: ()
       </Modal>
       {dialog}
     </>
+  );
+}
+
+/**
+ * Compact "Active" list of registered automations (Comms → Automations tab). Selecting one filters
+ * its run sessions (runs are associated by session title === automation name).
+ */
+export function ActiveAutomations(props: { selected: string | null; onSelect: (a: Automation | null) => void; highlight?: string | null }) {
+  const res = useResource<Automation[]>('/automations', ['automations']);
+  const list = useMemo(
+    () => (Array.isArray(res.data) ? res.data.filter((a) => a && typeof a.id === 'string') : []).sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.name.localeCompare(b.name)),
+    [res.data],
+  );
+  const [edit, setEdit] = useState<Partial<Automation> | null>(null);
+  const [running, setRunning] = useState<Record<string, boolean>>({});
+
+  // keep the parent's selection object fresh (e.g. after a rename) / clear it when deleted
+  useEffect(() => {
+    if (!props.selected || !res.data) return;
+    const cur = list.find((a) => a.id === props.selected);
+    props.onSelect(cur ?? null);
+  }, [res.data]);
+
+  const patch = async (a: Automation, p: Partial<Automation>) => {
+    const prev = res.data;
+    if (prev) res.setData(prev.map((x) => (x.id === a.id ? { ...x, ...p } : x)));
+    try {
+      await api.patch(`/automations/${encodeURIComponent(a.id)}`, p);
+    } catch (e: any) {
+      if (prev) res.setData(prev);
+      toast(`Update failed: ${e?.message ?? e}`, 'error');
+    }
+  };
+  const run = async (a: Automation) => {
+    setRunning((r) => ({ ...r, [a.id]: true }));
+    try {
+      const out = await api.post<{ sessionId: string }>(`/automations/${encodeURIComponent(a.id)}/run`);
+      if (out?.sessionId) location.hash = `#/comms/${encodeURIComponent(out.sessionId)}`;
+      toast(`Running “${a.name}”`, 'success');
+    } catch (e: any) {
+      toast(`Run failed: ${e?.message ?? e}`, 'error');
+    } finally {
+      setRunning((r) => ({ ...r, [a.id]: false }));
+    }
+  };
+
+  return (
+    <div class="border-b border-line">
+      <div class="flex items-center gap-2 px-3 pt-2 pb-1">
+        <span class="hud-label">Active</span>
+        <span class="font-mono text-[10px] text-fg-3">{list.filter((a) => a.enabled).length}/{list.length}</span>
+        <button class="ml-auto text-fg-3 hover:text-fg" title="New automation" aria-label="New automation" onClick={() => setEdit({ notify: true, enabled: true, schedule: '0 8 * * 1-5' })}>
+          <Plus size={13} />
+        </button>
+      </div>
+      {res.error && !res.data ? (
+        <LoadError error={res.error} onRetry={res.reload} />
+      ) : res.data === undefined ? (
+        <div class="px-3 pb-2 font-mono text-[10px] text-fg-3">Loading…</div>
+      ) : !list.length ? (
+        <div class="px-3 pb-2.5 text-[11.5px] text-fg-3 leading-snug">None registered. Ask Monarch (“remind me every morning…”) or add one with +.</div>
+      ) : (
+        <div class="max-h-[40vh] overflow-y-auto pb-1">
+          {list.map((a) => {
+            const sel = props.selected === a.id;
+            return (
+              <div
+                key={a.id}
+                data-automation={a.id}
+                class={`group px-3 py-1.5 cursor-pointer border-l-2 ${sel ? 'border-red bg-white/[0.03]' : props.highlight === a.id ? 'border-fg-3' : 'border-transparent hover:bg-white/[0.02]'} ${a.enabled ? '' : 'opacity-60'}`}
+                onClick={() => props.onSelect(sel ? null : a)}
+                title={sel ? 'Show all runs' : 'Show runs of this automation'}
+              >
+                <div class="flex items-center gap-1.5">
+                  <span class={`w-1.5 h-1.5 shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success' : 'border border-fg-3'}`} />
+                  <span class="text-[12.5px] text-fg truncate">{a.name}</span>
+                  <span class="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <button class="p-0.5 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100 focus:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
+                      <Pencil size={11} />
+                    </button>
+                    <button class="p-0.5 text-fg-3 hover:text-fg disabled:opacity-40" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>
+                      {running[a.id] ? <span class="loading loading-spinner loading-xs" /> : <Play size={11} />}
+                    </button>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-xs ml-0.5 checked:bg-red checked:border-red"
+                      checked={a.enabled}
+                      onChange={() => void patch(a, { enabled: !a.enabled })}
+                      aria-label={a.enabled ? `Disable ${a.name}` : `Enable ${a.name}`}
+                    />
+                  </span>
+                </div>
+                <div class="flex items-center gap-1.5 pl-3 font-mono text-[10px] text-fg-3 min-w-0">
+                  <span class="text-fg-2 truncate" title={a.schedule}>{describeSchedule(a.schedule)}</span>
+                  {a.enabled && a.nextRunAt && <span class="shrink-0" title={new Date(a.nextRunAt).toLocaleString()}>· {relTime(a.nextRunAt)}</span>}
+                  {a.lastStatus && <span class={`ml-auto shrink-0 ${a.lastStatus === 'error' ? 'text-red' : ''}`} title={a.lastRunAt ? `Last run ${new Date(a.lastRunAt).toLocaleString()}` : ''}>{a.lastStatus === 'error' ? 'ERR' : 'OK'}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <AutomationModal value={edit} onClose={() => setEdit(null)} onSaved={() => void res.reload()} />
+    </div>
   );
 }

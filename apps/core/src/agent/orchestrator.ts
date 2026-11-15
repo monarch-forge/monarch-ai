@@ -5,7 +5,7 @@
  * per session (extra messages queue as follow-ups), routes tool approvals, tracks usage and phases.
  */
 import type { AgentPhase, ChatItem, ClientCommand, EngineId, SessionKind, Usage } from '@monarch/shared';
-import { activity, bus, newId, nowIso, truncate } from '../kernel.ts';
+import { activity, bus, newId, notify, nowIso, truncate } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { recordUsage } from '../services/usage.ts';
 import { needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances } from './approvals.ts';
@@ -54,6 +54,8 @@ interface ActiveTurn {
 const engines: Record<EngineId, Engine> = { 'claude-sdk': claudeSdkEngine, pi: piEngine };
 const active = new Map<string, ActiveTurn>();
 const queued = new Map<string, string[]>();
+/** resolvers waiting for a session to go idle (turn finished and no queued follow-ups) — see waitForSessionIdle */
+const idleWaiters = new Map<string, Set<(o: TurnOutcome) => void>>();
 /** session ids ordered by most recent phase change (last = most recent) */
 const phaseRecency: string[] = [];
 let idleTimer: NodeJS.Timeout | null = null;
@@ -396,6 +398,24 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
   }
 
   const text = turn.texts.length ? turn.texts[turn.texts.length - 1] : '';
+  const moreQueued = !aborted && !!q?.length;
+  if (!moreQueued) {
+    const ws = idleWaiters.get(rec.id);
+    if (ws) {
+      idleWaiters.delete(rec.id);
+      for (const w of ws) w({ text, error });
+    }
+    if (rec.parentSessionId) {
+      const parent = getSession(rec.parentSessionId);
+      notify(
+        error && !aborted ? 'Coding agent failed' : aborted ? 'Coding agent stopped' : 'Coding agent finished',
+        `${clip(rec.title, 60)}${parent ? ` · from "${clip(parent.title, 40)}"` : ''}${error && !aborted ? ` — ${clip(error, 100)}` : ''}`,
+        error && !aborted ? 'error' : 'info',
+        `#/workshop/${encodeURIComponent(rec.id)}`,
+        { desktop: false },
+      );
+    }
+  }
   return { text, error };
 }
 
@@ -406,7 +426,7 @@ function defaultModel(engine: EngineId): string {
   return engine === 'pi' ? s.pi.model : s.claudeSdk.model;
 }
 
-function newSession(opts: { kind?: SessionKind; engine?: EngineId; model?: string; cwd?: string; title?: string }): SessionRecord {
+function newSession(opts: { kind?: SessionKind; engine?: EngineId; model?: string; cwd?: string; title?: string; parentSessionId?: string }): SessionRecord {
   const s = getSettings();
   const kind: SessionKind = opts.kind ?? 'chat';
   const engine: EngineId = opts.engine === 'pi' || opts.engine === 'claude-sdk' ? opts.engine : s.engine;
@@ -425,7 +445,7 @@ function newSession(opts: { kind?: SessionKind; engine?: EngineId; model?: strin
     }
   }
   const cwd = kind === 'coding' ? opts.cwd?.trim() || s.coding.defaultWorkspace : opts.cwd?.trim() || undefined;
-  return createSession({ kind, engine, model, cwd, title: opts.title, piProvider });
+  return createSession({ kind, engine, model, cwd, title: opts.title, piProvider, parentSessionId: opts.parentSessionId });
 }
 
 /**
@@ -567,8 +587,10 @@ export function startPrompt(opts: {
   engine?: EngineId;
   model?: string;
   cwd?: string;
+  /** the session whose agent started this one (delegation) */
+  parentSessionId?: string;
 }): { sessionId: string; done: Promise<{ text: string; error?: string }> } {
-  const rec = newSession({ kind: opts.kind, engine: opts.engine, model: opts.model, cwd: opts.cwd, title: opts.title });
+  const rec = newSession({ kind: opts.kind, engine: opts.engine, model: opts.model, cwd: opts.cwd, title: opts.title, parentSessionId: opts.parentSessionId });
   broadcastSession(rec);
   const text = (opts.text ?? '').trim();
   if (!text) return { sessionId: rec.id, done: Promise.resolve({ text: '', error: 'empty prompt' }) };
@@ -596,4 +618,59 @@ export function flushAgentState(): void {
 
 export function isSessionRunning(sessionId: string): boolean {
   return active.has(sessionId);
+}
+
+/* ─────────────── delegation helpers (tools/delegate.ts) ─────────────── */
+
+/**
+ * Send a follow-up to an existing session from code (same semantics as chat.send):
+ * starts a turn when idle, queues it when a turn is running. Returns what happened.
+ */
+export function sendToSession(sessionId: string, text: string): 'started' | 'queued' | 'not-found' {
+  const rec = getSession(sessionId);
+  if (!rec) return 'not-found';
+  const t = text.trim();
+  if (!t) return active.has(rec.id) ? 'queued' : 'started';
+  if (active.has(rec.id)) {
+    const q = queued.get(rec.id) ?? [];
+    q.push(t);
+    queued.set(rec.id, q);
+    activity(rec.kind === 'coding' ? 'CODE' : 'AGT', `Queued follow-up · ${clip(t, 60)}`, 'info', rec.id);
+    return 'queued';
+  }
+  appendUser(rec, t);
+  void startTurn(rec, t);
+  return 'started';
+}
+
+export function queuedCount(sessionId: string): number {
+  return queued.get(sessionId)?.length ?? 0;
+}
+
+/** current phase of a running session ('idle' when not running) */
+export function sessionPhase(sessionId: string): AgentPhase {
+  return active.get(sessionId)?.phase ?? 'idle';
+}
+
+/**
+ * Resolve when the session has no running turn and no queued follow-ups (last turn's final text),
+ * or `null` on timeout / abort of the waiting signal. Resolves immediately when already idle.
+ */
+export function waitForSessionIdle(sessionId: string, timeoutMs: number, signal?: AbortSignal): Promise<TurnOutcome | null> {
+  if (!active.has(sessionId) && !queued.get(sessionId)?.length) return Promise.resolve({ text: '' });
+  return new Promise((resolve) => {
+    let set = idleWaiters.get(sessionId);
+    if (!set) idleWaiters.set(sessionId, (set = new Set()));
+    const done = (o: TurnOutcome | null) => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      idleWaiters.get(sessionId)?.delete(w);
+      resolve(o);
+    };
+    const w = (o: TurnOutcome) => done(o);
+    const onAbort = () => done(null);
+    const timer = setTimeout(() => done(null), Math.max(0, timeoutMs));
+    signal?.addEventListener('abort', onAbort, { once: true });
+    set.add(w);
+  });
 }
