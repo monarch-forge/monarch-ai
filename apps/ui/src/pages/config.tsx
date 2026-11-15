@@ -3,7 +3,7 @@
  */
 import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
-import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna, AudioLines, RefreshCcw, Plug } from 'lucide-preact';
+import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna, AudioLines, RefreshCcw } from 'lucide-preact';
 import { conn, health, navigate, settings } from '../lib/store.ts';
 import { Panel, Tag, ErrorLine } from '../components/ui.tsx';
 import { SettingsGate } from '../components/config/fields.tsx';
@@ -15,7 +15,6 @@ import { PermissionsSection } from '../components/config/permissions.tsx';
 import { EvolutionSection } from '../components/config/evolution.tsx';
 import { VoiceSection } from '../components/config/voice.tsx';
 import { SyncSection } from '../components/config/sync.tsx';
-import { McpSection } from '../components/config/mcp.tsx';
 
 const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
   { id: 'general', label: 'General', icon: UserRound, desc: 'Identity, location, persona', page: GeneralSection, needsSettings: true },
@@ -26,7 +25,6 @@ const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: C
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'Approvals and folders', page: PermissionsSection, needsSettings: true },
   { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'Self-extension and reflection', page: EvolutionSection, needsSettings: true },
   { id: 'sync', label: 'Sync', icon: RefreshCcw, desc: 'Encrypted backup across devices', page: SyncSection, needsSettings: true },
-  { id: 'mcp', label: 'MCP', icon: Plug, desc: 'Model Context Protocol servers', page: McpSection, needsSettings: false },
 ];
 
 export default function ConfigPage(props: { params: string[] }) {

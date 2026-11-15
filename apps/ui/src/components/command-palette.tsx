@@ -262,7 +262,7 @@ export function CommandPalette() {
         icon: Plug,
         run: () => {
           close();
-          navigate('config/mcp');
+          navigate('evolve/mcp');
         },
       },
       {

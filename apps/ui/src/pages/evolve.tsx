@@ -1,12 +1,12 @@
 /**
- * EVOLVE — watch and steer Monarch extending itself: extensions, skills, proposals, the audit timeline
+ * EVOLVE — watch and steer Monarch extending itself: extensions, skills, MCP servers, proposals, the audit timeline
  * and the tool catalog. Route: #/evolve/<tab>/<id?>/<sub?>
  *   #/evolve/extensions/:id/(overview|panels|source|logs|history)   ("new" = editor)
  *   #/evolve/skills/:id                                             ("new" = editor)
- *   #/evolve/proposals · #/evolve/timeline · #/evolve/tools
+ *   #/evolve/mcp · #/evolve/proposals · #/evolve/timeline · #/evolve/tools
  */
 import type { LucideIcon } from 'lucide-preact';
-import { Blocks, BookText, History, Lightbulb, Wrench } from 'lucide-preact';
+import { Blocks, BookText, History, Lightbulb, Plug, Wrench } from 'lucide-preact';
 import type { EvolutionStats } from '@monarch/shared';
 import { navigate, useResource } from '../lib/store.ts';
 import { EvolveHeader } from '../components/evolve/header.tsx';
@@ -15,10 +15,12 @@ import { SkillsTab } from '../components/evolve/skills.tsx';
 import { ProposalsTab } from '../components/evolve/proposals.tsx';
 import { TimelineTab } from '../components/evolve/timeline.tsx';
 import { ToolsTab } from '../components/evolve/tools.tsx';
+import { McpSection } from '../components/evolve/mcp.tsx';
 
 const TABS: { id: string; label: string; icon: LucideIcon; count?: (s: EvolutionStats) => number | string; attention?: (s: EvolutionStats) => boolean }[] = [
   { id: 'extensions', label: 'Extensions', icon: Blocks, count: (s) => s.extensions.total, attention: (s) => s.extensions.error > 0 },
   { id: 'skills', label: 'Skills', icon: BookText, count: (s) => s.skills },
+  { id: 'mcp', label: 'MCP', icon: Plug },
   { id: 'proposals', label: 'Proposals', icon: Lightbulb, count: (s) => s.openProposals, attention: (s) => s.openProposals > 0 },
   { id: 'timeline', label: 'Timeline', icon: History },
   { id: 'tools', label: 'Tools', icon: Wrench, count: (s) => s.tools.always + s.tools.deferred },
@@ -69,6 +71,11 @@ export default function EvolvePage(props: { params: string[] }) {
         <div class="h-[78vh] lg:h-auto lg:flex-1 lg:min-h-0 shrink-0 lg:shrink" role="tabpanel" aria-label={tab.label}>
           {tab.id === 'extensions' && <ExtensionsTab id={id} sub={sub} />}
           {tab.id === 'skills' && <SkillsTab id={id} />}
+          {tab.id === 'mcp' && (
+            <div class="h-full overflow-y-auto">
+              <McpSection />
+            </div>
+          )}
           {tab.id === 'proposals' && <ProposalsTab />}
           {tab.id === 'timeline' && <TimelineTab />}
           {tab.id === 'tools' && <ToolsTab />}

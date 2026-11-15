@@ -7,7 +7,7 @@ import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
 import { Panel, Tag, Spinner, Empty, Btn } from '../ui.tsx';
 import { Modal, useConfirm } from '../mail/kit.tsx';
-import { Field, INPUT, SELECT, TEXTAREA, TOGGLE, ToggleRow } from './fields.tsx';
+import { Field, INPUT, SELECT, TEXTAREA, TOGGLE, ToggleRow } from '../config/fields.tsx';
 
 const BTN = 'btn btn-xs rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]';
 const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
