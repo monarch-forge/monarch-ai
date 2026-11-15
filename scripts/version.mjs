@@ -7,7 +7,7 @@
  *   npm run set-version patch|minor|major
  *   npm run set-version                re-sync from package.json (after editing it by hand)
  *   npm run set-version -- --check     exit 1 if any file is out of sync (used by CI)
- *   npm run set-version 0.4.1 -- --tag also commit "Release v0.4.1" and create tag v0.4.1 (not pushed)
+ *   npm run set-version 0.4.1 -- --tag also commit all tracked changes as "Release v0.4.1" and tag v0.4.1 (not pushed; new files must be git-added first)
  *
  * Synced: workspace package.json files, package-lock.json (Monarch's own entries only),
  * src-tauri/Cargo.toml + Cargo.lock (the monarch_ai package only), packaging/arch/PKGBUILD,
@@ -119,8 +119,8 @@ console.log(stale.length ? `updated: ${stale.join(', ')}` : 'everything already 
 
 if (tag) {
   const git = (...a) => execFileSync('git', a, { cwd: root, stdio: 'inherit' });
-  const files = ['package.json', ...WORKSPACES, 'package-lock.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock', 'src-tauri/tauri.conf.json', 'packaging/arch/PKGBUILD', 'README.md'];
-  git('add', ...files);
+  // the release commit includes every change to tracked files (the work being released), not just the version files
+  git('add', '-u');
   git('commit', '-m', `Release v${version}`);
   git('tag', `v${version}`);
   console.log(`\ncommitted and tagged v${version}. Publish with:\n  git push origin HEAD v${version}`);

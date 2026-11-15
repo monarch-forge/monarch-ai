@@ -126,7 +126,7 @@ npm run set-version 0.4.2        # or: patch | minor | major
 git commit -am "Release v0.4.2" && git tag v0.4.2 && git push origin HEAD v0.4.2
 ```
 
-`npm run set-version 0.4.2 -- --tag` does the commit and tag for you (it doesn't push). If you edit `package.json` by hand, run `npm run set-version` with no argument to sync the rest. CI refuses to build when the tag and `package.json` disagree or a file is out of sync.
+`npm run set-version 0.4.2 -- --tag` commits all changes to tracked files as the release and tags it (it doesn't push; `git add` new files first). If you edit `package.json` by hand, run `npm run set-version` with no argument to sync the rest. CI refuses to build when the tag and `package.json` disagree or a file is out of sync.
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds Linux, macOS (arm64 and x64) and Windows
 with Tauri, publishes a GitHub release, and then `.github/workflows/arch.yml` attaches the Arch package and
