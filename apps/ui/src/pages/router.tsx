@@ -29,7 +29,7 @@ const IN_TAURI = typeof window !== 'undefined' && !!(window as any).__TAURI_INTE
 async function openRouterWindow(): Promise<string | null> {
   try {
     const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('open_router_window', { url: ROUTER_URL });
+    await invoke('open_router_window', { url: `${ROUTER_URL}/dashboard/usage` });
     return null;
   } catch (e) {
     return String(e);
@@ -107,7 +107,7 @@ export default function RouterPage(_props: { params: string[] }) {
       </div>
       <div class="flex-1 min-h-0 hud-panel overflow-hidden">
         <iframe
-          src={ROUTER_URL}
+          src={`${ROUTER_URL}/dashboard/usage`}
           title="9Router Dashboard"
           // 9Router follows prefers-color-scheme ("system" theme); the iframe element's color-scheme is
           // what the embedded page sees (WebKitGTK ignores the parent page's scheme), so force dark here
