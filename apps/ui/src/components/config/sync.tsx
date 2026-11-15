@@ -18,7 +18,11 @@ function useSyncGet<T>(path: string | null, collections: Collection[]) {
   const [error, setError] = useState<string | undefined>();
   const [missing, setMissing] = useState(false);
   const [loading, setLoading] = useState(true);
+  // overlapping reloads (one per ws 'sync' event) can resolve out of order; only the newest may win,
+  // otherwise a response taken mid-operation ("busy") can land last and leave buttons disabled
+  const seq = useRef(0);
   const reload = useCallback(async () => {
+    const mine = ++seq.current;
     if (!path) {
       setData(undefined);
       setError(undefined);
@@ -27,10 +31,12 @@ function useSyncGet<T>(path: string | null, collections: Collection[]) {
     }
     try {
       const d = await api.get<T>(path);
+      if (mine !== seq.current) return;
       setData(d);
       setError(undefined);
       setMissing(false);
     } catch (e: any) {
+      if (mine !== seq.current) return;
       if (e instanceof ApiError && e.status === 404) setMissing(true);
       else setError(e?.message ?? String(e));
     } finally {
@@ -46,7 +52,11 @@ function useSyncGet<T>(path: string | null, collections: Collection[]) {
       offConn();
     };
   }, [path]);
-  return { data, error, missing, loading, reload, setData };
+  const set = useCallback((v: T | undefined) => {
+    seq.current++;
+    setData(v);
+  }, []);
+  return { data, error, missing, loading, reload, setData: set };
 }
 
 const PROVIDERS: { id: SyncProvider; label: string; cli: 'gh' | 'glab' | 'git' }[] = [
@@ -172,6 +182,7 @@ export function SyncSection() {
       } else if (!draft.enabled) await saveSettings({ sync: { enabled: true } }, false);
       const s = await api.post<SyncStatus>('/sync/connect');
       status.setData(s);
+      void status.reload();
       toast(s.remoteReady ? `Connected to ${s.remoteUrl ?? 'remote'}` : 'Connect finished, remote not ready', s.remoteReady ? 'success' : 'warn');
       void history.reload();
     } catch (e: any) {

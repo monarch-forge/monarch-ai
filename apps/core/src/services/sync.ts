@@ -88,8 +88,17 @@ function saveState(patch: Partial<SyncState>): void {
 
 let busy: SyncStatus['busy'];
 let queue: Promise<unknown> = Promise.resolve();
-/** serialize every operation (one at a time) */
-function serial<T>(kind: NonNullable<SyncStatus['busy']>, fn: () => Promise<T>): Promise<T> {
+/**
+ * serialize every operation (one at a time). `quiet` operations (read-only, e.g. history) neither show as
+ * busy nor broadcast changed('sync') — the UI reloads history on every 'sync' event, so a broadcasting
+ * history read would re-trigger itself forever and keep the status permanently "busy".
+ */
+function serial<T>(kind: NonNullable<SyncStatus['busy']>, fn: () => Promise<T>, opts: { quiet?: boolean } = {}): Promise<T> {
+  if (opts.quiet) {
+    const p = queue.then(fn, fn);
+    queue = p.catch(() => {});
+    return p;
+  }
   const run = async (): Promise<T> => {
     busy = kind;
     changed('sync');
@@ -717,7 +726,7 @@ export function history(limit = 30): Promise<SyncSnapshot[]> {
     } catch (e) {
       fail('history', e);
     }
-  });
+  }, { quiet: true });
 }
 
 /* ─────────────── pull / restore ─────────────── */
