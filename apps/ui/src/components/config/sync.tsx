@@ -8,7 +8,7 @@ import { conn, onCollectionChanged, settings, toast } from '../../lib/store.ts';
 import { socket } from '../../lib/api.ts';
 import { Btn, ErrorLine, Panel, Tag, fmt } from '../ui.tsx';
 import { Modal, relTime, useConfirm } from '../mail/kit.tsx';
-import { Field, INPUT, Kbd, SELECT, SaveBar, saveSettings, useDraft } from './fields.tsx';
+import { Field, INPUT, Kbd, SELECT, SaveBar, ToggleRow, saveSettings, useDraft } from './fields.tsx';
 
 type Collection = Parameters<typeof onCollectionChanged>[0];
 
@@ -68,7 +68,8 @@ function strength(p: string): { label: string; tone: 'red' | 'warn' | 'ok' } {
 }
 
 function statusTag(st: SyncStatus | undefined) {
-  if (!st || !st.configured || !st.passphraseSet || !st.remoteReady) return <Tag>Not set up</Tag>;
+  const encOff = settings.value?.sync?.encrypt === false;
+  if (!st || !st.configured || !(st.passphraseSet || encOff) || !st.remoteReady) return <Tag>Not set up</Tag>;
   if (st.error) return <Tag tone="red">Error</Tag>;
   if (st.busy) return <Tag tone="warn">{st.busy === 'push' ? 'Uploading…' : st.busy === 'pull' ? 'Restoring…' : 'Checking…'}</Tag>;
   if (st.localChanged) return <Tag tone="warn">Changes not synced</Tag>;
@@ -134,7 +135,8 @@ export function SyncSection() {
   const pv = providers.data;
   const cliInstalled = (cli: 'gh' | 'glab' | 'git') => (pv ? pv[cli].installed && pv.git.installed : true);
   const accounts = (pv?.accounts ?? []).filter((a) => a.provider === draft.provider).sort((a, b) => Number(b.active) - Number(a.active));
-  const ready = !!(st?.configured && st.passphraseSet && st.remoteReady);
+  const encrypt = settings.value?.sync?.encrypt !== false;
+  const ready = !!(st?.configured && (st.passphraseSet || !encrypt) && st.remoteReady);
   const repoPlaceholder = `${draft.account || '<login>'}/monarch-sync`;
   const passOk = pass1.length >= 8 && pass1 === pass2;
   const str = strength(pass1);
@@ -314,7 +316,25 @@ export function SyncSection() {
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
 
-      <Panel code="SYN.03" title="2 · Passphrase" right={st?.passphraseSet ? <Tag tone="ok">Passphrase set on this device</Tag> : <Tag>Not set</Tag>}>
+      <Panel
+        code="SYN.03"
+        title="2 · Encryption"
+        right={!encrypt ? <Tag tone="warn">Off — readable in the repo</Tag> : st?.passphraseSet ? <Tag tone="ok">Passphrase set on this device</Tag> : <Tag>Not set</Tag>}
+      >
+        <ToggleRow
+          label="Encrypt with a passphrase"
+          hint={
+            encrypt
+              ? 'Recommended. GitHub only ever stores ciphertext; a new device needs the same passphrase.'
+              : 'Off: snapshots are only compressed. The repo is still private, but anyone with access to it or to your GitHub token can read every API key and token in it.'
+          }
+          checked={encrypt}
+          onChange={(on) => {
+            void saveSettings({ sync: { encrypt: on } }, on ? 'Encryption on — set a passphrase to sync' : 'Encryption off — next sync uploads readable data').then(() => void status.reload());
+          }}
+        />
+        {encrypt && (
+          <div class="mt-3">
         <div class="grid gap-4 grid-cols-1 md:grid-cols-2">
           <Field label={st?.passphraseSet ? 'New passphrase' : 'Passphrase'} htmlFor="sync-pass1" hint={pass1 ? <span>Strength: <Tag tone={str.tone}>{str.label}</Tag></span> : 'At least 8 characters; a long phrase is best.'}>
             <input id="sync-pass1" type="password" autocomplete="new-password" class={INPUT} value={pass1} onInput={(e) => setPass1((e.target as HTMLInputElement).value)} />
@@ -331,6 +351,8 @@ export function SyncSection() {
             <KeyRound size={12} /> {st?.passphraseSet ? 'Change passphrase' : 'Set passphrase'}
           </Btn>
         </div>
+          </div>
+        )}
       </Panel>
 
       <Panel code="SYN.04" title="3 · Connect" right={st?.remoteReady ? <Tag tone="ok">connected</Tag> : <Tag>not connected</Tag>}>

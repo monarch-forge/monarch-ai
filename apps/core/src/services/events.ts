@@ -1,7 +1,7 @@
 /** Calendar events: local store + Google calendars (via integrations/google contract). */
 import type { CalendarEvent } from '@monarch/shared';
 import { activity, changed, HttpError, newId } from '../kernel.ts';
-import { createGoogleEvent, deleteGoogleEvent, listGoogleEvents, updateGoogleEvent } from '../integrations/google/index.ts';
+import { createGoogleEvent, deleteGoogleEvent, listGoogleEvents, listGoogleEventsDetailed, updateGoogleEvent, type CalendarAccountResult } from '../integrations/google/index.ts';
 import { serviceStore } from './persist.ts';
 import { addDays, isoOrNull, startOfDay } from './dates.ts';
 
@@ -42,6 +42,20 @@ export async function listEvents(from: Date, to: Date, opts: { googleTimeoutMs?:
     console.warn('[events] google calendar listing failed:', (e as Error).message);
   }
   return [...local, ...google].sort(byStart);
+}
+
+/** local + google events plus what was checked: local count and one result per Google account (count or error) */
+export async function listEventsWithCoverage(
+  from: Date,
+  to: Date,
+): Promise<{ events: CalendarEvent[]; local: number; google: CalendarAccountResult[]; googleError?: string }> {
+  const local = listLocalEvents(from, to);
+  try {
+    const g = await listGoogleEventsDetailed(from, to);
+    return { events: [...local, ...g.events].sort(byStart), local: local.length, google: g.accounts };
+  } catch (e) {
+    return { events: local, local: local.length, google: [], googleError: (e as Error).message || String(e) };
+  }
 }
 
 function normalize(input: EventInput, base?: CalendarEvent): Omit<CalendarEvent, 'id' | 'source'> {

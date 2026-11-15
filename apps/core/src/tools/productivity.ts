@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Automation, CalendarEvent, Task } from '@monarch/shared';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import { createTask, deleteTask, getTask, listTasks, updateTask } from '../services/tasks.ts';
-import { createEvent, deleteEvent, listEvents } from '../services/events.ts';
+import { createEvent, deleteEvent, listEventsWithCoverage } from '../services/events.ts';
 import { createAutomation, deleteAutomation, listAutomations, parseSchedule } from '../services/automations.ts';
 import { addDays, fmtLocal, localIso, parseWhen, startOfDay } from '../services/dates.ts';
 
@@ -23,11 +23,14 @@ const fmtTask = (t: Task) =>
     .filter(Boolean)
     .join(' | ');
 
+/** accountId → email, filled by calendar_list so event lines can name the account */
+let accountEmails = new Map<string, string>();
+
 const fmtEvent = (e: CalendarEvent) =>
   [
     `${e.allDay ? `${e.start.slice(0, 10)} (all day)` : `${fmtLocal(e.start)}${e.end ? ` – ${fmtLocal(e.end)}` : ''}`}  ${e.title}`,
     `id=${e.id}`,
-    `source=${e.source}${e.accountId ? `:${e.accountId}` : ''}`,
+    e.accountId ? `account=${accountEmails.get(e.accountId) ?? e.accountId} (accountId=${e.accountId})` : `source=${e.source}`,
     e.location ? `location=${e.location}` : null,
     e.link ? `link=${e.link}` : null,
     e.notes ? `notes=${JSON.stringify(e.notes.slice(0, 200))}` : null,
@@ -165,7 +168,7 @@ const calendarList = defineTool({
   group: 'productivity',
   keywords: ['events', 'schedule', 'agenda', 'meetings', 'appointments', 'google calendar'],
   description:
-    "List calendar events from the user's local Monarch calendar and all connected Google calendars in a time range (default: today through the next 7 days). Each line includes the event id and source.",
+    "List calendar events from the user's local Monarch calendar and ALL connected Google accounts' primary calendars in a time range (default: today through the next 7 days). Output starts with a coverage line naming every account checked with its event count or error: an account with 0 events has an empty calendar in that range, it is NOT disconnected. Each event line includes its id and account.",
   risk: 'safe',
   tag: 'CAL',
   schema: z.object({
@@ -176,14 +179,29 @@ const calendarList = defineTool({
   run: async ({ from, to, query }) => {
     const f = parseWhen(from) ?? startOfDay();
     const t = parseWhen(to) ?? addDays(f, 7);
-    let list = await listEvents(f, t);
-    if (query) {
-      const q = query.toLowerCase();
-      list = list.filter((e) => `${e.title} ${e.location ?? ''} ${e.notes ?? ''}`.toLowerCase().includes(q));
-    }
+    const res = await listEventsWithCoverage(f, t);
+    accountEmails = new Map(res.google.map((a) => [a.accountId, a.email]));
+    let list = res.events;
+    const q = query?.toLowerCase();
+    if (q) list = list.filter((e) => `${e.title} ${e.location ?? ''} ${e.notes ?? ''}`.toLowerCase().includes(q));
+    const count = (pred: (e: CalendarEvent) => boolean) => list.filter(pred).length;
+    const parts = res.google.map((a) =>
+      a.error ? `${a.email} (error: ${a.error.slice(0, 160)})` : `${a.email} (${count((e) => e.accountId === a.accountId)} event${count((e) => e.accountId === a.accountId) === 1 ? '' : 's'})`,
+    );
+    const coverage = [
+      res.googleError
+        ? `Google calendars could not be listed: ${res.googleError}`
+        : res.google.length
+          ? `Checked ${res.google.length} Google calendar${res.google.length === 1 ? '' : 's'}: ${parts.join(', ')}.`
+          : 'No Google accounts connected.',
+      `Local Monarch calendar: ${count((e) => !e.accountId)} event(s).`,
+      q ? `Filter: "${query}".` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
     const range = `${fmtLocal(f)} → ${fmtLocal(t)}`;
-    if (!list.length) return `No events between ${range}.`;
-    return `${list.length} event(s) between ${range}:\n${list.map(fmtEvent).join('\n')}`;
+    if (!list.length) return `${coverage}\nNo events between ${range}.`;
+    return `${coverage}\n${list.length} event(s) between ${range}:\n${list.map(fmtEvent).join('\n')}`;
   },
 });
 

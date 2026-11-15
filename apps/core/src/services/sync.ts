@@ -294,7 +294,7 @@ async function ensureProviderRepo(s: SyncSettings, token: string): Promise<void>
     if (r.status === 404) {
       const user = await api(s, token, 'GET', '/user');
       const path = user.json?.login?.toLowerCase() === owner!.toLowerCase() ? '/user/repos' : `/orgs/${owner}/repos`;
-      const c = await api(s, token, 'POST', path, { name, private: true, auto_init: false, description: 'Monarch encrypted sync (ciphertext only)' });
+      const c = await api(s, token, 'POST', path, { name, private: true, auto_init: false, description: 'Monarch sync (private)' });
       if (c.status >= 300) throw new HttpError(502, `Could not create ${repo}: ${scrub(c.json?.message ?? String(c.status))}`);
       activity('SYS', `Sync: created private repo ${repo}`);
       r = await api(s, token, 'GET', `/repos/${repo}`);
@@ -491,7 +491,14 @@ function deriveKey(pass: string, salt: Buffer, p: { N: number; r: number; p: num
   );
 }
 
-async function encrypt(plain: Buffer, pass: string): Promise<Buffer> {
+async function encrypt(plain: Buffer, pass: string | null): Promise<Buffer> {
+  if (pass === null) {
+    // encryption turned off (settings.sync.encrypt === false): gzip only, same container format
+    const header = Buffer.from(JSON.stringify({ cipher: 'none', compression: 'gzip' }));
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(header.length);
+    return Buffer.concat([ENC_MAGIC, Buffer.from([1]), len, header, gzipSync(plain, { level: 6 })]);
+  }
   const salt = randomBytes(16);
   const iv = randomBytes(12);
   const key = await deriveKey(pass, salt, KDF);
@@ -505,13 +512,15 @@ async function encrypt(plain: Buffer, pass: string): Promise<Buffer> {
   return Buffer.concat([ENC_MAGIC, Buffer.from([1]), len, header, ct]);
 }
 
-async function decrypt(file: Buffer, pass: string): Promise<Buffer> {
+async function decrypt(file: Buffer, pass: string | undefined): Promise<Buffer> {
   if (!file.subarray(0, ENC_MAGIC.length).equals(ENC_MAGIC)) throw new HttpError(422, 'Remote bundle is not a Monarch sync file');
   const ver = file[ENC_MAGIC.length];
   if (ver !== 1) throw new HttpError(422, `Unsupported sync format v${ver} — update Monarch`);
   const len = file.readUInt32BE(ENC_MAGIC.length + 1);
   const hStart = ENC_MAGIC.length + 5;
   const h = JSON.parse(file.subarray(hStart, hStart + len).toString('utf8'));
+  if (h.cipher === 'none') return gunzipSync(file.subarray(hStart + len));
+  if (!pass) throw new HttpError(400, 'This snapshot is encrypted — set the sync passphrase first');
   if (h.kdf !== 'scrypt' || h.N > 2 ** 20 || h.r > 32 || h.p > 16) throw new HttpError(422, 'Unsupported KDF parameters');
   const key = await deriveKey(pass, Buffer.from(h.salt, 'base64'), h);
   const d = createDecipheriv('aes-256-gcm', key, Buffer.from(h.iv, 'base64'));
@@ -530,6 +539,10 @@ async function decrypt(file: Buffer, pass: string): Promise<Buffer> {
 function passphrase(): string | undefined {
   const p = (secrets.get() as any).sync?.passphrase;
   return typeof p === 'string' && p ? p : undefined;
+}
+/** encryption is on unless the user turned it off in Config → Sync */
+function encryptOn(): boolean {
+  return (cfg() as { encrypt?: boolean }).encrypt !== false;
 }
 function requirePassphrase(): string {
   const p = passphrase();
@@ -638,7 +651,7 @@ export function connect(): Promise<SyncStatus> {
 export function push(opts: { force?: boolean; auto?: boolean } = {}): Promise<SyncStatus> {
   return serial('push', async () => {
     try {
-      const pass = requirePassphrase();
+      const pass = encryptOn() ? requirePassphrase() : null;
       const remote = await prepare();
       const b = cfg().branch || 'main';
       const tip = await fetchRemote(remote);
@@ -793,7 +806,7 @@ function applyBundle(b: Bundle): void {
 export function pull(opts: { commit?: string } = {}): Promise<{ restored: true; restarting: true; restoreNow: () => void }> {
   return serial('pull', async () => {
     try {
-      const pass = requirePassphrase();
+      const pass = passphrase();
       const remote = await prepare();
       const tip = await fetchRemote(remote);
       if (!tip) throw new HttpError(404, 'The remote has no snapshots yet');
@@ -852,7 +865,7 @@ function intervalMs(s = cfg()): number {
 
 async function autoTick(): Promise<void> {
   const s = cfg();
-  if (!s.enabled || !intervalMs(s) || !configured(s) || !passphrase() || busy) return;
+  if (!s.enabled || !intervalMs(s) || !configured(s) || (encryptOn() && !passphrase()) || busy) return;
   const last = Date.parse(state.lastPushAt || state.lastPullAt || '1970-01-01');
   if (Date.now() - last < intervalMs(s) - 60_000) return;
   try {

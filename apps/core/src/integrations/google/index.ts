@@ -1,12 +1,17 @@
 // Google integration (Core-C). The first six exports are the cross-module contract — signatures are fixed.
 import type { CalendarEvent } from '@monarch/shared';
 import { listAccounts } from './auth.ts';
-import { createEvent, deleteEvent, listEvents, updateEvent } from './calendar.ts';
+import { createEvent, deleteEvent, listEvents, listEventsDetailed, updateEvent, type CalendarAccountResult } from './calendar.ts';
+export type { CalendarAccountResult };
 import { unreadCount } from './gmail.ts';
 
 /** events from every connected Google account's primary calendar in [from, to) */
 export async function listGoogleEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
   return listEvents(from, to);
+}
+/** like listGoogleEvents, plus a per-account result (count or error) for coverage reporting */
+export async function listGoogleEventsDetailed(from: Date, to: Date) {
+  return listEventsDetailed(from, to);
 }
 /** create on the account's primary calendar (ev.accountId required) */
 export async function createGoogleEvent(ev: Omit<CalendarEvent, 'id' | 'source'>): Promise<CalendarEvent> {

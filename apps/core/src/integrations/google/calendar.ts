@@ -106,11 +106,22 @@ export function toGoogleBody(ev: Partial<CalendarEvent>, existing?: { allDay: bo
   return body;
 }
 
-export async function listEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
-  const accounts = listAccounts().filter((a) => !a.error);
-  if (!accounts.length) return [];
-  const per = await Promise.all(
-    accounts.map(async (a) => {
+/** what happened for one Google account during a listing (for coverage reporting) */
+export interface CalendarAccountResult {
+  accountId: string;
+  email: string;
+  /** events found in the range (0 = empty calendar, not a missing connection) */
+  count: number;
+  /** set when the account could not be queried (stored auth error or a failed fetch) */
+  error?: string;
+}
+
+/** events of every connected account plus a per-account result, so callers can report coverage and failures */
+export async function listEventsDetailed(from: Date, to: Date): Promise<{ events: CalendarEvent[]; accounts: CalendarAccountResult[] }> {
+  const all = listAccounts();
+  const results = await Promise.all(
+    all.map(async (a): Promise<{ events: CalendarEvent[]; result: CalendarAccountResult }> => {
+      if (a.error) return { events: [], result: { accountId: a.id, email: a.email, count: 0, error: a.error } };
       try {
         const out: CalendarEvent[] = [];
         let pageToken: string | undefined;
@@ -129,14 +140,22 @@ export async function listEvents(from: Date, to: Date): Promise<CalendarEvent[]>
           pageToken = r.nextPageToken;
           if (!pageToken) break;
         }
-        return out;
+        return { events: out, result: { accountId: a.id, email: a.email, count: out.length } };
       } catch (e) {
-        console.warn(`[calendar] ${a.email}: ${(e as Error).message}`);
-        return [];
+        const msg = (e as Error).message || String(e);
+        console.warn(`[calendar] ${a.email}: ${msg}`);
+        return { events: [], result: { accountId: a.id, email: a.email, count: 0, error: msg } };
       }
     }),
   );
-  return per.flat().sort((x, y) => x.start.localeCompare(y.start));
+  return {
+    events: results.flatMap((r) => r.events).sort((x, y) => x.start.localeCompare(y.start)),
+    accounts: results.map((r) => r.result),
+  };
+}
+
+export async function listEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
+  return (await listEventsDetailed(from, to)).events;
 }
 
 export async function createEvent(ev: Omit<CalendarEvent, 'id' | 'source'>): Promise<CalendarEvent> {

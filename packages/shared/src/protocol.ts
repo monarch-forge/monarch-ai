@@ -90,6 +90,9 @@ export interface SyncSettings {
   /** label for this machine in snapshot metadata */
   deviceName: string;
   autoSync: 'off' | 'hourly' | 'daily';
+  /** encrypt snapshots with the sync passphrase (default true). Off = gzip only; the repo is still private
+   * but anyone with access to it (or the account token) can read every key and token. */
+  encrypt?: boolean;
 }
 
 /** unencrypted metadata committed next to the encrypted bundle (no secrets) */
