@@ -109,6 +109,9 @@ export default function RouterPage(_props: { params: string[] }) {
         <iframe
           src={ROUTER_URL}
           title="9Router Dashboard"
+          // 9Router follows prefers-color-scheme ("system" theme); the iframe element's color-scheme is
+          // what the embedded page sees (WebKitGTK ignores the parent page's scheme), so force dark here
+          style={{ colorScheme: 'dark' }}
           class="w-full h-full border-0 bg-[#121213]"
         />
       </div>
