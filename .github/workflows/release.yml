@@ -82,8 +82,13 @@ jobs:
       # src-tauri/resources/core (the app spawns `node core.mjs` at runtime).
       - name: Derive version from tag
         shell: bash
+        run: echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      # version consistency (Linux only: Windows checkouts use CRLF, which the text checks don't expect)
+      - name: Check tag matches package.json
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
-          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
           pkg=$(node -p "require('./package.json').version")
           if [ "v$pkg" != "$TAG" ]; then echo "::error::Tag $TAG does not match package.json version $pkg (run: npm run set-version ${TAG#v})"; exit 1; fi
           node scripts/version.mjs --check
