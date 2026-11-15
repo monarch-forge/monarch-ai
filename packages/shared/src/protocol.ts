@@ -48,6 +48,85 @@ export interface CustomModel {
   reasoning?: boolean;
 }
 
+
+/* ─────────────── sync (encrypted backup to a git remote) ───────────────
+ *
+ * All Monarch data (settings, secrets/tokens, sessions, vault, extensions, skills, stores) is packed,
+ * encrypted on-device with a key derived from the user's sync passphrase (scrypt → AES-256-GCM) and
+ * committed to a PRIVATE git repo. Auth comes from the local CLIs: `gh` (GitHub, multiple accounts),
+ * `glab` (GitLab), or a plain git remote using the user's own git credentials (SSH/credential helper).
+ * Tokens are passed to git via environment config only, never written to disk or argv.
+ */
+
+export type SyncProvider = 'github' | 'gitlab' | 'git';
+
+export interface SyncAccount {
+  provider: 'github' | 'gitlab';
+  host: string; // github.com / gitlab.com / enterprise host
+  login: string;
+  active: boolean;
+  /** token scopes as reported by the CLI, when known */
+  scopes?: string;
+}
+
+export interface SyncProviders {
+  git: { installed: boolean; version?: string };
+  gh: { installed: boolean; version?: string };
+  glab: { installed: boolean; version?: string };
+  accounts: SyncAccount[];
+}
+
+export interface SyncSettings {
+  enabled: boolean;
+  provider: SyncProvider;
+  /** github/gitlab: CLI account to use */
+  host: string;
+  account: string;
+  /** github/gitlab: "<owner>/<name>" (default "<login>/monarch-sync"); created private if missing */
+  repo: string;
+  /** provider 'git': full remote URL (ssh or https) */
+  remoteUrl: string;
+  branch: string; // default "main"
+  /** label for this machine in snapshot metadata */
+  deviceName: string;
+  autoSync: 'off' | 'hourly' | 'daily';
+}
+
+/** unencrypted metadata committed next to the encrypted bundle (no secrets) */
+export interface SyncSnapshotMeta {
+  format: 1;
+  createdAt: ISODate;
+  device: string;
+  appVersion: string;
+  files: number;
+  bytes: number;
+  /** sha256 of the plaintext bundle (dedupe: skip commits when nothing changed) */
+  contentHash: string;
+}
+
+export interface SyncSnapshot extends SyncSnapshotMeta {
+  /** git commit sha */
+  commit: string;
+  message: string;
+}
+
+export interface SyncStatus {
+  configured: boolean;
+  /** a passphrase is set on this device */
+  passphraseSet: boolean;
+  /** remote reachable and repo exists */
+  remoteReady: boolean;
+  remoteUrl?: string; // display form, never contains tokens
+  lastPushAt?: ISODate;
+  lastPullAt?: ISODate;
+  /** newest snapshot on the remote */
+  remote?: SyncSnapshot;
+  /** local data differs from the last pushed/pulled snapshot */
+  localChanged: boolean;
+  busy?: 'push' | 'pull' | 'check';
+  error?: string;
+}
+
 /* ─────────────── voice (cloud speech) ─────────────── */
 
 export type VoiceSttProvider = 'none' | 'openai' | 'groq' | 'custom';
@@ -167,6 +246,8 @@ export interface Settings {
     /** Obsidian-compatible vault directory with markdown notes */
     vaultDir: string;
   };
+  /** encrypted sync of all Monarch data to a private git repo (Config → Sync) */
+  sync: SyncSettings;
   /** self-evolution: extensions, skills, reflection, deferred tools */
   evolution: {
     /** the agent may write/modify its own extensions and skills (still approval-gated by risk) */
@@ -830,7 +911,8 @@ export type ServerEvent =
         | 'notifications'
         | 'extensions'
         | 'skills'
-        | 'evolution';
+        | 'evolution'
+        | 'sync';
     }
   /** voice pipeline state (mic level 0..1 while listening) */
   | { type: 'voice.state'; phase: 'idle' | 'listening' | 'transcribing' | 'speaking'; level?: number }
@@ -954,6 +1036,13 @@ export type ClientCommand =
  * POST   /api/evolution/forge {text}         -> { sessionId }   (ask the agent to build a capability)
  * GET    /api/tools/catalog                  -> ToolCatalogEntry[]
  *
+ * GET    /api/sync/providers                 -> SyncProviders   (detected git/gh/glab + logged-in accounts)
+ * GET    /api/sync/status                    -> SyncStatus
+ * PUT    /api/sync/passphrase {passphrase}   -> SyncStatus      (stored locally only, in secrets; never synced in clear)
+ * POST   /api/sync/connect                   -> SyncStatus      (create the private repo if missing, verify access)
+ * POST   /api/sync/push {force?}             -> SyncStatus      (encrypt + commit + push; force overwrites a newer remote)
+ * POST   /api/sync/pull {commit?}            -> { restored: true; restarting: true }  (backup local, decrypt, restore, core restarts)
+ * GET    /api/sync/history?limit=30          -> SyncSnapshot[]
  * GET    /api/voice/status                   -> VoiceStatus
  * PUT    /api/voice/key {provider: VoiceKeyProvider, apiKey} -> VoiceStatus   (DELETE /api/voice/key/:provider)
  * GET    /api/voice/voices                   -> { id: string; name: string; hint?: string; disabled?: boolean }[]  (current TTS provider; disabled = not usable on this plan)

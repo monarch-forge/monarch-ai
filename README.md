@@ -21,6 +21,7 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Voice.** Cloud speech in and out: the mic in the console and in Comms records your request, which is transcribed by OpenAI, Groq or any OpenAI-compatible endpoint. Replies are spoken by OpenAI, ElevenLabs or any OpenAI-compatible text-to-speech service. Set it up in **Config → Voice**: pick a provider and add its API key. On Linux the core records with `pw-record` (or `parecord` or `arecord`), stops when you go quiet, and plays replies with `pw-play`, so it doesn't depend on the webview.
 - **Self-evolution.** Monarch extends itself. Ask it (or use **Evolve → Forge**) for a capability it lacks and it writes, sandboxes and tests a new extension (tools, dashboard panels, background jobs) or a skill (a learned procedure). Every change is versioned with rollback and logged on a timeline. An optional daily or weekly self-reflection turns friction into proposals you approve.
 - **Lean prompts.** Only about 14 core tools load into each prompt. The rest, including every extension tool, are found on demand through tool search (Claude Code's native ToolSearch, or `tool_search` on pi). That roughly halves the prompt.
+- **Sync across devices.** In **Config → Sync**, Monarch encrypts all its data (settings, keys and tokens, sessions, vault, extensions and skills) with your passphrase and keeps it in a private repo. It signs in with your existing `gh` account (or `glab`, or any git remote). On a new device, pick the same repo, enter the passphrase and press **Restore**.
 - **Command palette.** Press `Ctrl/⌘+K` for everything.
 
 ## Architecture
@@ -66,8 +67,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.4.3/monarch-ai-bin-0.4.3-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.4.3-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.4.4/monarch-ai-bin-0.4.4-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.4.4-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -92,30 +93,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.4.3_amd64.deb
+sudo apt install ./Monarch_0.4.4_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.4.3-1.x86_64.rpm
+sudo dnf install ./Monarch-0.4.4-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.4.3_amd64.AppImage && ./Monarch_0.4.3_amd64.AppImage
+chmod +x Monarch_0.4.4_amd64.AppImage && ./Monarch_0.4.4_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.4.3_aarch64.dmg` (Apple Silicon) or `Monarch_0.4.3_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.4.4_aarch64.dmg` (Apple Silicon) or `Monarch_0.4.4_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.4.3_x64-setup.exe`, or `Monarch_0.4.3_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.4.4_x64-setup.exe`, or `Monarch_0.4.4_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 
@@ -252,13 +253,15 @@ The `pi` engine (`@earendil-works/pi-ai` and `pi-agent-core`) works with many pr
 
 ## Integrations
 
+For a step-by-step guide with troubleshooting, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+
 ### Google (Gmail and Calendar, several accounts)
 
 1. Open the [Google Cloud console](https://console.cloud.google.com/) and create (or pick) a project.
 2. Under **APIs & Services → Library**, enable the **Gmail API** and the **Google Calendar API**.
 3. Under **OAuth consent screen**, choose type *External* and leave publishing status at *Testing*. Add every Gmail address you'll connect as a **test user**.
 4. Under **Credentials → Create credentials → OAuth client ID**, choose application type **Desktop app**. Copy the client ID and secret.
-5. In Monarch, open **Config → Google**, paste the client ID and secret, then use **Connect account** once per account.
+5. In Monarch, open **Config → Accounts**, paste the client ID and secret (**Save client**), then use **Connect** once per account.
 
 Sign-in happens in your browser. It redirects back to the core at `http://127.0.0.1:7717/oauth/google/callback`. Desktop-app clients accept any loopback redirect, so you don't need to register that URI.
 
@@ -270,7 +273,7 @@ Sign-in happens in your browser. It redirects back to the core at `http://127.0.
 2. Under **OAuth & Permissions → User Token Scopes**, add:
    `channels:history channels:read groups:history groups:read im:history im:read mpim:history mpim:read users:read search:read chat:write`
 3. Press **Install to Workspace** and approve.
-4. Copy the **User OAuth Token** (`xoxp-…`) into **Config → Slack**.
+4. Copy the **User OAuth Token** (`xoxp-…`) into **Config → Accounts → Slack**.
 
 Messages are posted as you, and every send goes through approval.
 

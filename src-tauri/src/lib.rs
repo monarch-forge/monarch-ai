@@ -24,6 +24,8 @@ use tauri_plugin_opener::OpenerExt;
 
 const CORE_ADDR: &str = "127.0.0.1:7717";
 const LOG_ROTATE_BYTES: u64 = 5 * 1024 * 1024;
+/// The core exits with this code when it wants to be restarted (e.g. after a sync pull restored the data dir).
+const CORE_RESTART_CODE: i32 = 75;
 
 /* ───────────────────────── state ───────────────────────── */
 
@@ -39,6 +41,8 @@ struct CoreInner {
     external: bool,
     error: Option<String>,
     log_path: Option<PathBuf>,
+    /// set by stop_core: the app is exiting, never respawn
+    stopping: bool,
 }
 
 struct CoreState(Mutex<CoreInner>);
@@ -293,6 +297,7 @@ fn stop_core(app: &AppHandle) {
     let Some(state) = app.try_state::<CoreState>() else { return };
     let (proc, log_path) = {
         let mut inner = state.0.lock().unwrap_or_else(|e| e.into_inner());
+        inner.stopping = true;
         (inner.proc.take(), inner.log_path.clone())
     };
     let Some(mut proc) = proc else { return };
@@ -329,6 +334,40 @@ fn wait_exit(child: &mut Child, timeout: Duration) -> bool {
             Err(_) => return true,
         }
     }
+}
+
+/// Respawn the core when it exits with CORE_RESTART_CODE (same args/env via spawn_core). Other exits are
+/// left for core_status() to report. Polls every 500ms without holding the lock while sleeping.
+fn watch_core(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(500));
+        let Some(state) = app.try_state::<CoreState>() else { return };
+        let mut inner = state.0.lock().unwrap_or_else(|e| e.into_inner());
+        if inner.stopping {
+            return;
+        }
+        let code = match inner.proc.as_mut().map(|p| p.child.try_wait()) {
+            Some(Ok(Some(status))) => status.code(),
+            _ => continue,
+        };
+        if code != Some(CORE_RESTART_CODE) {
+            continue; // core_status() reaps it and reports the exit
+        }
+        inner.proc = None;
+        let log = open_log();
+        inner.log_path = log.as_ref().map(|(_, p)| p.clone());
+        log_line(inner.log_path.as_deref(), "core requested a restart (exit 75) — respawning");
+        match spawn_core(&app, log) {
+            Ok(proc) => {
+                inner.proc = Some(proc);
+                inner.error = None;
+            }
+            Err(e) => {
+                log_line(inner.log_path.as_deref(), &format!("core respawn failed: {e}"));
+                inner.error = Some(e);
+            }
+        }
+    });
 }
 
 /* ───────────────────────── commands ───────────────────────── */
@@ -390,6 +429,8 @@ fn core_status(state: State<'_, CoreState>) -> CoreStatus {
     let (spawned, pid) = match inner.proc.as_mut() {
         Some(p) => match p.child.try_wait() {
             Ok(None) => (true, Some(p.child.id())),
+            // restart request: leave it for watch_core() to respawn
+            Ok(Some(status)) if status.code() == Some(CORE_RESTART_CODE) => (false, None),
             Ok(Some(status)) => {
                 exited = Some(format!("core exited: {status}"));
                 (false, None)
@@ -469,7 +510,10 @@ pub fn run() {
             let log = open_log();
             inner.log_path = log.as_ref().map(|(_, p)| p.clone());
             match spawn_core(&handle, log) {
-                Ok(proc) => inner.proc = Some(proc),
+                Ok(proc) => {
+                    inner.proc = Some(proc);
+                    watch_core(handle.clone());
+                }
                 // Never abort the window: the UI shows "core offline" and core_status() carries the reason.
                 Err(e) => {
                     log_line(inner.log_path.as_deref(), &format!("core not started: {e}"));

@@ -19,6 +19,7 @@ import {
   MessageSquare,
   MessageSquarePlus,
   Network,
+  RefreshCcw,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -228,6 +229,27 @@ export function CommandPalette() {
         run: () => {
           close();
           void toggleVoice();
+        },
+      },
+      {
+        id: 'act:sync',
+        group: 'Actions',
+        label: 'Sync now',
+        hint: 'Encrypted backup',
+        keywords: 'backup upload push git github encrypted devices',
+        icon: RefreshCcw,
+        run: async () => {
+          close();
+          try {
+            await api.post('/sync/push');
+            toast('Snapshot uploaded', 'success');
+          } catch (e: any) {
+            if (e?.status === 409) {
+              toast('Remote is newer — resolve in Config → Sync', 'warn');
+              navigate('config/sync');
+            } else if (e?.status === 404) toast('Sync service unavailable', 'warn');
+            else toast(`Sync failed: ${e?.message ?? e}`, 'error');
+          }
         },
       },
       {
