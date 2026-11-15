@@ -25,7 +25,8 @@
         "decorations": true,
         "backgroundColor": "#121213",
         "theme": "Dark",
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "create": false
       }
     ],
     "security": {
@@ -61,8 +62,8 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
-    "shortDescription": "Monarch — personal agentic OS",
-    "longDescription": "A calm HUD dashboard plus an AI agent that chats, codes, handles mail, Slack, memory, calendar and automations — with approval gates for risky actions.",
+    "shortDescription": "Monarch \u2014 personal agentic OS",
+    "longDescription": "A calm HUD dashboard plus an AI agent that chats, codes, handles mail, Slack, memory, calendar and automations \u2014 with approval gates for risky actions.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

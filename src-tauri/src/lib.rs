@@ -418,12 +418,39 @@ fn core_status(state: State<'_, CoreState>) -> CoreStatus {
 /* ───────────────────────── entry ───────────────────────── */
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Release builds serve the UI from http://localhost:UI_PORT instead of tauri://localhost, so the
+/// 9Router dashboard (http://localhost:20128) embedded in an iframe is same-site and its login cookie works.
+const UI_PORT: u16 = 7719;
+
+/// The main window (declared in tauri.conf.json with `create: false`): built here so release builds can
+/// point it at the localhost server; dev builds keep the configured devUrl (Vite).
+fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
+    let mut conf = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .unwrap_or_default();
+    if !cfg!(debug_assertions) {
+        let url: tauri::Url = format!("http://localhost:{UI_PORT}").parse().expect("valid localhost url");
+        conf.url = tauri::WebviewUrl::External(url);
+    }
+    tauri::WebviewWindowBuilder::from_config(app.handle(), &conf)?.build()?;
+    Ok(())
+}
+
 pub fn run() {
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    if !cfg!(debug_assertions) {
+        builder = builder.plugin(tauri_plugin_localhost::Builder::new(UI_PORT).build());
+    }
+    let app = builder
         .manage(CoreState(Mutex::new(CoreInner::default())))
         .invoke_handler(tauri::generate_handler![open_external, core_status, open_router_window])
         .setup(|app| {
+            create_main_window(app)?;
             let handle = app.handle().clone();
             let state = app.state::<CoreState>();
             let mut inner = state.0.lock().unwrap_or_else(|e| e.into_inner());

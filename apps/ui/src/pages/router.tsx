@@ -20,9 +20,9 @@ const ROUTER_URL = (() => {
 const ROUTER_LABEL = ROUTER_URL.replace(/^https?:\/\//, '').toUpperCase();
 
 /**
- * In the packaged app the UI origin is tauri://localhost (http://tauri.localhost on Windows), so an
- * iframe on 9Router is cross-site and its SameSite=Lax session cookie never sticks — login loops.
- * There we open 9Router in its own top-level Tauri window instead (see open_router_window in lib.rs).
+ * The iframe needs the UI to be same-site with 9Router (its session cookie is SameSite=Lax): dev runs on
+ * http://localhost:5173 and release builds serve the UI from http://localhost:7719 (tauri-plugin-localhost).
+ * "Open in window" (open_router_window in lib.rs) remains as an optional pop-out in the desktop app.
  */
 const IN_TAURI = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 
@@ -58,10 +58,6 @@ export default function RouterPage(_props: { params: string[] }) {
     checkRouter();
   }, []);
 
-  useEffect(() => {
-    if (IN_TAURI && available) void openRouterWindow().then(setOpenError);
-  }, [available]);
-
   if (loading) {
     return (
       <div class="h-full flex items-center justify-center font-mono text-xs text-fg-3">
@@ -88,24 +84,6 @@ export default function RouterPage(_props: { params: string[] }) {
     );
   }
 
-  if (IN_TAURI) {
-    return (
-      <div class="h-full flex items-center justify-center p-6">
-        <div class="hud-panel max-w-md w-full p-6 space-y-4 text-center">
-          <div class="font-mono text-xs tracking-widest text-fg-2 uppercase">9Router Gateway Console</div>
-          <div class="font-mono text-sm text-fg">9Router opens in its own window.</div>
-          {openError && <div class="font-mono text-xs text-red break-words">{openError}</div>}
-          <button
-            onClick={() => void openRouterWindow().then(setOpenError)}
-            class="px-4 py-2 font-mono text-xs uppercase border border-line bg-subtle hover:border-fg-2 text-fg transition"
-          >
-            Open 9Router Window
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div class="h-full flex flex-col p-3 xl:p-4 gap-3">
       <div class="flex items-center justify-between px-1">
@@ -113,7 +91,19 @@ export default function RouterPage(_props: { params: string[] }) {
           <span class="w-2 h-2 bg-success inline-block" />
           9Router Gateway Console
         </div>
-        <Tag tone="ok">{ROUTER_LABEL}</Tag>
+        <span class="flex items-center gap-2">
+          {openError && <span class="font-mono text-[10px] text-red truncate max-w-[320px]" title={openError}>{openError}</span>}
+          {IN_TAURI && (
+            <button
+              onClick={() => void openRouterWindow().then(setOpenError)}
+              class="font-mono text-[10px] tracking-wider uppercase border border-line px-2 py-0.5 text-fg-2 hover:text-fg hover:border-fg-3"
+              title="Pop 9Router out into its own window"
+            >
+              Open in window
+            </button>
+          )}
+          <Tag tone="ok">{ROUTER_LABEL}</Tag>
+        </span>
       </div>
       <div class="flex-1 min-h-0 hud-panel overflow-hidden">
         <iframe

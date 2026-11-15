@@ -16,6 +16,8 @@ const DEFAULT_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'tauri://localhost',
+  // release desktop builds serve the UI from here (tauri-plugin-localhost, see src-tauri/src/lib.rs)
+  'http://localhost:7719',
   'http://tauri.localhost',
   'https://tauri.localhost',
 ];

@@ -1,6 +1,6 @@
 [package]
 name = "monarch_ai"
-version = "0.4.1"
+version = "0.4.2"
 description = "Monarch — a Jarvis-style personal agentic OS (desktop shell)"
 edition = "2024"
 rust-version = "1.90"
@@ -22,6 +22,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 # Only used from Rust (our `open_external` command); no JS permission is granted for it.
 tauri-plugin-opener = "2"
+# Serves the bundled UI over http://localhost:<UI_PORT> in release builds, so embedded localhost
+# services (9Router) are same-site with the app and their SameSite cookies work.
+tauri-plugin-localhost = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
