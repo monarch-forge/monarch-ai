@@ -15,6 +15,7 @@ import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, exist
 import { join } from 'node:path';
 import type { ChatItem, EngineId, SessionDetail, SessionKind, SessionSummary, Usage } from '@monarch/shared';
 import { paths, newId, nowIso, bus } from '../kernel.ts';
+import { getSettings } from '../settings.ts';
 
 export interface EngineState {
   sdkSessionId?: string;
@@ -23,6 +24,8 @@ export interface EngineState {
   piMessages?: unknown[];
   /** pi: deferred tools activated by tool_search, kept across turns/restarts */
   activatedTools?: string[];
+  /** pi: assistant messages before this index predate the last compaction (their usage is stale) */
+  piUsageFrom?: number;
 }
 
 export interface SessionRecord extends SessionDetail {
@@ -65,6 +68,7 @@ export function toSummary(r: SessionRecord): SessionSummary {
     usage: r.usage,
     running: r.running,
     ...(r.parentSessionId ? { parentSessionId: r.parentSessionId } : {}),
+    ...(r.context ? { context: r.context } : {}),
   };
 }
 
@@ -106,6 +110,7 @@ function readRecord(id: string): SessionRecord | undefined {
       usage: { ...emptyUsage(), ...(raw.usage ?? {}) },
       running: false,
       parentSessionId: raw.parentSessionId,
+      context: raw.context,
       items: (raw.items ?? []).map((it) =>
         // a crash mid-turn can leave streaming / running markers behind
         it.kind === 'assistant' && it.streaming
@@ -250,4 +255,10 @@ export function autoTitle(text: string): string {
   const cut = one.slice(0, 48);
   const sp = cut.lastIndexOf(' ');
   return `${(sp > 24 ? cut.slice(0, sp) : cut).replace(/[\s,.;:!?-]+$/, '')}…`;
+}
+
+/** configured auto-compaction threshold in % (0 = off) */
+export function autoCompactPercent(): number {
+  const v = getSettings().agent?.autoCompactPercent;
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 75;
 }

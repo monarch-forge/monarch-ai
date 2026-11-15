@@ -2,7 +2,7 @@
 import type { Hono } from 'hono';
 import type { SessionKind } from '@monarch/shared';
 import { HttpError } from '../kernel.ts';
-import { abortSession, removeSession } from '../agent/orchestrator.ts';
+import { abortSession, compactSession, removeSession } from '../agent/orchestrator.ts';
 import { getSession, listSessions, renameSession, toDetail, toSummary } from '../agent/sessions.ts';
 import { pendingApprovals } from '../agent/approvals.ts';
 import { cancelGoogleFlow } from '../integrations/google/index.ts';
@@ -97,6 +97,12 @@ export function register(app: Hono): void {
   });
   app.delete('/api/sessions/:id', (c) => {
     if (!removeSession(c.req.param('id'))) throw new HttpError(404, 'Session not found');
+    return c.json({ ok: true });
+  });
+  app.post('/api/sessions/:id/compact', (c) => {
+    const r = compactSession(c.req.param('id'));
+    if (r === 'not-found') throw new HttpError(404, 'Session not found');
+    if (r === 'busy') throw new HttpError(409, 'Session is running; compact after the turn finishes');
     return c.json({ ok: true });
   });
   /** convenience (not in protocol.ts; WS chat.abort is canonical) */

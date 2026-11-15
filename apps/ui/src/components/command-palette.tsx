@@ -19,6 +19,7 @@ import {
   MessageSquare,
   MessageSquarePlus,
   Network,
+  Plug,
   RefreshCcw,
   Search,
   SlidersHorizontal,
@@ -250,6 +251,18 @@ export function CommandPalette() {
             } else if (e?.status === 404) toast('Sync service unavailable', 'warn');
             else toast(`Sync failed: ${e?.message ?? e}`, 'error');
           }
+        },
+      },
+      {
+        id: 'act:mcp',
+        group: 'Actions',
+        label: 'Go to MCP servers',
+        hint: 'Config → MCP',
+        keywords: 'mcp model context protocol servers tools plugins connectors',
+        icon: Plug,
+        run: () => {
+          close();
+          navigate('config/mcp');
         },
       },
       {

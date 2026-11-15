@@ -14,7 +14,11 @@ export type EngineEvent =
   | { type: 'tool-start'; callId: string; name: string; input: unknown; risk?: ToolRisk }
   | { type: 'tool-running'; callId: string }
   | { type: 'tool-end'; callId: string; ok: boolean; output: string; durationMs?: number }
-  | { type: 'phase'; phase: AgentPhase; detail?: string };
+  | { type: 'phase'; phase: AgentPhase; detail?: string }
+  /** current context size (prompt tokens of the latest model call) and the model window */
+  | { type: 'context'; used: number; window?: number }
+  /** the engine compacted the session context (pre/post token counts when known) */
+  | { type: 'compacted'; trigger: 'auto' | 'manual'; pre: number; post?: number };
 
 export interface ApprovalAsk {
   callId: string;
@@ -51,6 +55,8 @@ export interface TurnResult {
 export interface Engine {
   id: EngineId;
   runTurn(ctx: TurnContext): Promise<TurnResult>;
+  /** compact the session context now (manual /compact); same event/result contract as runTurn */
+  compact?(ctx: TurnContext): Promise<TurnResult>;
   /** drop in-memory state for a session (deleted / settings changed) */
   dispose?(sessionId: string): void;
 }

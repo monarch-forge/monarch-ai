@@ -19,6 +19,7 @@ import { flushAll } from './services/persist.ts';
 import { CORE_VERSION } from './services/meta.ts';
 import { initEvolution, shutdownEvolution } from './extensions/index.ts';
 import { stopVoice } from './services/voice.ts';
+import { startMcp, stopMcp } from './mcp/index.ts';
 import { RESTART_EXIT_CODE, setRestartHandler, startSync, stopSync } from './services/sync.ts';
 import { spawn } from 'node:child_process';
 import { openSync } from 'node:fs';
@@ -57,7 +58,7 @@ async function shutdown(reason: string, code = 0, beforeExit?: () => void): Prom
     stopMetrics();
     stopVoice();
     stopSync();
-    await Promise.race([Promise.all([core.close(), shutdownEvolution()]), new Promise((r) => setTimeout(r, 1500))]);
+    await Promise.race([Promise.all([core.close(), shutdownEvolution(), stopMcp()]), new Promise((r) => setTimeout(r, 1500))]);
   } catch (e) {
     console.error('[core] error during shutdown:', e);
   }
@@ -110,6 +111,7 @@ async function main(): Promise<void> {
   await step('google', initGoogle);
   await step('agent', initAgent, 30_000);
   await step('extensions', initEvolution, 25_000);
+  await step('mcp', startMcp); // connects in the background; never waits on a server
   startScheduler();
   startMetrics();
   await step('sync', startSync);

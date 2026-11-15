@@ -5,6 +5,8 @@ import { Pencil, Trash2, Check, X } from 'lucide-preact';
 import { deleteSession, renameSession } from '../../lib/chat-store.ts';
 import { toast } from '../../lib/store.ts';
 import { fmt } from '../ui.tsx';
+import { ContextMeter } from './meta.tsx';
+import { settings } from '../../lib/store.ts';
 
 export function SessionRow(props: { s: SessionSummary; active: boolean; href: string; onDeleted?: (id: string) => void; sub?: string }) {
   const { s } = props;
@@ -105,7 +107,14 @@ export function SessionRow(props: { s: SessionSummary; active: boolean; href: st
         </div>
       </div>
       <div class="shrink-0 flex flex-col items-end gap-1">
-        <span class="font-mono text-[10px] text-fg-3 tabular-nums">{fmt.ago(s.updatedAt)}</span>
+        <span class="font-mono text-[10px] text-fg-3 tabular-nums">
+          {s.context?.window ? (
+            <>
+              <ContextMeter context={s.context} autoCompactPercent={settings.value?.agent?.autoCompactPercent} compact /> ·{' '}
+            </>
+          ) : null}
+          {fmt.ago(s.updatedAt)}
+        </span>
         <span class="hidden group-hover:flex group-focus-within:flex items-center gap-1">
           <button
             class="text-fg-3 hover:text-fg"

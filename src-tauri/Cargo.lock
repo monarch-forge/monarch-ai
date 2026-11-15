@@ -2088,7 +2088,7 @@ dependencies = [
 
 [[package]]
 name = "monarch_ai"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "serde",
  "serde_json",

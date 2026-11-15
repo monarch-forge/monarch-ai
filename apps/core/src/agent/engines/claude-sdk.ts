@@ -20,7 +20,7 @@ import type { Usage } from '@monarch/shared';
 import { truncate, type ToolDef } from '../../kernel.ts';
 import { getSettings } from '../../settings.ts';
 import { cacheSupportedModels, claudeEnv, hasFreshSdkModels, invalidateClaudeStatus, resolveClaudeExecutable } from '../claude.ts';
-import { emptyUsage, addUsage } from '../sessions.ts';
+import { emptyUsage, addUsage, autoCompactPercent } from '../sessions.ts';
 import {
   SDK_CHAT_BUILTINS,
   SDK_CODING_BUILTINS,
@@ -97,9 +97,30 @@ export const claudeSdkEngine: Engine = {
     }
     return first;
   },
+  /** manual compaction: Claude Code's own `/compact` slash command, run as the turn prompt on the resumed session */
+  async compact(ctx: TurnContext): Promise<TurnResult> {
+    if (!ctx.session.engineState.sdkSessionId) return { usage: emptyUsage(), error: 'Nothing to compact yet.' };
+    const r = await runOnce(ctx, true, '/compact');
+    return r.resumeFailed ? { ...r, error: 'The Claude Code conversation for this session is gone; nothing to compact.' } : r;
+  },
 };
 
-async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResult & { resumeFailed?: boolean }> {
+/** prompt size of an API usage block (everything the model saw + what it wrote, i.e. the next prompt's floor) */
+function promptTokens(u: any): number {
+  if (!u) return 0;
+  return (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.output_tokens ?? 0);
+}
+
+/**
+ * Claude Code compacts on its own threshold; CLAUDE_AUTOCOMPACT_PCT_OVERRIDE (verified in the CLI: "lowered further by
+ * CLAUDE_AUTOCOMPACT_PCT_OVERRIDE") moves it to Monarch's setting. 0 = leave Claude Code's default alone.
+ */
+function compactEnv(): Record<string, string> {
+  const pct = autoCompactPercent();
+  return pct > 0 ? { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(pct) } : {};
+}
+
+async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: string): Promise<TurnResult & { resumeFailed?: boolean }> {
   const settings = getSettings();
   const rec = ctx.session;
   const coding = rec.kind === 'coding';
@@ -118,7 +139,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
   const inputDone = new Promise<void>((r) => (finishInput = r));
   const input: AsyncIterable<SDKUserMessage> = {
     async *[Symbol.asyncIterator]() {
-      yield { type: 'user', message: { role: 'user', content: ctx.text }, parent_tool_use_id: null };
+      yield { type: 'user', message: { role: 'user', content: promptOverride ?? ctx.text }, parent_tool_use_id: null };
       await inputDone;
     },
   };
@@ -214,7 +235,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
     includePartialMessages: true,
     // 'true' (not auto): defer regardless of size, and keep it on for sessions resumed from a
     // conversation that ran without ToolSearch. 'false' = every tool schema in every prompt.
-    env: { ...claudeEnv(), ENABLE_TOOL_SEARCH: defer ? 'true' : 'false' },
+    env: { ...claudeEnv(), ENABLE_TOOL_SEARCH: defer ? 'true' : 'false', ...compactEnv() },
     abortController: abort,
     maxTurns: coding ? 200 : 40,
     tools: [...(coding ? SDK_CODING_BUILTINS : SDK_CHAT_BUILTINS), ...(defer ? [SDK_TOOL_SEARCH] : [])],
@@ -247,6 +268,32 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
   let gotResult = false;
   let curMsgId: string | undefined;
   const streamed = new Set<string>();
+  let ctxWindow = rec.context?.window;
+  let lastUsed: number | undefined;
+  const emitContext = (used: number, window?: number) => {
+    if (window) ctxWindow = window;
+    lastUsed = used;
+    ctx.emit({ type: 'context', used, window: ctxWindow });
+  };
+  /** exact numbers from the live Claude Code process (summary mode: last response usage + local estimates) */
+  const exactContext = async () => {
+    try {
+      const cu = await Promise.race([
+        q.getContextUsage({ detail: 'summary' }),
+        new Promise<null>((res) => setTimeout(() => res(null), 4000).unref?.()),
+      ]);
+      if (cu && typeof cu.totalTokens === 'number' && cu.maxTokens > 0) {
+        emitContext(cu.totalTokens, cu.rawMaxTokens || cu.maxTokens);
+        return true;
+      }
+    } catch {
+      /* older CLI / process gone: keep the usage-based number */
+    }
+    if (lastUsed !== undefined) emitContext(lastUsed);
+    return false;
+  };
+  /** compact boundaries seen this turn; reported at the end with the exact post-compaction context size */
+  const compactions: { trigger: 'auto' | 'manual'; pre: number; post?: number }[] = [];
 
   try {
     for await (const m of q as AsyncIterable<SDKMessage>) {
@@ -261,6 +308,10 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
             model = m.model;
             ctx.emit({ type: 'model', model: m.model });
             if (!hasFreshSdkModels()) q.supportedModels().then(cacheSupportedModels).catch(() => {});
+          } else if ((m as any).subtype === 'compact_boundary') {
+            const meta = (m as any).compact_metadata ?? {};
+            compactions.push({ trigger: meta.trigger === 'manual' ? 'manual' : 'auto', pre: meta.pre_tokens ?? lastUsed ?? 0, post: meta.post_tokens });
+            ctx.emit({ type: 'phase', phase: 'thinking', detail: 'Context compacted' });
           }
           break;
         }
@@ -283,6 +334,8 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
         case 'assistant': {
           if (m.parent_tool_use_id) break;
           if (m.error) assistantError = String(m.error);
+          const used = promptTokens((m.message as any)?.usage);
+          if (used > 0) emitContext(used);
           const msgId: string | undefined = (m.message as any)?.id;
           for (const b of (m.message?.content ?? []) as any[]) {
             if (b.type === 'text' && b.text && !(msgId && streamed.has(msgId))) {
@@ -328,6 +381,10 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
           gotResult = true;
           const mu = (m as any).modelUsage as Record<string, unknown> | undefined;
           if (mu && Object.keys(mu).length) {
+            const want = (model ?? '').toLowerCase();
+            const entries = Object.entries(mu) as [string, any][];
+            const main = entries.find(([k]) => want && k.toLowerCase().includes(want)) ?? entries.reduce((a, b) => ((b[1]?.contextWindow ?? 0) > (a[1]?.contextWindow ?? 0) ? b : a));
+            if (main?.[1]?.contextWindow) ctxWindow = main[1].contextWindow;
             byModel = {};
             for (const [k, v] of Object.entries(mu)) {
               const u = usageFromModel(v);
@@ -350,6 +407,11 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
           } else {
             error = (m as any).errors?.join('; ') || m.subtype;
           }
+          const exact = await exactContext();
+          for (const c of compactions.splice(0)) {
+            ctx.emit({ type: 'compacted', trigger: c.trigger, pre: c.pre, post: exact ? lastUsed : c.post });
+            if (exact && lastUsed !== undefined) emitContext(lastUsed);
+          }
           finishInput();
           break;
         }
@@ -360,6 +422,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean): Promise<TurnResu
   } catch (e) {
     if (!gotResult || !error) error = error ?? errorText(e);
   } finally {
+    for (const c of compactions.splice(0)) ctx.emit({ type: 'compacted', trigger: c.trigger, pre: c.pre, post: c.post });
     ctx.signal.removeEventListener('abort', onAbort);
     finishInput();
   }

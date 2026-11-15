@@ -22,6 +22,8 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Self-evolution.** Monarch extends itself. Ask it (or use **Evolve → Forge**) for a capability it lacks and it writes, sandboxes and tests a new extension (tools, dashboard panels, background jobs) or a skill (a learned procedure). Every change is versioned with rollback and logged on a timeline. An optional daily or weekly self-reflection turns friction into proposals you approve.
 - **Lean prompts.** Only about 14 core tools load into each prompt. The rest, including every extension tool, are found on demand through tool search (Claude Code's native ToolSearch, or `tool_search` on pi). That roughly halves the prompt.
 - **Sync across devices.** In **Config → Sync**, Monarch encrypts all its data (settings, keys and tokens, sessions, vault, extensions and skills) with your passphrase and keeps it in a private repo. It signs in with your existing `gh` account (or `glab`, or any git remote). On a new device, pick the same repo, enter the passphrase and press **Restore**.
+- **MCP servers.** In **Config → MCP**, add Model Context Protocol servers: local commands (stdio) or remote URLs (HTTP/SSE). You can also paste a `{"mcpServers": …}` block from Claude Desktop, Claude Code or Cursor. Their tools become available to the agent in both engines, are found through tool search, and go through your approval rules; env values and headers are stored as secrets.
+- **Context meter and auto-compaction.** Every Comms and Workshop session shows how much of the model's context it uses. Long sessions compact automatically at 75% (adjustable in Config → Models), and `/compact` compacts on demand.
 - **Command palette.** Press `Ctrl/⌘+K` for everything.
 
 ## Architecture
@@ -67,8 +69,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.4.6/monarch-ai-bin-0.4.6-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.4.6-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.4.7/monarch-ai-bin-0.4.7-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.4.7-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -93,30 +95,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.4.6_amd64.deb
+sudo apt install ./Monarch_0.4.7_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.4.6-1.x86_64.rpm
+sudo dnf install ./Monarch-0.4.7-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.4.6_amd64.AppImage && ./Monarch_0.4.6_amd64.AppImage
+chmod +x Monarch_0.4.7_amd64.AppImage && ./Monarch_0.4.7_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.4.6_aarch64.dmg` (Apple Silicon) or `Monarch_0.4.6_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.4.7_aarch64.dmg` (Apple Silicon) or `Monarch_0.4.7_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.4.6_x64-setup.exe`, or `Monarch_0.4.6_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.4.7_x64-setup.exe`, or `Monarch_0.4.7_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 

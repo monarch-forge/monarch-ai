@@ -9,7 +9,7 @@ import { Panel, Tag, Empty, Spinner, ErrorLine } from '../components/ui.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
 import { SessionRow, Segmented } from '../components/chat/session-list.tsx';
-import { SessionStats, engineLabel } from '../components/chat/meta.tsx';
+import { SessionStats, engineLabel, ContextMeter, compactCommand } from '../components/chat/meta.tsx';
 import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { useChatSession, useSessions, renameSession, totalTokens } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
@@ -141,6 +141,7 @@ export default function CommsPage(props: { params: string[] }) {
   const commands: SlashCommand[] = [
     { cmd: '/new', description: 'Start a new conversation', run: newChat },
     { cmd: '/stop', description: 'Stop the running response', run: () => chat.abort() },
+    { cmd: '/compact', description: 'Summarize older turns to free up context', run: () => compactCommand(chat.session?.id, chat.running) },
     {
       cmd: '/rename',
       description: 'Rename this conversation — /rename <title>',
@@ -282,6 +283,7 @@ export default function CommsPage(props: { params: string[] }) {
               <span class="inline-block w-1.5 h-1.5 bg-fg-3" />
               <span class="truncate">{engineLabel(s, session?.id ? session.engine : choice?.engine, session?.id ? session.model : choice?.model)}</span>
               {session && totalTokens(session.usage) > 0 && <span class="hidden lg:inline">{fmt.num(totalTokens(session.usage))} tok</span>}
+              {session?.id && <ContextMeter context={session.context} autoCompactPercent={s?.agent?.autoCompactPercent} />}
             </>
           }
           tools={

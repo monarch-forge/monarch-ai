@@ -226,7 +226,50 @@ export function ModelsSection() {
         </div>
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
+
+      <ContextPanel />
     </div>
+  );
+}
+
+/** Settings.agent.autoCompactPercent — when a session's context gets compacted automatically */
+function ContextPanel() {
+  const s = settings.value!;
+  const [draft, set, dirty, reset] = useDraft<{ pct: number }>({ pct: s.agent?.autoCompactPercent ?? 75 });
+  const [saving, setSaving] = useState(false);
+  if (!draft) return null;
+  const on = draft.pct > 0;
+  const save = async () => {
+    setSaving(true);
+    const ok = await saveSettings({ agent: { ...(s.agent ?? {}), autoCompactPercent: Math.max(0, Math.min(95, Math.round(draft.pct))) } });
+    setSaving(false);
+    if (ok) reset();
+  };
+  return (
+    <Panel code="CFG.24" title="Context" right={<Tag tone={on ? 'ok' : 'warn'}>{on ? `auto ${draft.pct}%` : 'auto off'}</Tag>}>
+      <ToggleRow
+        label="Auto-compact context"
+        hint="When a session's context reaches the threshold, older turns are summarized so the conversation keeps fitting the model window. /compact does it on demand."
+        checked={on}
+        onChange={(v) => set({ pct: v ? 75 : 0 })}
+      />
+      {on && (
+        <div class="mt-3 max-w-[260px]">
+          <Field label="Threshold (% of context window)" hint="Claude SDK: passed to Claude Code (it can only lower its own default). Pi: Monarch summarizes with the session's model.">
+            <input
+              type="number"
+              min={5}
+              max={95}
+              class={`${INPUT} font-mono`}
+              value={draft.pct}
+              onInput={(e) => set({ pct: Number((e.target as HTMLInputElement).value) || 0 })}
+            />
+          </Field>
+        </div>
+      )}
+      {!on && <div class="mt-2 text-[11.5px] text-fg-3">Off: pi sessions are never compacted automatically; Claude Code still compacts at its own default near the limit.</div>}
+      <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
+    </Panel>
   );
 }
 

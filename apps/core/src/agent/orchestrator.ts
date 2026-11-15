@@ -234,7 +234,34 @@ function onEngineEvent(turn: ActiveTurn, ev: EngineEvent): void {
     case 'phase':
       setPhase(turn, ev.phase, ev.detail);
       break;
+    case 'context':
+      setContext(turn.rec, ev.used, ev.window);
+      break;
+    case 'compacted': {
+      const rec = turn.rec;
+      const prev = rec.context;
+      rec.context = { ...(prev ?? { used: 0, window: 0, percent: 0, compactions: 0 }), compactions: (prev?.compactions ?? 0) + 1, lastCompactedAt: nowIso() };
+      if (ev.post !== undefined) setContext(rec, ev.post);
+      closeAssistant(turn);
+      const how = ev.trigger === 'auto' ? 'auto' : 'manual';
+      const text = ev.post !== undefined && ev.pre ? `Context compacted (${how}): ${fmtTokens(ev.pre)} → ${fmtTokens(ev.post)} tokens` : ev.pre ? `Context compacted (${how}) from ${fmtTokens(ev.pre)} tokens` : `Context compacted (${how})`;
+      pushItem(rec, { kind: 'system', id: newId(), ts: nowIso(), text });
+      broadcastSession(rec);
+      activity(rec.kind === 'coding' ? 'CODE' : 'AGT', `${text} · ${clip(rec.title, 40)}`, 'info', rec.id);
+      break;
+    }
   }
+}
+
+/** update the session's context meter (window kept from earlier turns when the engine doesn't know it) */
+function setContext(rec: SessionRecord, used: number, window?: number): void {
+  const prev = rec.context;
+  const win = window && window > 0 ? window : prev?.window || 0;
+  const percent = win ? Math.round((used / win) * 1000) / 10 : 0;
+  if (prev && prev.used === used && prev.window === win) return;
+  rec.context = { used, window: win, percent, compactions: prev?.compactions ?? 0, ...(prev?.lastCompactedAt ? { lastCompactedAt: prev.lastCompactedAt } : {}) };
+  saveSession(rec);
+  broadcastSession(rec);
 }
 
 function toolProgress(turn: ActiveTurn, callId: string | undefined, name: string, text: string): void {
@@ -285,7 +312,7 @@ function fmtTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 
-async function startTurn(rec: SessionRecord, text: string): Promise<TurnOutcome> {
+async function startTurn(rec: SessionRecord, text: string, mode: 'turn' | 'compact' = 'turn'): Promise<TurnOutcome> {
   const turn: ActiveTurn = {
     rec,
     abort: new AbortController(),
@@ -302,9 +329,9 @@ async function startTurn(rec: SessionRecord, text: string): Promise<TurnOutcome>
   touch(rec);
   saveSession(rec);
   broadcastSession(rec);
-  setPhase(turn, 'thinking');
+  setPhase(turn, 'thinking', mode === 'compact' ? 'Compacting context' : undefined);
   const tag = rec.kind === 'coding' ? 'CODE' : 'AGT';
-  activity(tag, `${rec.kind === 'automation' ? 'Automation' : 'Turn'} started · ${clip(rec.title, 60)}`, 'info', rec.id);
+  activity(tag, `${mode === 'compact' ? 'Compaction' : rec.kind === 'automation' ? 'Automation' : 'Turn'} started · ${clip(rec.title, 60)}`, 'info', rec.id);
 
   let result: TurnResult;
   try {
@@ -322,7 +349,11 @@ async function startTurn(rec: SessionRecord, text: string): Promise<TurnOutcome>
       progress: (callId, name, t) => toolProgress(turn, callId, name, t),
       save: () => saveSession(rec),
     };
-    result = await engine.runTurn(ctx);
+    if (mode === 'compact') {
+      result = engine.compact ? await engine.compact(ctx) : { usage: emptyUsage(), error: 'This engine cannot compact.' };
+    } else {
+      result = await engine.runTurn(ctx);
+    }
   } catch (e) {
     result = { usage: emptyUsage(), error: errorText(e) };
   }
@@ -496,6 +527,11 @@ function chatSend(cmd: Extract<ClientCommand, { type: 'chat.send' }>): void {
     broadcastSession(rec, cmd.clientRef);
   }
   if (!text) return;
+  if (/^\/compact\s*$/i.test(text)) {
+    const r = compactSession(rec.id);
+    if (r !== 'started') pushItem(rec, { kind: 'system', id: newId(), ts: nowIso(), text: r === 'busy' ? 'Cannot compact while a turn is running.' : 'Nothing to compact.' });
+    return;
+  }
   if (active.has(rec.id)) {
     const q = queued.get(rec.id) ?? [];
     q.push(text);
@@ -505,6 +541,15 @@ function chatSend(cmd: Extract<ClientCommand, { type: 'chat.send' }>): void {
   }
   appendUser(rec, text);
   void startTurn(rec, text);
+}
+
+/** compact a session's context now (manual /compact). Runs as a turn without a user item. */
+export function compactSession(sessionId: string): 'started' | 'busy' | 'not-found' {
+  const rec = getSession(sessionId);
+  if (!rec) return 'not-found';
+  if (active.has(rec.id)) return 'busy';
+  void startTurn(rec, '/compact', 'compact');
+  return 'started';
 }
 
 /** stop the running turn of a session (and drop its queued follow-ups) */

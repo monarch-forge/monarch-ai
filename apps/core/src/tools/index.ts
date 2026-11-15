@@ -10,6 +10,7 @@
  *  - evolve.ts        (Evo)    self-evolution: extensions, skills, proposals (mostly deferred)
  *  - delegate.ts      coding agents: delegate work to Workshop coding sessions (start/send/status/wait/list/abort)
  *  + extensionToolDefs()        live tools contributed by enabled extensions (always deferred)
+ *  + mcpToolDefs()              live tools of connected MCP servers (deferred unless the server is alwaysLoad)
  * Loading: ToolDef.loading === 'always' → in every prompt; otherwise deferred behind tool search.
  */
 import type { ToolDef } from '../kernel.ts';
@@ -23,10 +24,11 @@ import { tools as memory } from './memory.ts';
 import { tools as evolve } from './evolve.ts';
 import { tools as delegate } from './delegate.ts';
 import { extensionToolDefs } from '../extensions/index.ts';
+import { mcpToolDefs } from '../mcp/index.ts';
 
 /** tools available to every session */
 export function assistantTools(): ToolDef[] {
-  return [...system, ...productivity, ...web, ...mail, ...slack, ...memory, ...evolve, ...delegate, ...extensionToolDefs()];
+  return [...system, ...productivity, ...web, ...mail, ...slack, ...memory, ...evolve, ...delegate, ...extensionToolDefs(), ...mcpToolDefs()];
 }
 
 /** file/shell tools for the pi engine (claude-sdk engine uses Claude Code's own Read/Write/Edit/Bash/Grep/Glob instead) */

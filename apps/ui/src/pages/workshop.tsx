@@ -8,7 +8,7 @@ import { Panel, Tag, Empty, Spinner, ErrorLine, fmt } from '../components/ui.tsx
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
 import { SessionRow } from '../components/chat/session-list.tsx';
-import { SessionStats, engineLabel } from '../components/chat/meta.tsx';
+import { SessionStats, engineLabel, ContextMeter, compactCommand } from '../components/chat/meta.tsx';
 import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { DirBrowser } from '../components/config/dir-browser.tsx';
 import { saveSettings } from '../components/config/fields.tsx';
@@ -135,6 +135,7 @@ export default function WorkshopPage(props: { params: string[] }) {
   const commands: SlashCommand[] = [
     { cmd: '/new', description: 'New coding session in this workspace', run: newSession },
     { cmd: '/stop', description: 'Stop the running agent', run: () => chat.abort() },
+    { cmd: '/compact', description: 'Summarize older turns to free up context', run: () => compactCommand(chat.session?.id, chat.running) },
   ];
 
   const isNewMode = !session?.id;
@@ -297,6 +298,7 @@ export default function WorkshopPage(props: { params: string[] }) {
             <>
               <span class="inline-block w-1.5 h-1.5 bg-fg-3" />
               <span class="truncate">{session?.id ? engineLabel(s, session.engine, session.model) : engineLabel(s, effEngine, choice?.model)}</span>
+              {session?.id && <ContextMeter context={session.context} autoCompactPercent={s?.agent?.autoCompactPercent} />}
             </>
           }
           tools={

@@ -49,6 +49,83 @@ export interface CustomModel {
 }
 
 
+
+/* ─────────────── MCP servers (Model Context Protocol) ───────────────
+ *
+ * Monarch is an MCP client: the user adds servers (local stdio commands or remote http/sse URLs) in
+ * Config → MCP. The core connects to each enabled server and exposes its tools to BOTH engines as
+ * engine-neutral tools named "mcp_<serverId>_<tool>" (deferred behind tool search, group "mcp:<serverId>"),
+ * with Monarch's approval policy applied by risk. Env values and headers can hold credentials: they are
+ * stored in secrets.json and only their NAMES are ever sent to the UI.
+ */
+
+export type McpTransport = 'stdio' | 'http' | 'sse';
+
+export interface McpServerInput {
+  /** kebab/snake id, unique; derived from name when omitted */
+  id?: string;
+  name: string;
+  enabled?: boolean;
+  transport: McpTransport;
+  /** stdio */
+  command?: string;
+  args?: string[];
+  cwd?: string;
+  /** stdio env; values are secrets ('' or the mask keeps the stored value) */
+  env?: Record<string, string>;
+  /** http/sse */
+  url?: string;
+  /** http/sse headers, e.g. Authorization; values are secrets */
+  headers?: Record<string, string>;
+  /** default risk for this server's tools (default 'sensitive') */
+  risk?: ToolRisk;
+  /** per-tool risk overrides by the server's own tool name */
+  toolRisks?: Record<string, ToolRisk>;
+  /** tools the user disabled (server's own names) */
+  disabledTools?: string[];
+  /** load this server's tools in every prompt instead of deferring them (default false) */
+  alwaysLoad?: boolean;
+}
+
+export interface McpToolInfo {
+  /** server's own tool name */
+  name: string;
+  /** name the agent sees: mcp_<serverId>_<tool> */
+  fullName: string;
+  description: string;
+  risk: ToolRisk;
+  enabled: boolean;
+  /** JSON schema of the input */
+  inputSchema?: unknown;
+}
+
+export interface McpServer {
+  id: string;
+  name: string;
+  enabled: boolean;
+  transport: McpTransport;
+  command?: string;
+  args?: string[];
+  cwd?: string;
+  url?: string;
+  /** names only — values never leave the core */
+  envKeys: string[];
+  headerKeys: string[];
+  risk: ToolRisk;
+  toolRisks: Record<string, ToolRisk>;
+  disabledTools: string[];
+  alwaysLoad: boolean;
+  status: 'connected' | 'connecting' | 'error' | 'disabled';
+  error?: string;
+  serverInfo?: { name: string; version: string };
+  instructions?: string;
+  tools: McpToolInfo[];
+  /** tail of the server's stderr (stdio) */
+  logs: string[];
+  calls: number;
+  connectedAt?: ISODate;
+}
+
 /* ─────────────── sync (encrypted backup to a git remote) ───────────────
  *
  * All Monarch data (settings, secrets/tokens, sessions, vault, extensions, skills, stores) is packed,
@@ -193,6 +270,11 @@ export interface CustomProvider {
 }
 
 export interface Settings {
+  /** agent loop behaviour shared by both engines */
+  agent?: {
+    /** compact a session's context when it reaches this % of the model window (0 = Monarch never compacts; Claude Code keeps its own default). Default 75 */
+    autoCompactPercent?: number;
+  };
   user: {
     name: string; // "Tony"
     honorific: string; // "sir" — how Monarch addresses the user
@@ -344,6 +426,20 @@ export interface SessionSummary {
   running: boolean;
   /** set when this session was started by another session's agent (e.g. a coding agent delegated from a Comms chat) */
   parentSessionId?: ID;
+  /** live context-window usage (prompt size of the latest model call) + compaction history */
+  context?: SessionContext;
+}
+
+export interface SessionContext {
+  /** tokens currently in the context (prompt of the latest model call, or an estimate) */
+  used: number;
+  /** model context window in tokens */
+  window: number;
+  /** used / window * 100, rounded to 1 decimal */
+  percent: number;
+  /** how many times this session's context was compacted */
+  compactions: number;
+  lastCompactedAt?: ISODate;
 }
 
 export type ToolStatus = 'pending-approval' | 'running' | 'ok' | 'error' | 'denied';
@@ -915,7 +1011,8 @@ export type ServerEvent =
         | 'extensions'
         | 'skills'
         | 'evolution'
-        | 'sync';
+        | 'sync'
+        | 'mcp';
     }
   /** voice pipeline state (mic level 0..1 while listening) */
   | { type: 'voice.state'; phase: 'idle' | 'listening' | 'transcribing' | 'speaking'; level?: number }
@@ -968,6 +1065,7 @@ export type ClientCommand =
  * GET    /api/sessions/:id                   -> SessionDetail
  * PATCH  /api/sessions/:id {title}           -> SessionSummary
  * DELETE /api/sessions/:id                   -> { ok }
+ * POST   /api/sessions/:id/compact           -> { ok } (compact the session context now; 409 while running)
  * GET    /api/approvals                      -> ApprovalRequest[]  (pending)
  *
  * GET/POST        /api/tasks                 -> Task[] / Task
@@ -1039,6 +1137,13 @@ export type ClientCommand =
  * POST   /api/evolution/forge {text}         -> { sessionId }   (ask the agent to build a capability)
  * GET    /api/tools/catalog                  -> ToolCatalogEntry[]
  *
+ * GET    /api/mcp/servers                    -> McpServer[]
+ * POST   /api/mcp/servers  McpServerInput     -> McpServer   (add; connects when enabled)
+ * PATCH  /api/mcp/servers/:id Partial<McpServerInput> -> McpServer  (reconnects when transport/command/env/url/headers change)
+ * DELETE /api/mcp/servers/:id                -> { ok }      (also forgets its secrets)
+ * POST   /api/mcp/servers/:id/reconnect      -> McpServer
+ * POST   /api/mcp/servers/:id/tools/:tool/test {args} -> { ok: boolean; output: string; durationMs: number }
+ * POST   /api/mcp/import {json}              -> McpServer[] (paste a Claude Desktop / Claude Code / Cursor style {"mcpServers": {...}} block)
  * GET    /api/sync/providers                 -> SyncProviders   (detected git/gh/glab + logged-in accounts)
  * GET    /api/sync/status                    -> SyncStatus
  * PUT    /api/sync/passphrase {passphrase}   -> SyncStatus      (stored locally only, in secrets; never synced in clear)
