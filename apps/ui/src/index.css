@@ -445,8 +445,6 @@ textarea::placeholder {
   outline-color: var(--accent-primary) !important;
 }
 
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
