@@ -233,6 +233,7 @@ export function ModelsSection() {
       <p class="text-[12.5px] text-fg-3 -mt-2 px-1">Helpers, small models and how long conversations are kept in memory.</p>
       <WorkerModelPanel />
       <SmallModelPanel />
+      <AutonomyPanel />
       <ContextPanel />
     </div>
   );
@@ -305,6 +306,38 @@ function SmallModelPanel() {
             <option value="auto">Auto (detect from the model)</option>
             <option value="on">Always on</option>
             <option value="off">Off</option>
+          </select>
+        </Field>
+      </div>
+      <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
+    </Panel>
+  );
+}
+
+type Autonomy = 'high' | 'normal';
+
+/** Settings.agent.autonomy — finish commands end to end instead of stopping to ask */
+function AutonomyPanel() {
+  const s = settings.value!;
+  const [draft, set, dirty, reset] = useDraft<{ mode: Autonomy }>({ mode: s.agent?.autonomy ?? 'high' });
+  const [saving, setSaving] = useState(false);
+  if (!draft) return null;
+  const save = async () => {
+    setSaving(true);
+    const ok = await saveSettings({ agent: { ...(s.agent ?? {}), autonomy: draft.mode } });
+    setSaving(false);
+    if (ok) reset();
+  };
+  return (
+    <Panel title="Autonomy" right={<Tag tone={draft.mode === 'high' ? 'ok' : undefined}>{draft.mode}</Tag>}>
+      <div class="max-w-[260px]">
+        <Field
+          label="Level"
+          hint="High: Beru and its workers finish your commands end to end and are nudged on (up to 3 times) when they stop early, skip parts or ask about reversible steps. Sending, posting and deleting still ask."
+        >
+          <select class={SELECT} value={draft.mode} onChange={(e) => set({ mode: (e.target as HTMLSelectElement).value as Autonomy })}>
+            <option value="high">High (finish without asking)</option>
+            <option value="normal">Normal</option>
           </select>
         </Field>
       </div>

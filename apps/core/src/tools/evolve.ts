@@ -227,7 +227,7 @@ const extTest = defineTool({
   keywords: ['extension', 'test', 'try', 'run tool', 'verify'],
   schema: z.object({
     id: z.string().describe('Extension id.'),
-    tool: z.string().describe('Tool name (local "top_stories" or full "hacker_news_top_stories").'),
+    tool: z.string().describe('Tool name (local "add" or full "follow_ups_add").'),
     args: z.record(z.string(), z.any()).default({}).describe('Tool input object.'),
   }),
   summarize: ({ id, tool, args }) => `Test ${id}.${tool} ${clip(JSON.stringify(args ?? {}), 80)}`,

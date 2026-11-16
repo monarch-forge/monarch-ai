@@ -1,14 +1,14 @@
 /**
  * Slack — workspaces + channels (left), message log + composer (main), search, "Catch me up".
- * Route: #/slack/:workspaceId?/:channelId?
+ * Route: #/slack/:workspaceId?/:channelId?/:threadTs?  (threadTs opens the thread pane)
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { SlackChannel, SlackMessage, SlackWorkspace } from '@monarch/shared';
 import { Hash, Lock, MessageSquare, Users, Search, Sparkles, Send, X, RefreshCw, ExternalLink, MessagesSquare } from 'lucide-preact';
 import { api, openExternal, qs } from '../lib/api.ts';
-import { navigate, toast, useResource } from '../lib/store.ts';
+import { invalidateResources, navigate, toast, useResource } from '../lib/store.ts';
 import { Btn } from '../components/ui.tsx';
-import { askMonarch, Button, LoadError, Loading, StateBlock, useConfirm, useHotkeys } from '../components/mail/kit.tsx';
+import { askMonarch, Button, LoadError, Loading, RefreshHint, relTime, StateBlock, useConfirm, useHotkeys } from '../components/mail/kit.tsx';
 import { mrkdwn } from '../components/slack/mrkdwn.ts';
 
 const enc = encodeURIComponent;
@@ -36,6 +36,7 @@ export default function SlackPage(props: { params: string[] }) {
   const workspaces = useMemo(() => (Array.isArray(wsRes.data) ? wsRes.data.filter((w) => w && typeof w.id === 'string') : []), [wsRes.data]);
   const wsId = props.params[0] || workspaces[0]?.id || null;
   const channelId = props.params[1] || null;
+  const threadTs = (channelId && props.params[2]) || null;
   const ws = workspaces.find((w) => w.id === wsId);
 
   const chRes = useResource<SlackChannel[]>(wsId && ws ? `/slack/${enc(wsId)}/channels` : null, ['slack']);
@@ -54,6 +55,13 @@ export default function SlackPage(props: { params: string[] }) {
   }, [wsId]);
 
   const msgRes = useResource<SlackMessage[]>(wsId && channelId && ws ? `/slack/${enc(wsId)}/channels/${enc(channelId)}/messages?limit=60` : null, ['slack'], { intervalMs: 20000 });
+  const threadRes = useResource<SlackMessage[]>(
+    wsId && channelId && threadTs && ws ? `/slack/${enc(wsId)}/channels/${enc(channelId)}/threads/${enc(threadTs)}` : null,
+    ['slack'],
+    { intervalMs: 20000 },
+  );
+  const openThread = (ts: string) => navigate(`slack/${enc(wsId!)}/${enc(channelId!)}/${enc(ts)}`);
+  const closeThread = () => navigate(`slack/${enc(wsId!)}/${enc(channelId!)}`);
   const searchRes = useResource<SlackMessage[]>(wsId && search ? `/slack/${enc(wsId)}/search${qs({ q: search })}` : null);
 
   const grouped = useMemo(() => {
@@ -87,8 +95,9 @@ export default function SlackPage(props: { params: string[] }) {
         if (n) go(n);
       },
       i: () => composerRef.current?.focus(),
+      ...(threadTs ? { Escape: closeThread } : {}),
     },
-    [flat, channelId, wsId],
+    [flat, channelId, wsId, threadTs],
   );
 
   /* ─────────── top-level states ─────────── */
@@ -197,7 +206,7 @@ export default function SlackPage(props: { params: string[] }) {
       </aside>
 
       {/* ── main ── */}
-      <section class={`${channelId || search ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
+      <section class={`${threadTs && !search ? 'hidden lg:flex' : channelId || search ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
         <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
           {(channelId || search) && (
             <button class="lg:hidden -ml-1 p-1 rounded-md text-fg-3 hover:text-fg" aria-label="Back to channels" onClick={() => (search ? (setSearch(''), setSearchInput('')) : navigate(`slack/${enc(wsId!)}`))}>
@@ -208,6 +217,7 @@ export default function SlackPage(props: { params: string[] }) {
             <h1 class="text-[16px] font-semibold text-fg truncate">{search ? `Search: ${search}` : channel ? chanLabel(channel) : channelId ? channelId : ws?.name ?? 'Slack'}</h1>
             {!search && channel?.topic && <div class="text-[12.5px] text-fg-3 truncate">{channel.topic}</div>}
           </div>
+          {channelId && !search && <RefreshHint res={msgRes} />}
           <form
             class="relative"
             onSubmit={(e) => {
@@ -282,7 +292,7 @@ export default function SlackPage(props: { params: string[] }) {
           </div>
         ) : (
           <>
-            <MessageLog res={msgRes} key={`${wsId}:${channelId}`} />
+            <MessageLog res={msgRes} key={`${wsId}:${channelId}`} activeThread={threadTs} onOpenThread={openThread} />
             <SlackComposer
               wsId={wsId!}
               wsName={ws?.name ?? wsId!}
@@ -297,6 +307,25 @@ export default function SlackPage(props: { params: string[] }) {
           </>
         )}
       </section>
+
+      {/* ── thread pane: side panel on desktop, full view on narrow screens ── */}
+      {channelId && threadTs && !search && (
+        <ThreadPane
+          key={`${wsId}:${channelId}:${threadTs}`}
+          res={threadRes}
+          wsId={wsId!}
+          wsName={ws?.name ?? wsId!}
+          channelId={channelId}
+          threadTs={threadTs}
+          label={chanLabel(channel, channelId)}
+          onClose={closeThread}
+          onPosted={(m) => {
+            if (m && threadRes.data) threadRes.setData([...threadRes.data, m]);
+            void threadRes.reload();
+            invalidateResources(`/slack/${enc(wsId!)}/channels/${enc(channelId)}/messages`);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -320,7 +349,9 @@ function msgDate(m: SlackMessage): Date {
   return isNaN(d.getTime()) ? new Date(parseFloat(m.ts) * 1000) : d;
 }
 
-function MessageLog(props: { res: { data: SlackMessage[] | undefined; error?: string; loading: boolean; reload: () => Promise<void> } }) {
+type MsgRes = { data: SlackMessage[] | undefined; error?: string; loading: boolean; refreshing?: boolean; refreshError?: string; reload: () => Promise<void> };
+
+function MessageLog(props: { res: MsgRes; activeThread?: string | null; onOpenThread: (ts: string) => void }) {
   const msgs = useMemo(() => sortMsgs(props.res.data), [props.res.data]);
   const users = useUserMap(msgs);
   const ref = useRef<HTMLDivElement>(null);
@@ -336,9 +367,6 @@ function MessageLog(props: { res: { data: SlackMessage[] | undefined; error?: st
   if (props.res.data === undefined) return <div class="flex-1"><Loading label="Loading history" /></div>;
   if (!msgs.length) return <div class="flex-1 flex items-center justify-center"><StateBlock title="No messages yet">Be the first to say something.</StateBlock></div>;
 
-  let lastDay = '';
-  let lastUser = '';
-  let lastTime = 0;
   return (
     <div
       ref={ref}
@@ -349,14 +377,29 @@ function MessageLog(props: { res: { data: SlackMessage[] | undefined; error?: st
       }}
       onClick={onExternalClick}
     >
-      {msgs.map((m) => {
+      <MsgList msgs={msgs} users={users} activeThread={props.activeThread} onOpenThread={props.onOpenThread} />
+    </div>
+  );
+}
+
+/** day dividers + same-author grouping; thread summaries are clickable when `onOpenThread` is given */
+function MsgList(props: { msgs: SlackMessage[]; users: Map<string, string>; activeThread?: string | null; onOpenThread?: (ts: string) => void; inThread?: boolean; afterDay?: string }) {
+  let lastDay = props.afterDay ?? '';
+  let lastUser = '';
+  let lastTime = 0;
+  return (
+    <>
+      {props.msgs.map((m) => {
         const d = msgDate(m);
         const day = d.toDateString();
         const showDay = day !== lastDay;
-        const grouped = !showDay && lastUser === (m.userId ?? m.user) && d.getTime() - lastTime < 5 * 60000;
+        const isParent = !!m.replyCount && (!m.threadTs || m.threadTs === m.ts);
+        // a broadcast reply ("also sent to the channel") starts its own block so its context line reads well
+        const grouped = !showDay && !m.broadcast && lastUser === (m.userId ?? m.user) && d.getTime() - lastTime < 5 * 60000;
         lastDay = day;
         lastUser = m.userId ?? m.user;
         lastTime = d.getTime();
+        const active = !!props.activeThread && props.activeThread === (m.threadTs ?? m.ts) && !props.inThread;
         return (
           <div key={m.ts}>
             {showDay && (
@@ -364,7 +407,7 @@ function MessageLog(props: { res: { data: SlackMessage[] | undefined; error?: st
                 <span class="text-[11.5px] text-fg-3 bg-white/[0.03] rounded-full px-3 py-0.5">{d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               </div>
             )}
-            <div class={`group flex gap-3 px-2 py-0.5 rounded-md hover:bg-white/[0.02] transition-colors ${grouped ? '' : 'mt-3'}`}>
+            <div class={`group flex gap-3 px-2 py-0.5 rounded-md transition-colors ${active ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'} ${grouped ? '' : 'mt-3'}`}>
               <span class="w-8 shrink-0 pt-0.5">
                 {grouped ? (
                   <span class="block font-mono text-[10px] text-fg-3 pt-[3px] opacity-0 group-hover:opacity-100 tabular-nums">{fmtTime(d)}</span>
@@ -373,21 +416,36 @@ function MessageLog(props: { res: { data: SlackMessage[] | undefined; error?: st
                 )}
               </span>
               <div class="min-w-0 flex-1">
+                {m.broadcast && !props.inThread && m.threadTs && (
+                  <button class="block text-[11.5px] text-fg-3 hover:text-fg-2 transition-colors mb-0.5" onClick={() => props.onOpenThread?.(m.threadTs!)} title="Open the thread">
+                    replied to a thread
+                  </button>
+                )}
                 {!grouped && (
                   <div class="flex items-baseline gap-2 mb-0.5">
                     <span class="text-[13.5px] font-semibold text-fg">{m.user || m.userId || 'unknown'}</span>
                     <span class="font-mono text-[11px] text-fg-3 tabular-nums" title={d.toLocaleString()}>
                       {fmtTime(d)}
                     </span>
+                    {m.broadcast && props.inThread && <span class="text-[11px] text-fg-3">· also sent to the channel</span>}
                   </div>
                 )}
-                <div class={SLK_CLASS} dangerouslySetInnerHTML={{ __html: mrkdwn(m.text ?? '', users) }} />
-                {(!!m.replyCount || m.permalink) && (
+                <div class={SLK_CLASS} dangerouslySetInnerHTML={{ __html: mrkdwn(m.text ?? '', props.users) }} />
+                {((isParent && !props.inThread) || m.permalink) && (
                   <div class="flex items-center gap-3 mt-1 text-[12px] text-fg-3">
-                    {!!m.replyCount && (
-                      <span class="text-fg-2">
-                        {m.replyCount} repl{m.replyCount === 1 ? 'y' : 'ies'}
-                      </span>
+                    {isParent && !props.inThread && (
+                      <button
+                        class={`inline-flex items-center gap-1.5 -ml-1.5 px-1.5 py-0.5 rounded-md transition-colors ${active ? 'text-fg' : 'text-fg-2 hover:text-fg hover:bg-white/[0.04]'}`}
+                        onClick={() => props.onOpenThread?.(m.ts)}
+                        title="Open thread"
+                      >
+                        <MessagesSquare size={12} strokeWidth={1.6} />
+                        <span>
+                          {m.replyCount} repl{m.replyCount === 1 ? 'y' : 'ies'}
+                        </span>
+                        {!!m.replyUsers?.length && <span class="text-fg-3 truncate max-w-[16rem]">· {m.replyUsers.slice(0, 3).join(', ')}{m.replyUsers.length > 3 ? ' …' : ''}</span>}
+                        {m.latestReply && <span class="text-fg-3">· last {relTime(m.latestReply)}</span>}
+                      </button>
                     )}
                     {m.permalink && (
                       <button class="opacity-0 group-hover:opacity-100 hover:text-fg inline-flex items-center gap-1" onClick={() => void openExternal(m.permalink!)}>
@@ -401,7 +459,74 @@ function MessageLog(props: { res: { data: SlackMessage[] | undefined; error?: st
           </div>
         );
       })}
-    </div>
+    </>
+  );
+}
+
+/* ───────────────────────── thread pane ───────────────────────── */
+
+function ThreadPane(props: {
+  res: MsgRes & { setData: (v: SlackMessage[] | undefined) => void };
+  wsId: string;
+  wsName: string;
+  channelId: string;
+  threadTs: string;
+  label: string;
+  onClose: () => void;
+  onPosted: (m: SlackMessage | null) => void;
+}) {
+  const msgs = useMemo(() => sortMsgs(props.res.data), [props.res.data]);
+  const users = useUserMap(msgs);
+  const parent = msgs.find((m) => m.ts === props.threadTs) ?? msgs[0];
+  const replies = msgs.filter((m) => m !== parent);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const lastTs = msgs[msgs.length - 1]?.ts;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lastTs]);
+
+  return (
+    <aside class="flex flex-1 lg:flex-none lg:w-[380px] xl:w-[420px] min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden" aria-label="Thread">
+      <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-[15px] font-semibold text-fg">Thread</h2>
+          <div class="text-[12px] text-fg-3 truncate">{props.label}</div>
+        </div>
+        <RefreshHint res={props.res} />
+        <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Close thread (Esc)" aria-label="Close thread" onClick={props.onClose}>
+          <X size={14} />
+        </button>
+      </header>
+      <div ref={ref} class="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 pb-4" onClick={onExternalClick}>
+        {props.res.error && !msgs.length ? (
+          <LoadError error={props.res.error} onRetry={props.res.reload} />
+        ) : props.res.data === undefined ? (
+          <Loading label="Opening thread" />
+        ) : !parent ? (
+          <StateBlock title="Thread not found">It may have been deleted.</StateBlock>
+        ) : (
+          <>
+            <MsgList msgs={[parent]} users={users} inThread />
+            <div class="flex items-center gap-3 mt-4 mb-1 px-2 text-[11.5px] text-fg-3">
+              <span>{replies.length ? `${replies.length} repl${replies.length === 1 ? 'y' : 'ies'}` : 'No replies yet'}</span>
+              <span class="flex-1 h-px bg-line" />
+            </div>
+            <MsgList msgs={replies} users={users} inThread afterDay={msgDate(parent).toDateString()} />
+          </>
+        )}
+      </div>
+      <SlackComposer
+        wsId={props.wsId}
+        wsName={props.wsName}
+        channelId={props.channelId}
+        threadTs={props.threadTs}
+        label={props.label}
+        inputRef={inputRef}
+        onPosted={props.onPosted}
+      />
+    </aside>
   );
 }
 
@@ -471,32 +596,35 @@ function SlackComposer(props: {
   wsId: string;
   wsName: string;
   channelId: string;
+  /** reply in this thread instead of posting to the channel */
+  threadTs?: string;
   label: string;
   inputRef: { current: HTMLTextAreaElement | null };
   onPosted: (m: SlackMessage | null) => void;
 }) {
+  const draftKey = props.threadTs ? `${props.channelId}:${props.threadTs}` : props.channelId;
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [dialog, confirm] = useConfirm();
   // drafts per channel survive switching channels within the session
   const drafts = useRef(new Map<string, string>());
-  const prevChan = useRef(props.channelId);
+  const prevChan = useRef(draftKey);
   useEffect(() => {
     drafts.current.set(prevChan.current, text);
-    setText(drafts.current.get(props.channelId) ?? '');
-    prevChan.current = props.channelId;
-  }, [props.channelId]);
+    setText(drafts.current.get(draftKey) ?? '');
+    prevChan.current = draftKey;
+  }, [draftKey]);
 
   const post = async () => {
     const t = text.trim();
     if (!t || busy) return;
     const ok = await confirm({
-      title: 'Post to Slack',
-      confirmLabel: 'Post',
+      title: props.threadTs ? 'Reply in thread' : 'Post to Slack',
+      confirmLabel: props.threadTs ? 'Reply' : 'Post',
       body: (
         <div>
           <div class="mb-2">
-            Post as you to <span class="text-fg font-mono">{props.label}</span> in <span class="text-fg">{props.wsName}</span>:
+            {props.threadTs ? 'Reply as you in a thread in' : 'Post as you to'} <span class="text-fg font-mono">{props.label}</span> in <span class="text-fg">{props.wsName}</span>:
           </div>
           <div class={`${SLK_CLASS} rounded-md bg-white/[0.04] p-3 max-h-60 overflow-y-auto`} dangerouslySetInnerHTML={{ __html: mrkdwn(t) }} />
         </div>
@@ -505,11 +633,11 @@ function SlackComposer(props: {
     if (!ok) return;
     setBusy(true);
     try {
-      const m = await api.post<SlackMessage>(`/slack/${enc(props.wsId)}/post`, { channelId: props.channelId, text: t });
+      const m = await api.post<SlackMessage>(`/slack/${enc(props.wsId)}/post`, { channelId: props.channelId, text: t, threadTs: props.threadTs });
       setText('');
-      drafts.current.delete(props.channelId);
+      drafts.current.delete(draftKey);
       props.onPosted(m && typeof m === 'object' && 'ts' in m ? m : null);
-      toast(`Posted to ${props.label}`, 'success');
+      toast(props.threadTs ? `Replied in thread` : `Posted to ${props.label}`, 'success');
     } catch (e: any) {
       toast(`Post failed: ${e?.message ?? e}`, 'error');
     } finally {
@@ -527,7 +655,7 @@ function SlackComposer(props: {
           }}
           rows={Math.min(8, Math.max(1, text.split('\n').length))}
           class="flex-1 bg-transparent outline-none resize-none px-3.5 py-2.5 text-[14px] leading-relaxed text-fg placeholder:text-fg-3"
-          placeholder={`Message ${props.label}`}
+          placeholder={props.threadTs ? 'Reply…' : `Message ${props.label}`}
           title="Enter to post · Shift+Enter for a new line"
           value={text}
           onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
@@ -537,7 +665,7 @@ function SlackComposer(props: {
               void post();
             } else if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur();
           }}
-          aria-label={`Message ${props.label}`}
+          aria-label={props.threadTs ? `Reply in thread in ${props.label}` : `Message ${props.label}`}
         />
         <Button variant="primary" size="xs" class="m-1.5" loading={busy} disabled={!text.trim()} onClick={() => void post()} title="Post (Enter)">
           <Send size={12} />

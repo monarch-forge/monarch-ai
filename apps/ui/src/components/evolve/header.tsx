@@ -118,7 +118,7 @@ function ForgeInput() {
     try {
       const r = await api.post<{ sessionId: string }>('/evolution/forge', { text: t });
       setText('');
-      toast('Forging — follow along in Comms', 'success');
+      toast('Forging — follow along in Beru', 'success');
       openSession(r?.sessionId);
     } catch (e) {
       toast(`Forge failed: ${errMsg(e)}`, 'error');

@@ -279,6 +279,11 @@ export interface Settings {
      * 'auto' (default) = on for models whose id/name looks small (flash, lite, mini, haiku, nano, 7b…) or with a context window under 64k.
      */
     smallModelMode?: 'auto' | 'on' | 'off';
+    /**
+     * 'high' (default): finish commands end to end without stopping for reversible steps; replies that defer/skip
+     * requested work or stop to ask are continued automatically (a few extra rounds). 'normal': stop when the model stops.
+     */
+    autonomy?: 'high' | 'normal';
     /** default runtime/model for worker agents (agent_start without engine/model); unset = the default engine/model */
     workerModel?: { engine: EngineId; model: string } | null;
   };
@@ -651,6 +656,12 @@ export interface SlackMessage {
   text: string;
   threadTs?: string;
   replyCount?: number;
+  /** thread parents: time of the latest reply */
+  latestReply?: ISODate;
+  /** thread parents: up to 5 reply participants (display names when resolved) */
+  replyUsers?: string[];
+  /** a thread reply that was "also sent to the channel" */
+  broadcast?: boolean;
   date: ISODate;
   permalink?: string;
 }
@@ -825,7 +836,7 @@ export type ExtensionOrigin = 'builtin' | 'user' | 'agent';
 export type ExtensionStatus = 'active' | 'disabled' | 'error' | 'starting';
 
 export interface ExtensionManifest {
-  /** kebab-case, unique: "hacker-news" */
+  /** kebab-case, unique: "follow-ups" */
   id: string;
   name: string;
   version: string; // semver-ish "0.1.0"
@@ -1109,6 +1120,7 @@ export type ClientCommand =
  * DELETE /api/slack/workspaces/:id           -> { ok }
  * GET    /api/slack/:workspaceId/channels    -> SlackChannel[]
  * GET    /api/slack/:workspaceId/channels/:channelId/messages?limit=50 -> SlackMessage[]
+ * GET    /api/slack/:workspaceId/channels/:channelId/threads/:threadTs?limit=100 -> SlackMessage[] (parent first, then replies)
  * GET    /api/slack/:workspaceId/search?q=   -> SlackMessage[]
  * POST   /api/slack/:workspaceId/post {channelId, text, threadTs?} -> SlackMessage
  *

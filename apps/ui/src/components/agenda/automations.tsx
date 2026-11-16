@@ -166,7 +166,7 @@ export function AutomationsPanel(props: { class?: string }) {
               {a.lastResult && a.lastStatus === 'error' && <div class="pl-3.5 mt-1 text-[12px] leading-snug line-clamp-2 text-red/80">{a.lastResult}</div>}
               {a.lastResult && a.lastStatus !== 'error' && <div class="pl-3.5 mt-1 text-[12px] leading-snug line-clamp-1 text-fg-3 hidden group-hover:block">{a.lastResult}</div>}
               {runs[a.id] && (
-                <a href={`#/comms/${encodeURIComponent(runs[a.id])}`} class="pl-3.5 mt-1 inline-flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg">
+                <a href={`#/beru/${encodeURIComponent(runs[a.id])}`} class="pl-3.5 mt-1 inline-flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg">
                   View run <ArrowUpRight size={10} />
                 </a>
               )}
@@ -334,7 +334,7 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
 }
 
 /**
- * Compact "Active" list of registered automations (Comms → Automations tab). Selecting one filters
+ * Compact "Active" list of registered automations (Beru → Automations tab). Selecting one filters
  * its run sessions (runs are associated by session title === automation name).
  */
 export function ActiveAutomations(props: { selected: string | null; onSelect: (a: Automation | null) => void; highlight?: string | null }) {
@@ -367,7 +367,7 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
     setRunning((r) => ({ ...r, [a.id]: true }));
     try {
       const out = await api.post<{ sessionId: string }>(`/automations/${encodeURIComponent(a.id)}/run`);
-      if (out?.sessionId) location.hash = `#/comms/${encodeURIComponent(out.sessionId)}`;
+      if (out?.sessionId) location.hash = `#/beru/${encodeURIComponent(out.sessionId)}`;
       toast(`Running “${a.name}”`, 'success');
     } catch (e: any) {
       toast(`Run failed: ${e?.message ?? e}`, 'error');

@@ -287,7 +287,7 @@ export default function WorkshopPage(props: { params: string[] }) {
         {session?.parentSessionId && (
           <div class="max-w-[760px] w-full mx-auto px-4 md:px-6 pb-2 -mt-1 text-[12.5px] text-fg-3">
             Delegated from{' '}
-            <a href={`#/comms/${encodeURIComponent(session.parentSessionId)}`} class="text-fg-2 underline decoration-fg-3 underline-offset-[3px] hover:text-fg">
+            <a href={`#/beru/${encodeURIComponent(session.parentSessionId)}`} class="text-fg-2 underline decoration-fg-3 underline-offset-[3px] hover:text-fg">
               a chat
             </a>
           </div>

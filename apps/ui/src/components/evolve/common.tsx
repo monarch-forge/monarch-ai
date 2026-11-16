@@ -104,9 +104,9 @@ export function SectionHead(props: { label: string; right?: ComponentChildren; c
   );
 }
 
-/** open a chat session in Comms */
+/** open a chat session in Beru */
 export function openSession(id: string | undefined): void {
-  if (id) navigate(`comms/${encodeURIComponent(id)}`);
+  if (id) navigate(`beru/${encodeURIComponent(id)}`);
 }
 
 /** "3m ago" style relative time for past instants */

@@ -91,7 +91,7 @@ function ExtEditor(props: {
     try {
       const m = JSON.parse(manifest) as ExtensionManifest;
       if (!m || typeof m !== 'object') return { err: 'Manifest must be a JSON object' };
-      if (!m.id || !ID_RE.test(m.id)) return { err: 'manifest.id must be kebab-case, e.g. "hacker-news"' };
+      if (!m.id || !ID_RE.test(m.id)) return { err: 'manifest.id must be kebab-case, e.g. "follow-ups"' };
       if (props.lockId && m.id !== props.initialManifest.id) return { err: `manifest.id cannot change (was "${props.initialManifest.id}")` };
       if (!m.name) return { err: 'manifest.name is required' };
       if (!Array.isArray(m.permissions)) return { err: 'manifest.permissions must be an array' };

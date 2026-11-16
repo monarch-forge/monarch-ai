@@ -42,6 +42,10 @@ export interface ExtensionState {
 interface StateFile {
   /** builtin examples were seeded once (never re-seeded, even if removed) */
   seeded: boolean;
+  /** builtin ids already offered once (a builtin shipped later is added to existing installs exactly once) */
+  seededIds?: string[];
+  /** the retired v0.8 examples (hacker-news, unit-convert, focus-timer) were cleaned up */
+  retiredExamples?: boolean;
   items: Record<string, ExtensionState>;
 }
 
@@ -95,7 +99,7 @@ export function normalizeManifest(raw: unknown, id?: string): ExtensionManifest 
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'manifest must be an object');
   const m = raw as Record<string, unknown>;
   const mid = String(m.id ?? id ?? '').trim();
-  if (!ID_RE.test(mid) || mid.length > 40) throw new HttpError(400, `manifest.id "${mid}" must be kebab-case (e.g. "hacker-news"), max 40 chars`);
+  if (!ID_RE.test(mid) || mid.length > 40) throw new HttpError(400, `manifest.id "${mid}" must be kebab-case (e.g. "follow-ups"), max 40 chars`);
   if (id && mid !== id) throw new HttpError(400, `manifest.id "${mid}" does not match the extension id "${id}"`);
   const name = String(m.name ?? '').trim();
   if (!name || name.length > 60) throw new HttpError(400, 'manifest.name is required (max 60 chars)');

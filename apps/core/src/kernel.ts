@@ -235,7 +235,7 @@ export interface ToolDef<S extends z.ZodObject<any> = z.ZodObject<any>> {
    * the model discovers it with tool search, keeping the prompt lean. See isAlwaysLoaded().
    */
   loading?: 'always' | 'deferred';
-  /** catalog grouping + tool-search hint, e.g. 'mail', 'slack', 'evolve', 'ext:hacker-news' */
+  /** catalog grouping + tool-search hint, e.g. 'mail', 'slack', 'evolve', 'ext:follow-ups' */
   group?: string;
   /** extra search terms for tool search */
   keywords?: string[];

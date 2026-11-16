@@ -1,5 +1,5 @@
 /**
- * Calm chat shell shared by Comms and Workshop: a slim session sidebar (drawer on narrow screens), a quiet header,
+ * Calm chat shell shared by Beru and Workshop: a slim session sidebar (drawer on narrow screens), a quiet header,
  * the transcript as the hero, and an optional "details" column that is hidden by default.
  */
 import type { ComponentChildren } from 'preact';

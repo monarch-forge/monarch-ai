@@ -133,6 +133,9 @@ export function usableCustomModels(prov: CustomProvider): CustomModel[] {
   return (prov.models ?? []).filter((m) => m.id?.trim() && customBaseUrl(prov, m));
 }
 
+/** 9Router per-request token-saver switch ("off" skips RTK, Caveman and Ponytail for that request) */
+export const NINE_ROUTER_TOKEN_SAVER_HEADER = 'x-9router-token-saver';
+
 export function customModelToPi(prov: CustomProvider, m: CustomModel): Model<'openai-completions'> {
   return {
     id: m.id,
@@ -145,7 +148,9 @@ export function customModelToPi(prov: CustomProvider, m: CustomModel): Model<'op
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: m.contextWindow || 32768,
     maxTokens: m.maxTokens || 8192,
-    headers: m.apiKey ? { Authorization: `Bearer ${m.apiKey}` } : undefined,
+    // 9Router: opt Monarch's requests out of its "Token saver" (RTK / Caveman / Ponytail prompt injections that make
+    // the model skip work). 9Router reads this per-request header; other OpenAI-compatible servers ignore it.
+    headers: { [NINE_ROUTER_TOKEN_SAVER_HEADER]: 'off', ...(m.apiKey ? { Authorization: `Bearer ${m.apiKey}` } : {}) },
     compat: {
       supportsDeveloperRole: false,
       supportsReasoningEffort: false,

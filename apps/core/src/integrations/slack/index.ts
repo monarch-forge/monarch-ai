@@ -11,7 +11,7 @@ const SLACK_API = 'https://slack.com/api';
 export const workspaceStore = dataStore<SlackWorkspace[]>('slack-workspaces', []);
 
 /** test hook: override the API base (e.g. a local mock server) */
-let apiBase = SLACK_API;
+let apiBase = process.env.MONARCH_SLACK_API_BASE?.trim() || SLACK_API; // dev/test only: point at a mock Slack API
 export function _setSlackApiBase(url: string): void {
   apiBase = url;
 }
@@ -323,6 +323,8 @@ interface SMsg {
   text?: string;
   thread_ts?: string;
   reply_count?: number;
+  latest_reply?: string;
+  reply_users?: string[];
   subtype?: string;
   permalink?: string;
   channel?: { id: string; name?: string };
@@ -365,6 +367,9 @@ function toMessage(ws: SlackWorkspace, channelId: string, m: SMsg, users: Map<st
   if (m.user) msg.userId = m.user;
   if (m.thread_ts) msg.threadTs = m.thread_ts;
   if (m.reply_count) msg.replyCount = m.reply_count;
+  if (m.latest_reply) msg.latestReply = tsToIso(m.latest_reply);
+  if (m.reply_users?.length) msg.replyUsers = m.reply_users.slice(0, 5).map((u) => users.get(u) ?? u);
+  if (m.subtype === 'thread_broadcast') msg.broadcast = true;
   if (m.permalink) msg.permalink = m.permalink;
   return msg;
 }
@@ -374,7 +379,7 @@ export async function channelHistory(workspaceId: string | undefined, channelId:
   const ws = resolveWorkspace(workspaceId);
   const r = await wsCall<{ messages: SMsg[] }>(ws, 'conversations.history', { channel: channelId, limit: Math.max(1, Math.min(200, limit)) });
   const msgs = (r.messages ?? []).filter((m) => !m.subtype || !['channel_join', 'channel_leave'].includes(m.subtype));
-  const users = await resolveUsers(ws, msgs.flatMap((m) => [m.user ?? '', ...mentionIds(m.text ?? '')]));
+  const users = await resolveUsers(ws, msgs.flatMap((m) => [m.user ?? '', ...(m.reply_users ?? []).slice(0, 5), ...mentionIds(m.text ?? '')]));
   return msgs.map((m) => toMessage(ws, channelId, m, users)).reverse();
 }
 

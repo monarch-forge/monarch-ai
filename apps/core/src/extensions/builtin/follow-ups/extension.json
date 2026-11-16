@@ -1,0 +1,7 @@
+{
+  "id": "follow-ups",
+  "name": "Follow-ups",
+  "version": "1.0.0",
+  "description": "Track commitments you owe and things you're waiting on, with due dates: add/list/done/snooze tools, a morning digest of what's due, and a panel of open loops.",
+  "permissions": []
+}

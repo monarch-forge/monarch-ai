@@ -18,12 +18,12 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Memory.** An Obsidian-compatible markdown vault with `[[wikilinks]]`, tags, backlinks and a graph view. The agent reads and writes it.
 - **Agenda.** Google Calendar, plus local tasks, reminders and cron-style automations.
 - **9Router.** Live model proxy status check (localhost:20128) and chat completion gateway diagnostics.
-- **Voice.** Cloud speech in and out: the mic in the console and in Comms records your request, which is transcribed by OpenAI, Groq or any OpenAI-compatible endpoint. Replies are spoken by OpenAI, ElevenLabs or any OpenAI-compatible text-to-speech service. Set it up in **Config → Voice**: pick a provider and add its API key. On Linux the core records with `pw-record` (or `parecord` or `arecord`), stops when you go quiet, and plays replies with `pw-play`, so it doesn't depend on the webview.
+- **Voice.** Cloud speech in and out: the mic in the console and in Beru records your request, which is transcribed by OpenAI, Groq or any OpenAI-compatible endpoint. Replies are spoken by OpenAI, ElevenLabs or any OpenAI-compatible text-to-speech service. Set it up in **Config → Voice**: pick a provider and add its API key. On Linux the core records with `pw-record` (or `parecord` or `arecord`), stops when you go quiet, and plays replies with `pw-play`, so it doesn't depend on the webview.
 - **Self-evolution.** Monarch extends itself. Ask it (or use **Evolve → Forge**) for a capability it lacks and it writes, sandboxes and tests a new extension (tools, dashboard panels, background jobs) or a skill (a learned procedure). Every change is versioned with rollback and logged on a timeline. An optional daily or weekly self-reflection turns friction into proposals you approve.
 - **Lean prompts.** Only about 14 core tools load into each prompt. The rest, including every extension tool, are found on demand through tool search (Claude Code's native ToolSearch, or `tool_search` on pi). That roughly halves the prompt.
 - **Sync across devices.** In **Config → Sync**, Monarch encrypts all its data (settings, keys and tokens, sessions, vault, extensions and skills) with your passphrase and keeps it in a private repo. It signs in with your existing `gh` account (or `glab`, or any git remote). On a new device, pick the same repo, enter the passphrase and press **Restore**.
 - **MCP servers.** In **Evolve → MCP**, add Model Context Protocol servers: local commands (stdio) or remote URLs (HTTP/SSE). You can also paste a `{"mcpServers": …}` block from Claude Desktop, Claude Code or Cursor. Their tools become available to the agent in both engines, are found through tool search, and go through your approval rules; env values and headers are stored as secrets.
-- **Context meter and auto-compaction.** Every Comms and Workshop session shows how much of the model's context it uses. Long sessions compact automatically at 75% (adjustable in Config → Models), and `/compact` compacts on demand.
+- **Context meter and auto-compaction.** Every Beru and Workshop session shows how much of the model's context it uses. Long sessions compact automatically at 75% (adjustable in Config → Models), and `/compact` compacts on demand.
 - **Chief of staff.** One long-running Monarch session can handle office work, personal errands and side projects. It runs your inbox, calendar (move events, find shared free time, answer invites, add Meet links), Slack and tasks itself, and leads your Workshop worker agents. It does quick things itself and hands heavy work (code, full inbox triage, research, planning, long drafts) to workers: it starts them, sends follow-ups, picks their model (default in Config → Models → Worker agents) and reviews their work. It never sends you off to another tab.
 - **Works on small models.** Small-model mode (automatic for Flash/Lite/mini-class models, or set in Config → Models) loads the common tools up front, uses a compact prompt, fixes common argument slips and catches cut-off replies. Models that write tool calls as text instead of making real calls still work: Monarch runs those calls for real and feeds the results back. Combined with auto-compaction and the memory vault, a single manager session stays usable over time.
 - **Command palette.** Press `Ctrl/⌘+K` for everything.
@@ -71,8 +71,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.8.0/monarch-ai-bin-0.8.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.8.0-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.9.0/monarch-ai-bin-0.9.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.9.0-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -97,30 +97,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.8.0_amd64.deb
+sudo apt install ./Monarch_0.9.0_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.8.0-1.x86_64.rpm
+sudo dnf install ./Monarch-0.9.0-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.8.0_amd64.AppImage && ./Monarch_0.8.0_amd64.AppImage
+chmod +x Monarch_0.9.0_amd64.AppImage && ./Monarch_0.9.0_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.8.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.8.0_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.9.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.9.0_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.8.0_x64-setup.exe`, or `Monarch_0.8.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.9.0_x64-setup.exe`, or `Monarch_0.9.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 
@@ -287,7 +287,7 @@ The default vault is `~/.monarch-ai/vault`. To use an existing Obsidian vault, p
 
 ### Extensions and skills
 
-An extension is a folder `~/.monarch-ai/extensions/<id>/` holding `extension.json` (manifest) and `index.mjs`, which exports `activate(api)`. With `api.tool`, `api.panel`, `api.job`, `api.store`, `api.secrets`, `api.notify` and `api.z` (zod) it adds tools the agent can call, panels for the Evolve page, and interval jobs. The full reference is in **Evolve → New → API reference**, and the agent reads it before writing one. Three builtin examples are seeded on first run: Hacker News, Unit Convert and Focus Timer.
+An extension is a folder `~/.monarch-ai/extensions/<id>/` holding `extension.json` (manifest) and `index.mjs`, which exports `activate(api)`. With `api.tool`, `api.panel`, `api.job`, `api.store`, `api.secrets`, `api.notify` and `api.z` (zod) it adds tools the agent can call, panels for the Evolve page, and interval jobs. The full reference is in **Evolve → New → API reference**, and the agent reads it before writing one. One builtin extension is seeded: **Follow-ups**, which tracks what you owe people and what you are waiting on, with due dates, a morning digest notification and a panel. It needs no permissions and doubles as the reference example the agent learns from.
 
 Each extension runs in its own Node child process under Node's permission model:
 

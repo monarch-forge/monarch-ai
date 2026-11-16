@@ -113,6 +113,16 @@ export const UNEXECUTED_WARNING =
 export const NO_TOOLS_NOTE =
   'NOTE: the worker ran no tools in its latest turn, so it did not create, edit or run anything — if the task needed changes, they were NOT made (whatever its reply says).';
 
+export const DEFERRED_NOTE =
+  'NOTE: the worker skipped or deferred part of the task (e.g. "skipped: … add when …"). It is NOT done — send it back with agent_send to finish the skipped parts, then agent_wait again.';
+
+/** the worker's reply defers/skips requested work */
+async function deferred(reply: string): Promise<boolean> {
+  if (!reply.trim()) return false;
+  const { earlyStopReason } = await import('../agent/autonomy.ts');
+  return earlyStopReason(reply, '', 1) !== undefined;
+}
+
 /** tool names a worker could have meant (Monarch coding tools + Claude Code built-ins) */
 async function workerToolNames(): Promise<string[]> {
   const t = await import('../agent/toolset.ts');
@@ -145,6 +155,7 @@ async function statusOf(id: string, tail = 8) {
   const settled = state !== 'running' && lastUserIdx >= 0;
   const warn = settled && (await unexecuted(toolCallsThisTurn, last));
   const noTools = settled && !warn && toolCallsThisTurn === 0 && !errorThisTurn && !pend.length;
+  const skipped = settled && !warn && !noTools && (await deferred(last));
   return {
     sessionId: id,
     link: link(id),
@@ -157,7 +168,7 @@ async function statusOf(id: string, tail = 8) {
     queuedFollowUps: o.queuedCount(id),
     error: errorThisTurn,
     pendingApprovals: pend.map((p) => ({ id: p.id, tool: p.tool, summary: p.summary })),
-    ...(warn ? { warning: UNEXECUTED_WARNING } : noTools ? { warning: NO_TOOLS_NOTE } : {}),
+    ...(warn ? { warning: UNEXECUTED_WARNING } : noTools ? { warning: NO_TOOLS_NOTE } : skipped ? { warning: DEFERRED_NOTE } : {}),
     toolCalls: tools.length,
     toolCallsThisTurn,
     recentTools: tools.slice(-Math.max(0, tail)).map(toolLine),

@@ -158,7 +158,7 @@ function ApprovalCard(props: { req: ApprovalRequest }) {
             </button>
             <button
               class="text-[12px] text-fg-3 hover:text-fg-2"
-              onClick={() => navigate(`comms/${encodeURIComponent(a.sessionId)}`)}
+              onClick={() => navigate(`beru/${encodeURIComponent(a.sessionId)}`)}
               title="Open the session that requested this"
             >
               Open session ↗

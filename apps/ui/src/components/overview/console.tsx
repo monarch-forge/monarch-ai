@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ArrowRight, CornerDownLeft, Mic, Plus, Square, X } from 'lucide-preact';
 import { conn, navigate, settings, toast } from '../../lib/store.ts';
-import { interimTranscript, listen, listening, stopListening, stripMarkdown, voiceSupport, UNSUPPORTED_LISTEN } from '../../lib/voice.ts';
+import { interimTranscript, listen, listening, stopListening, voiceSupport, UNSUPPORTED_LISTEN } from '../../lib/voice.ts';
+import { Markdown } from '../chat/markdown.tsx';
 import { Tag } from '../ui.tsx';
 import { activeConversation, consoleConversation, consoleHistory, consoleRun, dismissConsoleRun, newConsoleConversation, runConsoleCommand } from './console-store.ts';
 
@@ -167,7 +168,7 @@ function ReplyPreview() {
   const working = run.status === 'sending' || run.status === 'thinking' || run.status === 'tool' || run.status === 'streaming';
   const statusLabel =
     run.status === 'sending' ? 'Sending' : run.status === 'thinking' ? 'Thinking' : run.status === 'tool' ? 'Tool' : run.status === 'streaming' ? 'Responding' : run.status === 'done' ? 'Done' : 'Error';
-  const reply = stripMarkdown(run.reply);
+  const reply = run.reply.trim();
   return (
     <div class="rounded-[10px] bg-surface flex flex-col min-h-0 animate-monarch-fade" role="region" aria-label="Assistant reply" aria-live="polite">
       <div class="flex items-center gap-2 px-4 pt-3 pb-1">
@@ -177,20 +178,17 @@ function ReplyPreview() {
         </span>
         <Tag tone={run.status === 'error' ? 'red' : working ? 'default' : 'plain'}>{statusLabel}</Tag>
         {run.sessionId && (
-          <a href={`#/comms/${run.sessionId}`} class="flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg whitespace-nowrap">
-            Open in Comms <ArrowRight size={11} strokeWidth={1.75} />
+          <a href={`#/beru/${run.sessionId}`} class="flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg whitespace-nowrap">
+            Open in Beru <ArrowRight size={11} strokeWidth={1.75} />
           </a>
         )}
         <button type="button" class="text-fg-3 hover:text-fg p-0.5" onClick={dismissConsoleRun} aria-label="Dismiss reply" title="Dismiss">
           <X size={13} strokeWidth={1.5} />
         </button>
       </div>
-      <div ref={bodyRef} class="px-4 pt-1 pb-3 max-h-[clamp(5rem,18vh,12rem)] overflow-y-auto text-[13px] leading-relaxed text-fg whitespace-pre-wrap">
+      <div ref={bodyRef} class="px-4 pt-1 pb-3 max-h-[clamp(8rem,34vh,24rem)] overflow-y-auto text-[13px] leading-relaxed text-fg">
         {reply ? (
-          <>
-            {reply}
-            {run.status === 'streaming' && <span class="inline-block w-1.5 h-3 bg-fg-2 ml-0.5 align-[-1px] hud-blink" />}
-          </>
+          <Markdown text={run.reply} caret={run.status === 'streaming'} />
         ) : run.status === 'error' ? (
           <span class="text-[#f0686d] text-[12.5px]">{run.error ?? 'The request failed.'}</span>
         ) : (

@@ -1,5 +1,5 @@
 /**
- * Comms — conversations with Monarch (route #/comms/:id?, "#/comms/new" = blank session). UI-B.
+ * Beru — conversations with Monarch (route #/beru/:id?, "#/beru/new" = blank session). UI-B.
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { speak, stopSpeaking } from '../lib/voice.ts';
@@ -55,7 +55,7 @@ function useStoredKind(): [SessionKind, (k: SessionKind) => void] {
 }
 
 export default function CommsPage(props: { params: string[] }) {
-  // "#/comms/automations/<id>?" = deep link to the Automations tab (Active list), e.g. from a notification
+  // "#/beru/automations/<id>?" = deep link to the Automations tab (Active list), e.g. from a notification
   const autoLink = props.params[0] === 'automations';
   const routeId = autoLink ? undefined : props.params[0];
   const isNew = routeId === 'new';
@@ -72,7 +72,7 @@ export default function CommsPage(props: { params: string[] }) {
     const id = props.params[1] || null;
     setFlash(id);
     if (id) setTimeout(() => setFlash((f) => (f === id ? null : f)), 4000);
-    location.replace('#/comms');
+    location.replace('#/beru');
   }, [autoLink, props.params[1]]);
   const [detailsOpen, setDetailsOpen] = useStoredFlag('monarch.comms.details', false);
   const [inject, setInject] = useState<{ text: string; n: number } | null>(null);
@@ -87,8 +87,8 @@ export default function CommsPage(props: { params: string[] }) {
   // no id → open the most recent chat (or stay in "new" mode when there is none)
   useEffect(() => {
     if (routeId || autoLink || !chats.sessions) return;
-    if (chats.sessions.length) location.replace(`#/comms/${encodeURIComponent(chats.sessions[0].id)}`);
-    else location.replace('#/comms/new');
+    if (chats.sessions.length) location.replace(`#/beru/${encodeURIComponent(chats.sessions[0].id)}`);
+    else location.replace('#/beru/new');
   }, [routeId, chats.sessions]);
 
   const filtered = useMemo(() => {
@@ -124,14 +124,14 @@ export default function CommsPage(props: { params: string[] }) {
   const send = async (text: string) => {
     try {
       const id = await chat.sendMessage(text, { kind: 'chat', engine: choice?.engine, model: choice?.model });
-      if (id !== sessionId) location.replace(`#/comms/${encodeURIComponent(id)}`);
+      if (id !== sessionId) location.replace(`#/beru/${encodeURIComponent(id)}`);
     } catch (e: any) {
       if (e?.message !== 'Cancelled') toast(e?.message ?? String(e), 'error');
     }
   };
 
   const newChat = () => {
-    navigate('comms/new');
+    navigate('beru/new');
     requestAnimationFrame(() => focusComposer());
   };
 
@@ -230,8 +230,8 @@ export default function CommsPage(props: { params: string[] }) {
               key={x.id}
               s={x}
               active={x.id === chat.sessionId}
-              href={`#/comms/${encodeURIComponent(x.id)}`}
-              onDeleted={(id) => id === chat.sessionId && location.replace('#/comms/new')}
+              href={`#/beru/${encodeURIComponent(x.id)}`}
+              onDeleted={(id) => id === chat.sessionId && location.replace('#/beru/new')}
             />
           ))
         )}

@@ -12,10 +12,10 @@ import { Btn, Spinner } from '../ui.tsx';
 
 /* ─────────── ask Monarch ─────────── */
 
-/** hand a prompt to the agent in a fresh chat session and jump to Comms */
+/** hand a prompt to the agent in a fresh chat session and jump to Beru */
 export function askMonarch(text: string): void {
   socket.send({ type: 'chat.send', text });
-  navigate('comms');
+  navigate('beru');
 }
 
 /* ─────────── account colour markers (calm, never red — red means attention) ─────────── */
@@ -174,6 +174,27 @@ export function Loading(props: { label?: string; class?: string }) {
       <Spinner /> {props.label ?? 'Loading'}…
     </div>
   );
+}
+
+/**
+ * Subtle stale-while-revalidate marker: a tiny pulsing dot while cached data is being refreshed,
+ * a quiet "couldn't refresh" note (click to retry) when the last refresh failed. Renders nothing otherwise.
+ */
+export function RefreshHint(props: { res: { refreshing?: boolean; refreshError?: string; reload?: () => Promise<void> | void }; class?: string }) {
+  const { refreshing, refreshError } = props.res;
+  if (refreshError && !refreshing)
+    return (
+      <button
+        type="button"
+        class={`inline-flex items-center gap-1 text-[11px] text-fg-3 hover:text-fg-2 transition-colors ${props.class ?? ''}`}
+        title={`Showing saved data — ${refreshError}. Click to retry.`}
+        onClick={() => void props.res.reload?.()}
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-warning/70" /> couldn’t refresh
+      </button>
+    );
+  if (!refreshing) return null;
+  return <span class={`inline-block w-1.5 h-1.5 rounded-full bg-fg-3 animate-pulse ${props.class ?? ''}`} title="Refreshing…" aria-label="Refreshing" role="status" />;
 }
 
 /** error block that knows about the core being offline */

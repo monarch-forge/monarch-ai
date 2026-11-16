@@ -143,57 +143,217 @@ export function useServerEvent(fn: (ev: ServerEvent) => void, deps: unknown[] = 
 
 export interface Resource<T> {
   data: T | undefined;
+  /** load error — only set when there is no data to show (see refreshError) */
   error: string | undefined;
+  /** a fetch is in flight (also true while revalidating cached data) */
   loading: boolean;
+  /** a fetch is in flight while (possibly cached) data is already shown */
+  refreshing: boolean;
+  /** the last background refresh failed; `data` is the previous (cached) value */
+  refreshError: string | undefined;
   reload: () => Promise<void>;
   setData: (v: T | undefined) => void;
+}
+
+/* ─────────── stale-while-revalidate resource cache ─────────── */
+
+interface CacheEntry {
+  data: unknown;
+  hasData: boolean;
+  error: string | undefined;
+  inflight: Promise<void> | null;
+  /** a refetch was requested while one was in flight — run once more afterwards */
+  again: boolean;
+  /** time of the last successful fetch */
+  at: number;
+}
+
+const CACHE_MAX = 100;
+const SS_PREFIX = 'monarch.rc:';
+const SS_MAX_ENTRY = 256 * 1024; // chars
+const SS_MAX_KEYS = 40;
+/** insertion order = LRU order (Map iteration order); re-set on access */
+const cache = new Map<string, CacheEntry>();
+const pathSubs = new Map<string, Set<() => void>>();
+
+function ssKeys(): string[] {
+  try {
+    const out: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith(SS_PREFIX)) out.push(k);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function ssRead(path: string): { data: unknown; at: number } | null {
+  try {
+    const raw = sessionStorage.getItem(SS_PREFIX + path);
+    return raw ? (JSON.parse(raw) as { data: unknown; at: number }) : null;
+  } catch {
+    return null;
+  }
+}
+
+function ssWrite(path: string, data: unknown, at: number): void {
+  try {
+    const raw = JSON.stringify({ data, at });
+    if (raw.length > SS_MAX_ENTRY) {
+      sessionStorage.removeItem(SS_PREFIX + path);
+      return;
+    }
+    const keys = ssKeys();
+    if (keys.length >= SS_MAX_KEYS && !keys.includes(SS_PREFIX + path)) {
+      // drop the oldest persisted entry
+      let oldest: string | null = null;
+      let oldestAt = Infinity;
+      for (const k of keys) {
+        try {
+          const at2 = (JSON.parse(sessionStorage.getItem(k) ?? '{}') as { at?: number }).at ?? 0;
+          if (at2 < oldestAt) (oldestAt = at2), (oldest = k);
+        } catch {
+          oldest = k;
+          break;
+        }
+      }
+      if (oldest) sessionStorage.removeItem(oldest);
+    }
+    sessionStorage.setItem(SS_PREFIX + path, raw);
+  } catch {
+    /* quota / disabled storage — memory cache still works */
+  }
+}
+
+function entryFor(path: string): CacheEntry {
+  let e = cache.get(path);
+  if (e) {
+    cache.delete(path); // bump LRU
+    cache.set(path, e);
+    return e;
+  }
+  const persisted = ssRead(path);
+  e = { data: persisted?.data, hasData: !!persisted, error: undefined, inflight: null, again: false, at: persisted?.at ?? 0 };
+  cache.set(path, e);
+  while (cache.size > CACHE_MAX) {
+    const victim = [...cache.keys()].find((k) => !pathSubs.get(k)?.size && !cache.get(k)?.inflight);
+    if (!victim) break;
+    cache.delete(victim);
+  }
+  return e;
+}
+
+function notifyPath(path: string): void {
+  pathSubs.get(path)?.forEach((fn) => fn());
+}
+
+function fetchPath(path: string, force = false): Promise<void> {
+  const e = entryFor(path);
+  if (e.inflight) {
+    if (force) e.again = true;
+    return e.inflight;
+  }
+  const p = (async () => {
+    try {
+      const d = await api.get<unknown>(path);
+      e.data = d;
+      e.hasData = true;
+      e.error = undefined;
+      e.at = Date.now();
+      ssWrite(path, d, e.at);
+    } catch (err: any) {
+      e.error = err?.message ?? String(err);
+    } finally {
+      e.inflight = null;
+      if (e.again) {
+        e.again = false;
+        void fetchPath(path);
+      } else notifyPath(path);
+    }
+  })();
+  e.inflight = p;
+  notifyPath(path);
+  return p;
+}
+
+function setPathData(path: string, v: unknown): void {
+  const e = entryFor(path);
+  e.data = v;
+  e.hasData = v !== undefined;
+  if (v !== undefined) {
+    e.error = undefined;
+    e.at = Date.now();
+    ssWrite(path, v, e.at);
+  }
+  notifyPath(path);
+}
+
+/**
+ * Refetch every cached resource whose path starts with one of `prefixes` (mounted views update in
+ * place; unmounted entries are marked stale so they revalidate on next mount — they always do anyway).
+ */
+export function invalidateResources(...prefixes: string[]): void {
+  for (const k of [...cache.keys()]) {
+    if (!prefixes.some((p) => k.startsWith(p))) continue;
+    if (pathSubs.get(k)?.size) void fetchPath(k, true);
+  }
 }
 
 /**
  * Fetch `path` from the core REST API; refetch automatically when any of `collections` changes
  * (data.changed event), when the socket reconnects, and when `path` changes. Pass null to skip.
+ *
+ * Stale-while-revalidate: results are cached per path (memory LRU + small sessionStorage mirror),
+ * so a remount/path switch returns the cached value immediately (`refreshing` true) while a
+ * background refetch runs. A failed refetch keeps the cached data and sets `refreshError`.
  */
 export function useResource<T>(path: string | null, collections: Collection[] = [], opts: { intervalMs?: number } = {}): Resource<T> {
-  const [data, setData] = useState<T | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState<boolean>(!!path);
+  const [, force] = useState(0);
   const pathRef = useRef(path);
   pathRef.current = path;
 
-  const reload = useCallback(async () => {
-    const p = pathRef.current;
-    if (!p) return;
-    setLoading(true);
-    try {
-      const d = await api.get<T>(p);
-      if (pathRef.current === p) {
-        setData(d);
-        setError(undefined);
-      }
-    } catch (e: any) {
-      if (pathRef.current === p) setError(e?.message ?? String(e));
-    } finally {
-      if (pathRef.current === p) setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    if (!path) {
-      setLoading(false);
-      return;
-    }
-    void reload();
-    const offs = collections.map((c) => onCollectionChanged(c, () => void reload()));
-    const offConn = socket.onStatus((s) => s === 'open' && void reload());
-    const iv = opts.intervalMs ? window.setInterval(() => void reload(), opts.intervalMs) : undefined;
+    if (!path) return;
+    const rerender = () => force((n) => n + 1);
+    if (!pathSubs.has(path)) pathSubs.set(path, new Set());
+    pathSubs.get(path)!.add(rerender);
+    const reloadNow = () => void fetchPath(path);
+    reloadNow();
+    const offs = collections.map((c) => onCollectionChanged(c, () => void fetchPath(path, true)));
+    const offConn = socket.onStatus((s) => s === 'open' && reloadNow());
+    const iv = opts.intervalMs ? window.setInterval(reloadNow, opts.intervalMs) : undefined;
     return () => {
+      pathSubs.get(path)?.delete(rerender);
       offs.forEach((o) => o());
       offConn();
       if (iv) window.clearInterval(iv);
     };
   }, [path, collections.join(','), opts.intervalMs]);
 
-  return { data, error, loading, reload, setData };
+  const reload = useCallback(async () => {
+    const p = pathRef.current;
+    if (p) await fetchPath(p, true);
+  }, []);
+  const setData = useCallback((v: T | undefined) => {
+    const p = pathRef.current;
+    if (p) setPathData(p, v);
+  }, []);
+
+  if (!path) return { data: undefined, error: undefined, loading: false, refreshing: false, refreshError: undefined, reload, setData };
+  const e = entryFor(path);
+  // a mount always revalidates: report loading from the first render, before the effect has run
+  const loading = !!e.inflight || !pathSubs.get(path)?.size;
+  return {
+    data: e.hasData ? (e.data as T) : undefined,
+    error: e.hasData ? undefined : e.error,
+    loading,
+    refreshing: loading && e.hasData,
+    refreshError: e.hasData ? e.error : undefined,
+    reload,
+    setData,
+  };
 }
 
 /** current hash route, e.g. "#/comms/abc" -> ["comms","abc"] */

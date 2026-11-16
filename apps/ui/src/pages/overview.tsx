@@ -3,12 +3,14 @@
  * Below it, at most three cards with what matters today (schedule, what is waiting on the user, inbox).
  * Telemetry (weather, vitals, model usage, uplinks, assistant log) lives behind "More".
  */
+import type { ComponentChildren } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 import { ChevronDown } from 'lucide-preact';
 import type { Briefing, UsageReport } from '@monarch/shared';
 import { conn, settings, useResource } from '../lib/store.ts';
 import { fmt } from '../components/ui.tsx';
 import { CoreOrb } from '../components/core-orb.tsx';
+import { RefreshHint } from '../components/mail/kit.tsx';
 import { CommandConsole } from '../components/overview/console.tsx';
 import { EnvPanel, SchedulePanel, VitalsPanel } from '../components/overview/left-panels.tsx';
 import { LogPanel, UplinksPanel, UsagePanel } from '../components/overview/right-panels.tsx';
@@ -21,9 +23,10 @@ export default function OverviewPage(_props: { params: string[] }) {
   const usage = useResource<UsageReport>('/usage?range=24h', ['sessions'], { intervalMs: 60_000 });
   const [more, setMore] = useState(() => {
     try {
-      return localStorage.getItem(MORE_KEY) === '1';
+      // open by default; stays closed only after the user closes it
+      return localStorage.getItem(MORE_KEY) !== '0';
     } catch {
-      return false;
+      return true;
     }
   });
   const toggleMore = () => {
@@ -43,7 +46,7 @@ export default function OverviewPage(_props: { params: string[] }) {
           <div class="relative w-[148px] h-[148px] sm:w-[176px] sm:h-[176px]">
             <OrbBlock usage={usage.data} />
           </div>
-          <Greeting briefing={briefing.data} error={briefing.error} />
+          <Greeting briefing={briefing.data} error={briefing.error} hint={<RefreshHint res={briefing} />} />
           <div class="w-full max-w-[720px]">
             <CommandConsole />
           </div>
@@ -85,7 +88,7 @@ function partOfDay(d = new Date()): string {
   return h < 5 ? 'evening' : h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
 }
 
-function Greeting(props: { briefing?: Briefing; error?: string }) {
+function Greeting(props: { briefing?: Briefing; error?: string; hint?: ComponentChildren }) {
   const s = settings.value;
   const honorific = s?.user.honorific?.trim() || 'sir';
   const greeting = props.briefing?.greeting ?? `Good ${partOfDay()}, ${honorific}.`;
@@ -93,9 +96,11 @@ function Greeting(props: { briefing?: Briefing; error?: string }) {
     props.briefing?.headline ??
     (conn.value === 'open' ? (props.error ? 'Everything is running. Your briefing will be back shortly.' : 'Putting your day together…') : conn.value === 'connecting' ? 'Waking up…' : 'Monarch is offline for the moment.');
   return (
-    <header class="text-center max-w-[640px]">
+    <header class="relative text-center max-w-[640px]">
       <h1 class="text-[clamp(24px,3vw,30px)] font-medium tracking-[-0.015em] text-fg leading-tight">{greeting}</h1>
       <p class="mt-2 text-[14px] text-fg-2 leading-relaxed">{headline}</p>
+      {/* out of flow so the refresh marker never shifts the layout */}
+      <div class="absolute left-0 right-0 -bottom-5 flex justify-center">{props.hint}</div>
     </header>
   );
 }

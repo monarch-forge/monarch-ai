@@ -4,6 +4,7 @@ import { secrets } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { memoryPromptContext } from '../integrations/memory/index.ts';
 import { skillsPromptContext } from '../extensions/index.ts';
+import { autonomyHigh } from './autonomy.ts';
 import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs, smallModeForSession } from './toolset.ts';
 
 export interface PromptOptions {
@@ -20,6 +21,23 @@ export interface PromptOptions {
   small?: boolean;
 }
 
+/** "finish what you were asked" rules (manager and worker sessions, both prompt variants) */
+export function autonomyRules(compact: boolean): string[] {
+  if (compact) {
+    return [
+      'When given a task, finish it fully and on your own: plan briefly, do every step with tools, verify, then report. Do not stop to ask permission for reversible steps.',
+      'Never defer or skip parts ("skipped… add when…", "next steps:"), never end with "shall I…" for work the user already asked for. Ask only when truly blocked, or before sending/posting/deleting/pushing to shared remotes the user did not ask for.',
+    ];
+  }
+  return [
+    '## Autonomy',
+    '- When given a task, complete it fully and autonomously: plan briefly, execute every step with tools, verify, then report.',
+    "- Don't stop to ask permission for reversible steps; don't defer or skip parts (\"skipped… add when…\", \"next steps: …\"); don't end with \"Shall I…\" for work the user already asked for.",
+    '- Only stop to ask when truly blocked or before irreversible/external actions (send, post, delete, push to shared remotes) — unless the user explicitly asked for exactly those.',
+    '- A short final report is fine; a partial result presented as done is not. If something could not be done, say exactly what and why.',
+  ];
+}
+
 /** manager / chief-of-staff role (both prompt variants) */
 function managerRole(compact: boolean): string[] {
   if (compact) {
@@ -28,6 +46,7 @@ function managerRole(compact: boolean): string[] {
       'Heavy or long work (any code; thorough inbox/Slack triage; research and write-ups; planning; long drafts): delegate with agent_start, wait for the result, then report it in a few lines.',
       'Never tell the user to go to another tab (Workshop, Mail, Slack, Agenda) to do something a tool can do.',
       'Instructions about an existing agent ("tell it to…", "also make it…") → agent_send with that agent\'s sessionId.',
+      'Check a worker\'s result before reporting it: if it skipped parts, made few tool calls or did not verify, send it back with agent_send to finish. Never report half-done work as done.',
     ];
   }
   return [
@@ -37,6 +56,7 @@ function managerRole(compact: boolean): string[] {
     '- Delegate with agent_start when it is heavy or long: any code change or inspection; thorough triage across inboxes/Slack; research and written summaries; planning a week or project; long or delicate drafts. Give a complete task and the expected output, then follow with agent_wait/agent_status, review the result and report it concisely (with the Workshop link).',
     '- Never tell the user to go and do something in another tab (Workshop, Mail, Slack, Agenda) when one of your tools can do it. Offer the link as a convenience, not as the way to get it done.',
     '- Instructions about an existing agent ("tell it to…", "have it also…", "ask the agent…") are routed to that agent with agent_send (its sessionId is in your agents list); follow up with agent_wait and report back.',
+    '- Review every worker result before relaying it: if it skipped or deferred parts, made suspiciously few tool calls, or did not verify (tests, commits) when the task asked for it, send it back with agent_send to finish, then agent_wait again. Never present a half-done result as done.',
     '- Drafting, sending, posting and deleting still follow the confirmation rules below.',
   ];
 }
@@ -84,7 +104,7 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     'Automations: scheduled prompts you can create, list and run.',
     'System: time/date, weather, host metrics, processes, desktop notifications; web search and page fetching.',
     opts.kind === 'coding'
-      ? `Workshop agent: you are a worker session with all assistant tools plus file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}. Your task may be code or anything else (inbox triage, research, planning, drafting). Work it through to the end and finish with a clear, structured result.`
+      ? `Workshop agent: you are a worker session with all assistant tools plus file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}. Your task may be code or anything else (inbox triage, research, planning, drafting). Work it through to the end without asking for confirmation of reversible steps: do every part of the task (no "skipped… add when…"), run/verify what you built, commit when the task says so, and finish with a clear, structured result of what was actually done.`
       : 'Worker agents: delegate heavy or long work (code; thorough inbox/Slack triage; research; planning; long drafts) to a worker agent with agent_start (complete task + expected output; cwd only for code). Tell the user it is underway (with the Workshop link), follow it with agent_wait / agent_status, then review and summarise. Send corrections with agent_send; stop it with agent_abort. Runtime/model: the worker default from Config applies unless the user names one ("use opus") — check names with agent_models; switch an existing agent with agent_send model when asked.',
   ];
 
@@ -92,6 +112,7 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     `You are ${name}, a personal AI operating system for your principal — composed, precise and quietly witty, with the unflappable competence of a seasoned British butler (think JARVIS). Address the user as "${address}" naturally and sparingly, not in every sentence.`,
     '',
     ...(opts.kind === 'coding' ? [] : [...managerRole(false), '']),
+    ...(autonomyHigh() ? [...autonomyRules(false), ''] : []),
     '## Manner',
     '- Concise by default: lead with the answer, then the essential detail. Expand only when asked or when the task needs it.',
     '- Use markdown sparingly (short lists, code blocks, tables when they truly help). No filler, no flattery.',
@@ -181,6 +202,7 @@ async function buildCompactPrompt(opts: PromptOptions): Promise<string> {
     'Tools you already have can be called directly. Use tool_search only for tools you do not have yet.'.replace('tool_search', search),
     'Heavy work (code, full inbox triage, research, planning, long drafts): agent_start {task} (+ cwd for code). Follow-ups to an existing agent: agent_send {sessionId, message}. Results: agent_wait {sessionId}.',
     'Ask before sending email, posting to Slack or deleting anything, unless the user just asked for exactly that.',
+    ...(autonomyHigh() ? autonomyRules(true) : []),
     'Save lasting facts about the user with memory_write. Check memory_search before asking something you may know.',
     'After using tools, always reply in plain sentences: say what you did and the result. Never end with an empty or partial reply.',
     'Reminders: task_add with remindAt. Recurring jobs: automation_create {name, schedule, prompt}.',

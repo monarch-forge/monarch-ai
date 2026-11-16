@@ -240,7 +240,7 @@ export async function setExtensionSecret(id: string, name: string, value: string
 
 export async function testExtensionTool(id: string, tool: string, args: unknown): Promise<{ ok: boolean; output: string; durationMs: number }> {
   checkId(id);
-  // accept both the local name ("top_stories") and the full name ("hacker_news_top_stories")
+  // accept both the local name ("add") and the full name ("follow_ups_add")
   const prefix = `${id.replace(/-/g, '_')}_`;
   const rt = runtimeOf(id);
   const local = rt?.registry?.tools.some((t) => t.name === tool) ? tool : tool.startsWith(prefix) ? tool.slice(prefix.length) : tool;

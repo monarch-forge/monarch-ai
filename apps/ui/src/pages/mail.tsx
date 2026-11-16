@@ -9,7 +9,7 @@ import { Inbox, Star, Send, FileText, Mail as MailIcon, Search, PenSquare, Archi
 import { api, qs } from '../lib/api.ts';
 import { navigate, toast, useResource } from '../lib/store.ts';
 import { Btn } from '../components/ui.tsx';
-import { AccountMark, displayName, LoadError, Loading, StateBlock, shortStamp, useHotkeys } from '../components/mail/kit.tsx';
+import { AccountMark, displayName, LoadError, Loading, RefreshHint, StateBlock, shortStamp, useHotkeys } from '../components/mail/kit.tsx';
 import { ThreadReader, type MailAction } from '../components/mail/reader.tsx';
 import { ComposeModal } from '../components/mail/composer.tsx';
 
@@ -265,6 +265,7 @@ export default function MailPage(props: { params: string[] }) {
         <div class="flex items-baseline gap-2 px-4 pt-4 pb-2">
           <h1 class="text-[16px] font-semibold text-fg truncate">{labelName}</h1>
           <span class="text-[12.5px] text-fg-3 truncate">{viewAccount ? viewAccount.label || viewAccount.email : 'all inboxes'}</span>
+          <RefreshHint res={listRes} class="self-center" />
           <button class="ml-auto p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
             <RefreshCw size={13} class={listRes.loading ? 'animate-spin' : ''} />
           </button>

@@ -64,14 +64,14 @@ export function VoiceSection() {
         <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-6">
           <ToggleRow
             label="Speak responses"
-            hint={ttsReady ? 'Read replies aloud (console, and Comms when you asked by voice).' : st?.tts.error ? `Text to speech not ready: ${st.tts.error}${st.tts.hint ? ` — ${st.tts.hint}` : ''}` : 'Set up a text-to-speech provider below first.'}
+            hint={ttsReady ? 'Read replies aloud (console, and Beru when you asked by voice).' : st?.tts.error ? `Text to speech not ready: ${st.tts.error}${st.tts.hint ? ` — ${st.tts.hint}` : ''}` : 'Set up a text-to-speech provider below first.'}
             checked={v.speak && ttsReady}
             disabled={!ttsReady}
             onChange={(on) => void patch({ speak: on }, on ? 'Spoken replies on' : 'Spoken replies off')}
           />
           <ToggleRow
             label="Voice input"
-            hint={sttReady ? 'Mic button in the console and Comms.' : 'Set up a speech-to-text provider below first.'}
+            hint={sttReady ? 'Mic button in the console and Beru.' : 'Set up a speech-to-text provider below first.'}
             checked={v.listen && sttReady}
             disabled={!sttReady}
             onChange={(on) => void patch({ listen: on }, on ? 'Voice input on' : 'Voice input off')}

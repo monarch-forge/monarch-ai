@@ -46,7 +46,7 @@ window.addEventListener('monarch:focus-approvals', () => focusApprovals());
 
 const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ params: string[] }> }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid, page: OverviewPage },
-  { id: 'comms', label: 'Comms', icon: MessageSquare, page: CommsPage },
+  { id: 'beru', label: 'Beru', icon: MessageSquare, page: CommsPage },
   { id: 'workshop', label: 'Workshop', icon: Wrench, page: WorkshopPage },
   { id: 'mail', label: 'Mail', icon: Mail, page: MailPage },
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
@@ -59,7 +59,12 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
 ];
 
 export function App() {
-  const [current, ...params] = route.value;
+  let [current, ...params] = route.value;
+  // legacy alias: "#/comms/..." (old notifications, stored links, tool output) -> canonical "#/beru/..."
+  if (current === 'comms') {
+    current = 'beru';
+    location.replace('#/' + ['beru', ...params].map(encodeURIComponent).join('/'));
+  }
   const entry = NAV.find((n) => n.id === current) ?? NAV[0];
   const Page = entry.page;
   return (

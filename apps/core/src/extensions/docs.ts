@@ -21,7 +21,7 @@ const MINIMAL = `export default function activate(api) {
 
 export function extensionApiDocs(): string {
   const sb = sandboxInfo();
-  const example = readBuiltinSource('focus-timer');
+  const example = readBuiltinSource('follow-ups');
   return `# Monarch extension API
 
 An extension is a small ES module that adds **tools** (callable by the agent), **panels** (shown in the
@@ -49,7 +49,7 @@ Sandbox: ${sb.flag ? `Node permission model (${sb.flag})` : 'process isolation o
 ## The \`api\` object
 - \`api.z\` — zod v4 (use it for every tool input).
 - \`api.tool({ name, description, risk?, input?, run })\`
-  - \`name\`: snake_case, unique in the extension. Exposed to the agent as \`<id with - → _>_<name>\` (e.g. \`hacker_news_top_stories\`).
+  - \`name\`: snake_case, unique in the extension. Exposed to the agent as \`<id with - → _>_<name>\` (e.g. \`follow_ups_add\`).
   - \`description\`: one or two sentences — what it does and returns.
   - \`risk\`: \`'safe'\` (read-only), \`'sensitive'\` (default; changes local state / sends data), \`'dangerous'\` (destructive / irreversible). Non-safe tools may need user approval.
   - \`input\`: \`z.object({...})\` (or a plain shape \`{ q: z.string() }\`). Omit for no input. Validated before \`run\`; defaults applied. Use \`.describe()\` on fields.
@@ -82,7 +82,7 @@ A crashing extension is restarted (3 quick retries) then marked \`error\`.
 ${MINIMAL}
 \`\`\`
 
-${example ? `## Complete example — builtin \`focus-timer\` (tools + store + job + notify + panel)
+${example ? `## Complete example — builtin \`follow-ups\` (tools + store + job + notify + panel)
 \`\`\`js
 ${example.trim()}
 \`\`\`` : ''}

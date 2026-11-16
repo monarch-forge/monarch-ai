@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   memory: { vaultDir: paths.vault },
   sync: { enabled: false, provider: 'github', host: 'github.com', account: '', repo: '', remoteUrl: '', branch: 'main', deviceName: '', autoSync: 'off' },
   evolution: { enabled: true, autoEnable: true, reflect: 'off', deferTools: true },
-  agent: { autoCompactPercent: 75, smallModelMode: 'auto' },
+  agent: { autoCompactPercent: 75, smallModelMode: 'auto', autonomy: 'high' },
 };
 
 const store = dataStore<Settings>('settings', DEFAULT_SETTINGS);

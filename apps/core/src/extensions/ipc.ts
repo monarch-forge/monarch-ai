@@ -8,7 +8,7 @@
 import type { ExtensionPermission, ToolRisk } from '@monarch/shared';
 
 export interface HostToolInfo {
-  /** local name as registered by the extension ("top_stories") */
+  /** local name as registered by the extension ("add") */
   name: string;
   description: string;
   risk: ToolRisk;

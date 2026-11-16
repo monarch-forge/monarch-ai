@@ -29,6 +29,7 @@ import {
   removeWorkspace,
   resolveWorkspace,
   searchMessages,
+  threadReplies,
 } from '../integrations/slack/index.ts';
 import { deleteNote, getGraph, getNote, putNote, searchNotes } from '../integrations/memory/index.ts';
 
@@ -212,6 +213,14 @@ export function register(app: Hono): void {
     h(async (c) => {
       const ws = resolveWorkspace(c.req.param('workspaceId'));
       return c.json(await channelHistory(ws.id, c.req.param('channelId') ?? '', intParam(c.req.query('limit'), 50, 1, 200)));
+    }),
+  );
+
+  app.get(
+    '/api/slack/:workspaceId/channels/:channelId/threads/:threadTs',
+    h(async (c) => {
+      const ws = resolveWorkspace(c.req.param('workspaceId'));
+      return c.json(await threadReplies(ws.id, c.req.param('channelId') ?? '', c.req.param('threadTs') ?? '', intParam(c.req.query('limit'), 100, 1, 200)));
     }),
   );
 

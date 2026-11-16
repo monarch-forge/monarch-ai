@@ -20,6 +20,7 @@ import { parseLooseObject, parseTextToolCalls, textToolResultsMessage, type Text
 import { codingAgentsBrief } from '../../tools/delegate.ts';
 import { piModels, resolvePiModel } from '../pi-models.ts';
 import type { Engine, TurnContext, TurnResult } from './types.ts';
+import { autonomyHigh, CONTINUE_NUDGE, earlyStopReason, MAX_AUTO_CONTINUE, noteTokenSaver } from '../autonomy.ts';
 
 interface TurnState {
   ctx: TurnContext;
@@ -41,6 +42,10 @@ interface TurnState {
   fragment?: string;
   /** the last reply was cut off for lack of room in the context window */
   starved?: boolean;
+  /** tool calls executed in this turn (native + text fallback) */
+  toolCalls: number;
+  /** full text of the last assistant message that had no tool calls (autonomy check) */
+  lastReply: string;
 }
 
 interface Entry {
@@ -236,6 +241,7 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
         if (!hasToolCall && (starved || isFragment(rest))) turn.fragment = rest;
         else emit({ type: 'text', delta: rest });
       } else if (starved && turn.out === 0) turn.fragment = turn.fragment ?? '';
+      turn.lastReply = hasToolCall || parsed?.calls.length ? '' : turn.msg;
       turn.msg = '';
       turn.out = 0;
       turn.suppress = false;
@@ -244,6 +250,7 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
       break;
     }
     case 'tool_execution_start': {
+      turn.toolCalls++;
       const def = entry.defs.get(ev.toolName);
       emit({ type: 'tool-start', callId: ev.toolCallId, name: ev.toolName, input: ev.args, risk: def?.risk });
       break;
@@ -669,7 +676,7 @@ export const piEngine: Engine = {
       return { usage: emptyUsage(), model: model.id, error: 'This session is still busy.' };
     }
 
-    const turn: TurnState = { ctx, usage: preUsage, byModel: preUsage.inputTokens ? { [model.id]: preUsage } : {}, model: model.id, msg: '', out: 0, suppress: false, rawArgs: {} };
+    const turn: TurnState = { ctx, usage: preUsage, byModel: preUsage.inputTokens ? { [model.id]: preUsage } : {}, model: model.id, msg: '', out: 0, suppress: false, rawArgs: {}, toolCalls: 0, lastReply: '' };
     entry.turn = turn;
     ctx.emit({ type: 'model', model: model.id });
 
@@ -712,6 +719,7 @@ export const piEngine: Engine = {
           agent.state.messages = [...agent.state.messages, syntheticAssistant(model, msg)];
         }
       }
+      await autoContinue(entry, rec, turn, model);
     } finally {
       ctx.signal.removeEventListener('abort', onAbort);
       entry.turn = null;
@@ -746,6 +754,51 @@ export const piEngine: Engine = {
     }
   },
 };
+
+/* ─────────────── autonomy loop ─────────────── */
+
+/** tool calls per turn after which Monarch no longer pushes the model to keep going */
+const AUTO_CONTINUE_TOOL_BUDGET = 80;
+let autoSeq = 0;
+
+/**
+ * Settings.agent.autonomy 'high': the turn ended with plain text that defers/skips requested work, announces
+ * work without doing it, or asks "shall I…" after an imperative instruction → continue with a short system
+ * nudge (up to MAX_AUTO_CONTINUE extra rounds). A small "Continued automatically" card marks each round.
+ */
+async function autoContinue(entry: Entry, rec: SessionRecord, turn: TurnState, model: Model<Api>): Promise<void> {
+  const ctx = turn.ctx;
+  noteTokenSaver(turn.lastReply, rec.id);
+  if (!autonomyHigh() || rec.kind === 'automation') return;
+  const agent = entry.agent;
+  let roundStart = 0;
+  for (let i = 0; i < MAX_AUTO_CONTINUE; i++) {
+    if (turn.error || ctx.signal.aborted || turn.fragment !== undefined) return;
+    if (turn.toolCalls >= AUTO_CONTINUE_TOOL_BUDGET) return;
+    const reason = earlyStopReason(turn.lastReply, ctx.text, turn.toolCalls - roundStart);
+    if (!reason) return;
+    console.info(`[pi] session ${rec.id}: reply ${reason}; continuing automatically (${i + 1}/${MAX_AUTO_CONTINUE})`);
+    const callId = `autocontinue_${Date.now().toString(36)}_${++autoSeq}`;
+    ctx.emit({ type: 'tool-start', callId, name: 'continued_automatically', input: { reason, round: i + 1 } });
+    ctx.emit({ type: 'tool-end', callId, ok: true, output: `Continued automatically: the reply ${reason}.`, durationMs: 0 });
+    roundStart = turn.toolCalls;
+    turn.lastReply = '';
+    const nudge = { role: 'user', content: `[Monarch system note] ${CONTINUE_NUDGE}`, timestamp: Date.now() } as AgentMessage;
+    agent.state.messages = [...agent.state.messages, nudge];
+    try {
+      await agent.continue();
+      await drainTextCalls(entry, rec, turn, model);
+    } finally {
+      agent.state.messages = agent.state.messages.filter((m) => m !== nudge);
+    }
+    if (turn.fragment !== undefined) {
+      dropTrailingFragment(agent);
+      turn.fragment = undefined;
+      return;
+    }
+    noteTokenSaver(turn.lastReply, rec.id);
+  }
+}
 
 /* ─────────────── text tool-call fallback ─────────────── */
 
@@ -798,6 +851,7 @@ async function runTextCall(entry: Entry, rec: SessionRecord, turn: TurnState, ca
   const ctx = turn.ctx;
   const def = entry.defs.get(call.name);
   const callId = `textcall_${Date.now().toString(36)}_${++textCallSeq}`;
+  turn.toolCalls++;
   ctx.emit({ type: 'tool-start', callId, name: call.name, input: call.args, risk: def?.risk });
   const t0 = Date.now();
   const end = (ok: boolean, output: string) => {

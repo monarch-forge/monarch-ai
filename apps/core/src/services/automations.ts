@@ -217,8 +217,8 @@ function humanSchedule(expr: string): string {
   return t;
 }
 
-/** href where an automation is listed in the UI (Comms → Automations → Active) */
-export const automationHref = (id: string) => `#/comms/automations/${encodeURIComponent(id)}`;
+/** href where an automation is listed in the UI (Beru → Automations → Active) */
+export const automationHref = (id: string) => `#/beru/automations/${encodeURIComponent(id)}`;
 
 /**
  * createAutomation(input, { announce: true }) also posts a notification ("Automation registered: …") —

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { GoogleAccount, MailDraft } from '@monarch/shared';
 import { Send, Save } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
-import { toast } from '../../lib/store.ts';
+import { invalidateResources, toast } from '../../lib/store.ts';
 import { Btn } from '../ui.tsx';
 import { AccountMark, Button, Modal } from './kit.tsx';
 
@@ -58,6 +58,7 @@ export function Composer(props: {
     try {
       await api.post<{ id: string }>('/mail/send', draft());
       toast(`Sent to ${d.to.trim()}`, 'success');
+      invalidateResources('/mail/threads');
       props.onDone(true);
     } catch (e: any) {
       toast(`Send failed: ${e?.message ?? e}`, 'error');
@@ -71,6 +72,7 @@ export function Composer(props: {
     try {
       await api.post<{ id: string }>('/mail/drafts', draft());
       toast('Draft saved to Gmail', 'success');
+      invalidateResources('/mail/threads');
       props.onDone(false);
     } catch (e: any) {
       toast(`Draft failed: ${e?.message ?? e}`, 'error');
