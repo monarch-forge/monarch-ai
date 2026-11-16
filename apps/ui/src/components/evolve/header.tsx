@@ -148,7 +148,7 @@ function ForgeInput() {
   };
   return (
     <form
-      class="flex items-stretch border border-line bg-[#121213] focus-within:border-fg-3"
+      class="flex items-stretch border border-line bg-[#121213] "
       onSubmit={(e) => {
         e.preventDefault();
         void submit();

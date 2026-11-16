@@ -320,9 +320,6 @@ textarea::placeholder {
     outline: none;
     border-radius: 2px;
   }
-  .hud-input:focus {
-    border-color: var(--text-muted);
-  }
   .hud-input::placeholder {
     color: var(--text-muted);
   }
@@ -448,10 +445,6 @@ textarea::placeholder {
   outline-color: var(--accent-primary) !important;
 }
 
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline: 1px solid var(--text-secondary) !important;
-  outline-offset: 1px !important;
-  box-shadow: 0 0 0 2px rgb(158 158 164 / 0.15) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

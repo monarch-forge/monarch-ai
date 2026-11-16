@@ -500,7 +500,7 @@ function SlackComposer(props: {
 
   return (
     <div class="border-t border-line p-2.5">
-      <div class="flex items-end gap-2 border border-line bg-[#121213] focus-within:border-fg-3">
+      <div class="flex items-end gap-2 border border-line bg-[#121213] ">
         <textarea
           ref={(el) => {
             props.inputRef.current = el;

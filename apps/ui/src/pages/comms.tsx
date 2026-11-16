@@ -179,7 +179,7 @@ export default function CommsPage(props: { params: string[] }) {
               { value: 'automation', label: 'Automations' },
             ]}
           />
-          <label class="flex items-center gap-2 border border-line bg-[#121213] px-2 h-7 focus-within:border-fg-3">
+          <label class="flex items-center gap-2 border border-line bg-[#121213] px-2 h-7 ">
             <Search size={12} class="text-fg-3" />
             <input
               class="flex-1 min-w-0 bg-transparent outline-none text-[12px] placeholder:text-fg-3"

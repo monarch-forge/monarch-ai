@@ -73,7 +73,7 @@ export function CommandConsole() {
 
   return (
     <div class="flex flex-col gap-2.5 w-full">
-      <div class={`flex items-stretch border bg-[#121213] transition-colors ${isListening ? 'border-red/60' : 'border-line focus-within:border-fg-3'}`}>
+      <div class={`flex items-stretch border bg-[#121213] transition-colors ${isListening ? 'border-red/60' : 'border-line '}`}>
         <span class="flex items-center pl-3 pr-1 font-mono text-[12px] text-fg-3 select-none" aria-hidden="true">
           {isListening ? <span class="inline-block w-1.5 h-1.5 bg-red hud-blink" /> : '›'}
         </span>
