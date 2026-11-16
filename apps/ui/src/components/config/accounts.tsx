@@ -8,7 +8,7 @@ import { Panel, Tag, Spinner, ErrorLine, Empty, fmt } from '../ui.tsx';
 import { Field, INPUT, Kbd } from './fields.tsx';
 import { OAuthFlowView } from './oauth-flow.tsx';
 
-const BTN = 'btn btn-xs rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]';
+const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
 const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
 
 const SLACK_SCOPES = [
@@ -43,7 +43,7 @@ function ConfirmRemove(props: { label: string; onConfirm: () => Promise<void> })
     );
   return (
     <span class="flex items-center gap-1.5">
-      <span class="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3">sure?</span>
+      <span class=" text-[12px] text-fg-3">sure?</span>
       <button
         class="text-red hover:text-fg p-0.5"
         disabled={busy}
@@ -105,13 +105,12 @@ function GoogleClient() {
 
   return (
     <Panel
-      code="CFG.41"
       title="Google OAuth client"
       right={res.loading && !res.data ? <Spinner /> : configured ? <Tag tone="ok">configured</Tag> : <Tag tone="warn">required</Tag>}
     >
       <div class="text-[12.5px] text-fg-2 leading-relaxed">
         Gmail and Calendar use your own Google Cloud OAuth client, so tokens never leave this machine.
-        <button class="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3 hover:text-fg-2" onClick={() => setShowSteps(!steps)}>
+        <button class="ml-2 text-[12px] text-fg-3 hover:text-fg-2" onClick={() => setShowSteps(!steps)}>
           {steps ? 'hide steps' : 'setup steps'}
         </button>
       </div>
@@ -201,7 +200,6 @@ function GoogleAccounts() {
 
   return (
     <Panel
-      code="CFG.42"
       title="Google accounts"
       right={
         <button class={`${BTN} btn-primary`} disabled={!configured || busy || (!!flow && flow.status !== 'error' && flow.status !== 'done')} onClick={() => void connect()} title={configured ? 'Connect a Google account' : 'Configure the OAuth client first'}>
@@ -238,9 +236,9 @@ function GoogleAccounts() {
           {res.data.map((a) => (
             <div key={a.id} class="flex items-center gap-3 py-2 border-b border-line last:border-b-0">
               {a.picture ? (
-                <img src={a.picture} alt="" class="w-7 h-7 rounded-[2px] grayscale opacity-80" referrerpolicy="no-referrer" />
+                <img src={a.picture} alt="" class="w-7 h-7 rounded-[6px] grayscale opacity-80" referrerpolicy="no-referrer" />
               ) : (
-                <div class="w-7 h-7 border border-line flex items-center justify-center font-mono text-[11px] text-fg-2 uppercase">{(a.name || a.email)[0]}</div>
+                <div class="w-7 h-7 border border-line flex items-center justify-center text-[12px] text-fg-2">{(a.name || a.email)[0]}</div>
               )}
               <div class="flex-1 min-w-0">
                 <div class="text-[13px] text-fg truncate">
@@ -295,7 +293,7 @@ function SlackWorkspaces() {
   };
 
   return (
-    <Panel code="CFG.43" title="Slack workspaces" right={res.data ? <Tag>{res.data.length} linked</Tag> : res.loading ? <Spinner /> : null}>
+    <Panel title="Slack workspaces" right={res.data ? <Tag>{res.data.length} linked</Tag> : res.loading ? <Spinner /> : null}>
       {res.error && !res.data ? (
         <ErrorLine error={res.error} />
       ) : res.data?.length ? (
@@ -328,7 +326,7 @@ function SlackWorkspaces() {
               api.slack.com/apps
             </button>
             , add the user-token scopes below, install it to your workspace, and paste the <Kbd>xoxp-…</Kbd> user token (or an <Kbd>xoxb-…</Kbd> bot token).{' '}
-            <button class="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3 hover:text-fg-2" onClick={() => setShowScopes(!showScopes)}>
+            <button class=" text-[12px] text-fg-3 hover:text-fg-2" onClick={() => setShowScopes(!showScopes)}>
               {showScopes ? 'hide scopes' : 'show scopes'}
             </button>
           </>

@@ -8,7 +8,7 @@ import { listen, micLevel, listening, refreshVoiceStatus, speak, speaking, stopL
 import { Panel, Tag } from '../ui.tsx';
 import { Field, INPUT, SELECT, ToggleRow, saveSettings } from './fields.tsx';
 
-const BTN = 'btn btn-xs rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]';
+const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
 const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
 
 type Voice = Settings['assistant']['voice'];
@@ -50,7 +50,7 @@ export function VoiceSection() {
 
   return (
     <div class="flex flex-col gap-3">
-      <Panel code="CFG.41" title="Voice" right={<Tag tone={sttReady || ttsReady ? 'ok' : 'warn'}>{sttReady && ttsReady ? 'in + out ready' : sttReady ? 'input ready' : ttsReady ? 'output ready' : 'not set up'}</Tag>}>
+      <Panel title="Voice" right={<Tag tone={sttReady || ttsReady ? 'ok' : 'warn'}>{sttReady && ttsReady ? 'in + out ready' : sttReady ? 'input ready' : ttsReady ? 'output ready' : 'not set up'}</Tag>}>
         <div class="text-[12.5px] text-fg-2 leading-relaxed max-w-[760px]">
           Monarch talks and listens through cloud speech services. Pick a provider for each direction and add its API key, then switch voice on.
           {st && (
@@ -229,7 +229,7 @@ function SttPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
     }
   };
   return (
-    <Panel code="CFG.42" title="Speech to text" right={<StatusTag s={props.status} />}>
+    <Panel title="Speech to text" right={<StatusTag s={props.status} />}>
       <div class="flex flex-col gap-3">
         <ProviderPick value={c.provider} options={STT_PROVIDERS} onChange={(provider) => set({ provider, model: '' })} />
         {c.provider !== 'none' && (
@@ -299,7 +299,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
   };
 
   return (
-    <Panel code="CFG.43" title="Text to speech" right={<StatusTag s={props.status} />}>
+    <Panel title="Text to speech" right={<StatusTag s={props.status} />}>
       <div class="flex flex-col gap-3">
         <ProviderPick value={c.provider} options={TTS_PROVIDERS} onChange={(provider) => set({ provider, model: '', voice: '' })} />
         {c.provider !== 'none' && (

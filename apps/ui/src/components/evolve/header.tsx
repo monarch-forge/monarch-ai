@@ -1,5 +1,4 @@
 /** Evolve header strip: evolution stats, "Reflect now" and the Forge command input. */
-import type { ComponentChildren } from 'preact';
 import { useRef, useState } from 'preact/hooks';
 import type { EvolutionStats } from '@monarch/shared';
 import { Hammer, RefreshCcw, CornerDownLeft } from 'lucide-preact';
@@ -27,84 +26,65 @@ export function EvolveHeader(props: { stats: Resource<EvolutionStats> }) {
     }
   };
 
+  const attention: { label: string; href: string; tone: 'red' | 'warn' }[] = [];
+  if (st?.extensions.error) attention.push({ label: `${st.extensions.error} extension${st.extensions.error > 1 ? 's' : ''} need a look`, href: '#/evolve/extensions', tone: 'red' });
+  if (st?.openProposals) attention.push({ label: `${st.openProposals} proposal${st.openProposals > 1 ? 's' : ''} waiting`, href: '#/evolve/proposals', tone: 'warn' });
+
   return (
-    <section class="hud-panel shrink-0" aria-label="Evolution status">
-      <div class="flex flex-col xl:flex-row xl:items-stretch">
-        {/* title block */}
-        <div class="flex items-center gap-3 px-4 py-3 xl:border-r border-b xl:border-b-0 border-line xl:w-[184px] 2xl:w-[220px] shrink-0">
-          <span class="hud-code">EVO.00</span>
-          <div class="min-w-0">
-            <h1 class="font-mono text-[13px] tracking-[0.2em] uppercase text-fg">Evolve</h1>
-            <div class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 mt-0.5 truncate">
-              {evo ? (evo.enabled ? 'self-mod · on' : 'self-mod · off') : 'self-extension'}
-            </div>
+    <section class="shrink-0 flex flex-col gap-4" aria-label="Evolution status">
+      <div class="flex flex-col lg:flex-row lg:items-start gap-4">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-[20px] font-semibold text-fg flex items-center gap-2.5">
+            Evolve
+            {evo && (
+              <span class="text-[12px] font-normal text-fg-3 flex items-center gap-1.5">
+                <span class={`inline-block w-1.5 h-1.5 rounded-full ${evo.enabled ? 'bg-success' : 'bg-fg-3'}`} />
+                {evo.enabled ? 'self-extension on' : 'self-extension off'}
+              </span>
+            )}
+          </h1>
+          <p class="text-[13.5px] text-fg-2 mt-1 leading-relaxed">
+            {missing ? (
+              'The evolution service is not available right now.'
+            ) : st ? (
+              <>
+                Monarch has {st.extensions.active} active extension{st.extensions.active === 1 ? '' : 's'} and {st.skills} skill{st.skills === 1 ? '' : 's'}, with{' '}
+                {st.changes7d} change{st.changes7d === 1 ? '' : 's'} this week. {st.lastReflectionAt ? `Last reflected ${ago(st.lastReflectionAt)}.` : 'No reflection yet.'}
+              </>
+            ) : props.stats.loading ? (
+              <Spinner />
+            ) : (
+              '—'
+            )}
+          </p>
+          <div class="flex flex-wrap gap-2 mt-3">
+            {attention.length ? (
+              attention.map((a) => (
+                <a key={a.href} href={a.href} class={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] ${a.tone === 'red' ? 'bg-red/12 text-red' : 'bg-warning/12 text-warning'} hover:brightness-125`}>
+                  <span class="inline-block w-1.5 h-1.5 rounded-full bg-current" /> {a.label}
+                </a>
+              ))
+            ) : st ? (
+              <span class="text-[12.5px] text-fg-3">Nothing waiting on you.</span>
+            ) : null}
           </div>
-          {evo && <span class={`ml-auto xl:hidden 2xl:inline-block 2xl:ml-0 inline-block w-1.5 h-1.5 ${evo.enabled ? 'bg-red' : 'border border-fg-3'}`} title={evo.enabled ? 'Evolution enabled' : 'Evolution disabled'} />}
         </div>
 
-        {/* stats */}
-        <div class="flex-1 min-w-0 grid grid-cols-3 lg:grid-cols-6 gap-px bg-line border-b xl:border-b-0 border-line">
-          {missing ? (
-            <div class="col-span-full bg-surface flex items-center gap-2 px-4 py-3 font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3">
-              <span class="inline-block w-1.5 h-1.5 border border-fg-3" /> Evolution service unavailable
-            </div>
-          ) : (
-            <>
-              <Cell label="Extensions">
-                {st ? (
-                  <>
-                    <span class="text-fg">{st.extensions.active}</span>
-                    <span class="text-fg-3">/{st.extensions.total}</span>
-                    {st.extensions.error > 0 && <span class="text-red text-[11px] ml-2">{st.extensions.error} err</span>}
-                  </>
-                ) : (
-                  <Dash loading={props.stats.loading} />
-                )}
-              </Cell>
-              <Cell label="Skills">{st ? st.skills : <Dash loading={props.stats.loading} />}</Cell>
-              <Cell label="Proposals">
-                {st ? <span class={st.openProposals > 0 ? 'text-fg' : 'text-fg-2'}>{st.openProposals}<span class="text-fg-3 text-[11px] ml-1">open</span></span> : <Dash loading={props.stats.loading} />}
-              </Cell>
-              <Cell label="Changes · 7d" sub={st ? `reflected ${ago(st.lastReflectionAt)}` : undefined}>
-                {st ? st.changes7d : <Dash loading={props.stats.loading} />}
-              </Cell>
-              <Cell label="Tools" class="col-span-2">
-                {st ? <ToolSplit always={st.tools.always} deferred={st.tools.deferred} /> : <Dash loading={props.stats.loading} />}
-              </Cell>
-            </>
-          )}
-        </div>
-
-        {/* actions */}
-        <div class="flex flex-col gap-2 px-3 py-3 xl:w-[360px] 2xl:w-[460px] shrink-0 xl:border-l border-line">
+        <div class="flex flex-col gap-2 w-full lg:w-[420px] shrink-0">
           <ForgeInput />
-          <div class="flex items-center gap-2">
-            <Btn size="xs" onClick={() => void reflect()} loading={reflecting} disabled={conn.value !== 'open' || missing} title="Review recent sessions for friction and turn it into proposals">
-              {!reflecting && <RefreshCcw size={11} />} Reflect now
+          <div class="flex items-center gap-3">
+            <Btn size="xs" variant="ghost" onClick={() => void reflect()} loading={reflecting} disabled={conn.value !== 'open' || missing} title="Review recent sessions for friction and turn it into proposals">
+              {!reflecting && <RefreshCcw size={12} />} Reflect now
             </Btn>
-            <span class="font-mono text-[10px] tracking-[0.1em] uppercase text-fg-3 truncate">
-              {evo ? `auto · ${evo.reflect}` : ''}
-              {evo && !evo.autoEnable ? ' · review before enable' : ''}
+            <span class="text-[12px] text-fg-3 truncate">
+              {evo ? `Reflects ${evo.reflect}` : ''}
+              {evo && !evo.autoEnable ? ' · you review before anything is enabled' : ''}
             </span>
           </div>
         </div>
       </div>
     </section>
   );
-}
-
-function Cell(props: { label: string; children: ComponentChildren; sub?: string; class?: string }) {
-  return (
-    <div class={`bg-surface px-3 2xl:px-4 py-2.5 sm:py-3 min-w-0 ${props.class ?? ''}`}>
-      <div class="hud-label text-[10px]">{props.label}</div>
-      <div class="hud-value text-[16px] sm:text-[18px] font-light leading-tight mt-1 truncate">{props.children}</div>
-      {props.sub && <div class="font-mono text-[10px] text-fg-3 mt-0.5 truncate">{props.sub}</div>}
-    </div>
-  );
-}
-
-function Dash(props: { loading: boolean }) {
-  return props.loading ? <Spinner /> : <span class="text-fg-3">—</span>;
 }
 
 /** "12 loaded · 48 on demand" with a thin proportional bar */
@@ -148,7 +128,7 @@ function ForgeInput() {
   };
   return (
     <form
-      class="flex items-stretch border border-line bg-[#121213] "
+      class="flex items-stretch border border-line bg-[#121213] rounded-[8px] overflow-hidden focus-within:border-fg-3 transition-colors"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -175,7 +155,7 @@ function ForgeInput() {
       />
       <button
         type="submit"
-        class="flex items-center gap-1.5 px-3 font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2 border-l border-line hover:text-fg hover:bg-subtle disabled:opacity-40"
+        class="flex items-center gap-1.5 px-3 text-[12.5px] text-fg-2 hover:text-fg hover:bg-subtle disabled:opacity-40"
         disabled={!text.trim() || busy || conn.value !== 'open'}
         title="Start a build session (Enter)"
       >

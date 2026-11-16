@@ -70,7 +70,7 @@ export function TimelineTab() {
   }, [res.data, filter, actor]);
 
   return (
-    <Panel code="EVO.41" title="Timeline" class="h-full" noPad bodyClass="flex flex-col" right={res.data && <Tag tone="plain">{res.data.length} entries</Tag>}>
+    <Panel title="Timeline" class="h-full" noPad bodyClass="flex flex-col" right={res.data && <Tag tone="plain">{res.data.length} entries</Tag>}>
       <div class="flex items-center gap-1.5 px-3 py-2 border-b border-line flex-wrap">
         <div class="flex gap-1 flex-wrap" role="group" aria-label="Filter by kind">
           {FILTERS.map((f) => (
@@ -124,11 +124,11 @@ function TimelineItem(props: { e: EvolutionEntry }) {
         <Icon size={9} strokeWidth={2} />
       </span>
       <div class="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">
-        <span class={`font-mono text-[10px] tracking-[0.12em] uppercase ${k.tone === 'red' ? 'text-red' : 'text-fg-3'}`}>{k.label}</span>
+        <span class={` text-[12px] ${k.tone === 'red' ? 'text-red' : 'text-fg-3'}`}>{k.label}</span>
         <span class="font-mono text-[10px] text-fg-3 tabular-nums" title={stamp(e.ts)}>
           {new Date(e.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} · {ago(e.ts)}
         </span>
-        <span class={`font-mono text-[10px] tracking-[0.1em] uppercase ${e.actor === 'agent' ? 'text-fg-2' : 'text-fg-3'}`}>by {e.actor}</span>
+        <span class={` text-[12px] ${e.actor === 'agent' ? 'text-fg-2' : 'text-fg-3'}`}>by {e.actor}</span>
       </div>
       <div class="text-[13px] text-fg mt-0.5 leading-snug">
         {href ? (
@@ -148,7 +148,7 @@ function TimelineItem(props: { e: EvolutionEntry }) {
             </a>
           )}
           {e.sessionId && (
-            <button class="font-mono text-[10px] tracking-[0.1em] uppercase text-fg-3 hover:text-fg-2 flex items-center gap-1" onClick={() => openSession(e.sessionId)}>
+            <button class=" text-[12px] text-fg-3 hover:text-fg-2 flex items-center gap-1" onClick={() => openSession(e.sessionId)}>
               <MessageSquare size={10} /> session
             </button>
           )}
@@ -161,7 +161,7 @@ function TimelineItem(props: { e: EvolutionEntry }) {
 export function Chip(props: { on: boolean; onClick: () => void; children: string }) {
   return (
     <button
-      class={`font-mono text-[10px] tracking-[0.12em] uppercase px-2 py-0.5 border ${props.on ? 'border-fg-3 text-fg bg-subtle' : 'border-line text-fg-3 hover:text-fg-2'}`}
+      class={` text-[12px] px-2 py-0.5 border ${props.on ? 'border-fg-3 text-fg bg-subtle' : 'border-line text-fg-3 hover:text-fg-2'}`}
       aria-pressed={props.on}
       onClick={props.onClick}
     >

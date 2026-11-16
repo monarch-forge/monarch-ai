@@ -1,11 +1,12 @@
 /**
- * COMMS — conversations with Monarch (route #/comms/:id?, "#/comms/new" = blank session). UI-B.
+ * Comms — conversations with Monarch (route #/comms/:id?, "#/comms/new" = blank session). UI-B.
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { speak, stopSpeaking } from '../lib/voice.ts';
 import type { Automation, SessionKind } from '@monarch/shared';
-import { Plus, Search, MessageSquare, Zap } from 'lucide-preact';
-import { Panel, Tag, Empty, Spinner, ErrorLine } from '../components/ui.tsx';
+import { Search, SquarePen, X } from 'lucide-preact';
+import { Tag, Spinner, ErrorLine, Btn } from '../components/ui.tsx';
+import { ChatLayout, SideLabel, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
 import { SessionRow, Segmented } from '../components/chat/session-list.tsx';
@@ -17,10 +18,10 @@ import { fmt } from '../components/ui.tsx';
 import { ActiveAutomations } from '../components/agenda/automations.tsx';
 
 const SUGGESTED = [
-  { title: 'Morning brief', text: 'Give me a brief of my day: calendar, important unread email, open tasks and the weather.' },
-  { title: 'Inbox triage', text: 'Summarize my unread email across all accounts and flag anything that needs a reply today.' },
-  { title: 'This week', text: 'What does my calendar look like this week? Point out conflicts and free blocks.' },
-  { title: 'System check', text: 'Run a quick health check of this machine: CPU, memory, disk and anything unusual.' },
+  { title: 'Brief me on my day', text: 'Give me a brief of my day: calendar, important unread email, open tasks and the weather.' },
+  { title: 'Triage my inbox', text: 'Summarize my unread email across all accounts and flag anything that needs a reply today.' },
+  { title: 'How does my week look?', text: 'What does my calendar look like this week? Point out conflicts and free blocks.' },
+  { title: 'Check this machine', text: 'Run a quick health check of this machine: CPU, memory, disk and anything unusual.' },
 ];
 
 const QUICK = [
@@ -73,6 +74,7 @@ export default function CommsPage(props: { params: string[] }) {
     if (id) setTimeout(() => setFlash((f) => (f === id ? null : f)), 4000);
     location.replace('#/comms');
   }, [autoLink, props.params[1]]);
+  const [detailsOpen, setDetailsOpen] = useStoredFlag('monarch.comms.details', false);
   const [inject, setInject] = useState<{ text: string; n: number } | null>(null);
   const list = useSessions(kind);
   const chats = useSessions('chat');
@@ -156,178 +158,187 @@ export default function CommsPage(props: { params: string[] }) {
   const session = chat.session;
   const title = session?.title || (isNew || !routeId ? 'New conversation' : 'Conversation');
 
-  return (
-    <div class="h-full p-3 grid gap-3 grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_260px]">
-      {/* ── sessions ── */}
-      <Panel
-        code="COM.01"
-        title="Sessions"
-        noPad
-        bodyClass="flex flex-col"
-        right={
-          <button class="btn btn-xs btn-ghost rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] text-fg-2 hover:text-fg px-1.5" onClick={newChat} title="New chat">
-            <Plus size={12} /> New
-          </button>
-        }
-      >
-        <div class="p-2.5 flex flex-col gap-2 border-b border-line">
-          <Segmented
-            value={kind}
-            onChange={setKind}
-            options={[
-              { value: 'chat', label: 'Chats' },
-              { value: 'automation', label: 'Automations' },
-            ]}
+  const sidebar = (
+    <>
+      <div class="px-3 pt-3 flex items-center gap-2">
+        <Segmented
+          class="flex-1"
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: 'chat', label: 'Chats' },
+            { value: 'automation', label: 'Automations' },
+          ]}
+        />
+      </div>
+      <div class="px-3 pt-2 flex items-center gap-1.5">
+        <label class="flex-1 min-w-0 flex items-center gap-2 rounded-[8px] px-2.5 h-8 text-fg-3 hover:bg-[var(--bg-raised,#202023)] focus-within:bg-[var(--bg-raised,#202023)] transition-colors duration-150">
+          <Search size={14} strokeWidth={1.75} />
+          <input
+            class="flex-1 min-w-0 bg-transparent outline-none text-[13px] text-fg placeholder:text-fg-3"
+            placeholder="Search"
+            value={query}
+            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+            onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
           />
-          <label class="flex items-center gap-2 border border-line bg-[#121213] px-2 h-7 ">
-            <Search size={12} class="text-fg-3" />
-            <input
-              class="flex-1 min-w-0 bg-transparent outline-none text-[12px] placeholder:text-fg-3"
-              placeholder="Search sessions"
-              value={query}
-              onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-              onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
-            />
-          </label>
-        </div>
-        <div class="flex-1 min-h-0 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {kind === 'automation' && (
-            <>
-              <ActiveAutomations selected={selAuto?.id ?? null} onSelect={setSelAuto} highlight={flash} />
-              <div class="flex items-center gap-2 px-3 pt-2.5 pb-1">
-                <span class="hud-label">{selAuto ? 'Runs' : 'Recent runs'}</span>
-                {selAuto && (
-                  <button class="ml-auto font-mono text-[10px] text-fg-3 hover:text-fg truncate max-w-[60%]" onClick={() => setSelAuto(null)} title="Show all runs">
-                    {selAuto.name} ×
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-          {list.loading && !list.sessions ? (
-            <div class="flex justify-center py-6">
-              <Spinner />
-            </div>
-          ) : list.error && !list.sessions ? (
-            <div class="px-3">
-              <ErrorLine error={conn.value === 'open' ? list.error : 'Core offline'} />
-            </div>
-          ) : filtered.length === 0 ? (
-            <Empty>{query ? 'No matches' : kind === 'chat' ? 'No conversations yet' : selAuto ? 'No runs of this automation yet' : 'No automation runs yet'}</Empty>
-          ) : (
-            filtered.map((x) => (
-              <SessionRow
-                key={x.id}
-                s={x}
-                active={x.id === chat.sessionId}
-                href={`#/comms/${encodeURIComponent(x.id)}`}
-                onDeleted={(id) => id === chat.sessionId && location.replace('#/comms/new')}
-              />
-            ))
-          )}
-        </div>
-      </Panel>
-
-      {/* ── transcript ── */}
-      <Panel
-        code="COM.02"
-        title={title}
-        active={chat.running}
-        noPad
-        bodyClass="flex flex-col"
-        right={
+        </label>
+        <button class={ICON_BTN} onClick={newChat} title="New chat" aria-label="New chat">
+          <SquarePen size={16} strokeWidth={1.75} />
+        </button>
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto py-2">
+        {kind === 'automation' && (
           <>
-            {session && session.kind !== 'chat' && <Tag>{session.kind}</Tag>}
-            {chat.running ? <Tag tone="red">live</Tag> : session?.id ? <Tag>idle</Tag> : null}
+            <SideLabel>Active</SideLabel>
+            <div class="px-1">
+              <ActiveAutomations selected={selAuto?.id ?? null} onSelect={setSelAuto} highlight={flash} />
+            </div>
+            <SideLabel
+              right={
+                selAuto && (
+                  <button class="text-[11.5px] text-fg-3 hover:text-fg truncate max-w-[140px] inline-flex items-center gap-1" onClick={() => setSelAuto(null)} title="Show all runs">
+                    {selAuto.name} <X size={11} />
+                  </button>
+                )
+              }
+            >
+              {selAuto ? 'Runs' : 'Recent runs'}
+            </SideLabel>
           </>
-        }
-      >
-        {chat.loading && !session ? (
-          <div class="flex-1 flex items-center justify-center">
+        )}
+        {list.loading && !list.sessions ? (
+          <div class="flex justify-center py-6">
             <Spinner />
           </div>
-        ) : chat.error && !session ? (
-          <div class="flex-1 flex flex-col items-center justify-center gap-3">
-            <ErrorLine error={chat.error} />
-            <div class="flex gap-2">
-              {chat.error !== 'Session not found' && chat.error !== 'Session deleted' && (
-                <button class="btn btn-xs btn-outline border-line rounded-[2px] font-mono font-normal uppercase text-[10px] text-fg-2" onClick={() => void chat.reload()}>
-                  Retry
-                </button>
-              )}
-              <button class="btn btn-xs btn-primary rounded-[2px] font-mono font-normal uppercase text-[10px]" onClick={newChat}>
-                New chat
-              </button>
-            </div>
+        ) : list.error && !list.sessions ? (
+          <div class="px-4">
+            <ErrorLine error={conn.value === 'open' ? list.error : 'Core offline'} />
           </div>
+        ) : filtered.length === 0 ? (
+          <p class="px-5 py-6 text-[13px] text-fg-3 leading-relaxed">
+            {query
+              ? 'Nothing matches that search.'
+              : kind === 'chat'
+                ? 'No conversations yet. Say hello to get started.'
+                : selAuto
+                  ? 'This automation hasn’t run yet.'
+                  : 'No automation runs yet.'}
+          </p>
         ) : (
-          <Transcript
-            items={session?.items ?? []}
-            sessionId={chat.sessionId}
-            running={chat.running}
-            empty={<EmptyState name={s?.user.name} honorific={s?.user.honorific} assistant={s?.assistant.name} onPick={(t) => void send(t)} />}
-          />
-        )}
-        <Composer
-          onSend={send}
-          onVoiceSend={sendVoice}
-          onAbort={chat.abort}
-          running={chat.running}
-          commands={commands}
-          inject={inject}
-          autoFocus
-          disabled={!!chat.error && !session}
-          placeholder={session?.id ? 'Reply…' : `Message ${s?.assistant.name || 'Monarch'}…`}
-          meta={
-            <>
-              <span class="inline-block w-1.5 h-1.5 bg-fg-3" />
-              <span class="truncate">{engineLabel(s, session?.id ? session.engine : choice?.engine, session?.id ? session.model : choice?.model)}</span>
-              {session && totalTokens(session.usage) > 0 && <span class="hidden lg:inline">{fmt.num(totalTokens(session.usage))} tok</span>}
-              {session?.id && <ContextMeter context={session.context} autoCompactPercent={s?.agent?.autoCompactPercent} />}
-            </>
-          }
-          tools={
-            <ModelPicker
-              value={choice}
-              onChange={setChoice}
-              lockEngine={session?.id ? session.engine : undefined}
-              current={session?.id ? { engine: session.engine, model: session.model } : null}
-              noDefault={!!session?.id}
+          filtered.map((x) => (
+            <SessionRow
+              key={x.id}
+              s={x}
+              active={x.id === chat.sessionId}
+              href={`#/comms/${encodeURIComponent(x.id)}`}
+              onDeleted={(id) => id === chat.sessionId && location.replace('#/comms/new')}
             />
-          }
-        />
-      </Panel>
-
-      {/* ── context ── */}
-      <Panel code="COM.03" title="Context" class="hidden xl:flex" bodyClass="overflow-y-auto flex flex-col gap-5">
-        {session?.id ? (
-          <SessionStats session={session} lastTurn={chat.lastTurn} />
-        ) : (
-          <div class="text-[12px] text-fg-3 leading-relaxed">
-            New conversation on <span class="font-mono text-fg-2">{engineLabel(s)}</span>. Change the default engine in{' '}
-            <a href="#/config/models" class="text-fg-2 underline decoration-red underline-offset-2">
-              Config → Models
-            </a>
-            .
-          </div>
+          ))
         )}
-        <div>
-          <div class="hud-label mb-2">Quick prompts</div>
-          <div class="flex flex-col">
-            {QUICK.map((q) => (
-              <button
-                key={q}
-                class="text-left text-[12.5px] text-fg-2 hover:text-fg hover:bg-white/[0.02] px-2 py-1.5 border-l border-line hover:border-red disabled:opacity-40"
-                onClick={() => quick(q)}
-                disabled={chat.running || conn.value !== 'open'}
-              >
-                {q}
-              </button>
-            ))}
+      </div>
+    </>
+  );
+
+  const details = (
+    <>
+      {session?.id ? (
+        <SessionStats session={session} lastTurn={chat.lastTurn} />
+      ) : (
+        <p class="text-[13px] text-fg-3 leading-relaxed">
+          New conversations use <span class="text-fg-2">{engineLabel(s)}</span>. You can change the default in{' '}
+          <a href="#/config/models" class="text-fg-2 underline decoration-fg-3 underline-offset-[3px] hover:text-fg">
+            Config → Models
+          </a>
+          .
+        </p>
+      )}
+      <div>
+        <div class="text-[12px] text-fg-3 mb-1.5">Quick prompts</div>
+        <div class="flex flex-col -mx-2">
+          {QUICK.map((q) => (
+            <button
+              key={q}
+              class="text-left text-[13px] text-fg-2 hover:text-fg hover:bg-[var(--bg-raised,#202023)] rounded-[6px] px-2 py-1.5 disabled:opacity-40 transition-colors duration-150"
+              onClick={() => quick(q)}
+              disabled={chat.running || conn.value !== 'open'}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <ChatLayout
+      sidebar={sidebar}
+      routeKey={routeId}
+      detailsOpen={detailsOpen}
+      onDetails={setDetailsOpen}
+      details={details}
+      title={
+        <>
+          <h1 class="truncate text-[15px] font-semibold text-fg">{title}</h1>
+          {session && session.kind !== 'chat' && <Tag>{session.kind}</Tag>}
+          <LiveBadge running={chat.running} />
+        </>
+      }
+    >
+      {chat.loading && !session ? (
+        <div class="flex-1 flex items-center justify-center">
+          <Spinner />
+        </div>
+      ) : chat.error && !session ? (
+        <div class="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <p class="text-[14px] text-fg-2">{chat.error === 'Session not found' || chat.error === 'Session deleted' ? 'This conversation is no longer here.' : 'Couldn’t open this conversation.'}</p>
+          <ErrorLine error={chat.error} />
+          <div class="flex gap-2">
+            {chat.error !== 'Session not found' && chat.error !== 'Session deleted' && (
+              <Btn variant="ghost" onClick={() => void chat.reload()}>
+                Try again
+              </Btn>
+            )}
+            <Btn variant="primary" onClick={newChat}>
+              New chat
+            </Btn>
           </div>
         </div>
-      </Panel>
-    </div>
+      ) : (
+        <Transcript
+          items={session?.items ?? []}
+          sessionId={chat.sessionId}
+          running={chat.running}
+          empty={<EmptyState name={s?.user.name} honorific={s?.user.honorific} assistant={s?.assistant.name} onPick={(t) => void send(t)} />}
+        />
+      )}
+      <Composer
+        onSend={send}
+        onVoiceSend={sendVoice}
+        onAbort={chat.abort}
+        running={chat.running}
+        commands={commands}
+        inject={inject}
+        autoFocus
+        disabled={!!chat.error && !session}
+        placeholder={session?.id ? 'Reply…' : `Message ${s?.assistant.name || 'Monarch'}…`}
+        meta={
+          <>
+            {session?.id && <ContextMeter context={session.context} autoCompactPercent={s?.agent?.autoCompactPercent} />}
+            {session && totalTokens(session.usage) > 0 && <span class="hidden lg:inline tabular-nums">{fmt.num(totalTokens(session.usage))} tokens</span>}
+          </>
+        }
+        tools={
+          <ModelPicker
+            value={choice}
+            onChange={setChoice}
+            lockEngine={session?.id ? session.engine : undefined}
+            current={session?.id ? { engine: session.engine, model: session.model } : null}
+            noDefault={!!session?.id}
+          />
+        }
+      />
+    </ChatLayout>
   );
 }
 
@@ -336,33 +347,15 @@ function EmptyState(props: { name?: string; honorific?: string; assistant?: stri
   const part = hour < 5 ? 'evening' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
   const who = props.honorific || props.name || '';
   return (
-    <div class="h-full flex flex-col items-center justify-center px-6 py-10">
-      <div class="w-10 h-10 border border-line flex items-center justify-center mb-5 relative">
-        <span class="w-2 h-2 bg-red" />
-        <span class="absolute -top-px -left-px w-2 h-2 border-t border-l border-fg-3" />
-        <span class="absolute -bottom-px -right-px w-2 h-2 border-b border-r border-fg-3" />
-      </div>
-      <h2 class="text-xl text-fg font-light tracking-tight">
+    <div class="min-h-full flex flex-col items-center justify-center px-6 py-10 text-center">
+      <span class="w-2.5 h-2.5 rounded-full bg-red mb-6" aria-hidden="true" />
+      <h2 class="text-[22px] text-fg font-semibold tracking-tight">
         Good {part}
         {who ? <>, {who}</> : null}.
       </h2>
-      <p class="text-[13px] text-fg-3 mt-1.5">{props.assistant || 'Monarch'} is standing by. Ask anything, or start with one of these.</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-6 w-full max-w-[640px]">
-        {SUGGESTED.map((p, i) => (
-          <button
-            key={p.title}
-            class="text-left border border-line bg-[#18181a] hover:border-fg-3 hover:bg-subtle/40 px-3 py-2.5 group disabled:opacity-50"
-            onClick={() => props.onPick(p.text)}
-            disabled={conn.value !== 'open'}
-          >
-            <div class="flex items-center gap-2 font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3 group-hover:text-fg-2">
-              {i % 2 ? <Zap size={11} strokeWidth={1.5} /> : <MessageSquare size={11} strokeWidth={1.5} />}
-              <span>P.{String(i + 1).padStart(2, '0')}</span>
-              <span class="text-fg-2">{p.title}</span>
-            </div>
-            <div class="text-[12.5px] text-fg-2 mt-1 leading-snug">{p.text}</div>
-          </button>
-        ))}
+      <p class="text-[14px] text-fg-3 mt-2">What can {props.assistant || 'Monarch'} help you with?</p>
+      <div class="mt-8">
+        <Suggestions items={SUGGESTED.map((p) => p.title)} onPick={(t) => props.onPick(SUGGESTED.find((p) => p.title === t)!.text)} disabled={conn.value !== 'open'} />
       </div>
     </div>
   );

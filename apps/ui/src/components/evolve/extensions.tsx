@@ -28,7 +28,6 @@ export function ExtensionsTab(props: { id?: string; sub?: string }) {
   return (
     <div class="h-full min-h-0 grid gap-3 grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)]">
       <Panel
-        code="EVO.11"
         title="Extensions"
         noPad
         bodyClass="flex flex-col"
@@ -86,7 +85,7 @@ export function ExtensionsTab(props: { id?: string; sub?: string }) {
         ) : selected ? (
           <ExtDetailPane key={selected} id={selected} sub={(SUB as readonly string[]).includes(props.sub ?? '') ? (props.sub as Sub) : 'overview'} />
         ) : (
-          <Panel code="EVO.12" title="Detail" class="flex-1">
+          <Panel title="Detail" class="flex-1">
             <EvoNote label="Select an extension" sub="Inspect its manifest, tools, panels, source and history." />
           </Panel>
         )}
@@ -106,7 +105,7 @@ function ExtRow(props: { x: ExtensionSummary; active: boolean }) {
           <span class="font-mono text-[10px] text-fg-3 shrink-0">v{x.version}</span>
         </span>
         <span class="block text-[11.5px] text-fg-3 truncate mt-0.5">{x.status === 'error' && x.error ? <span class="text-red">{x.error}</span> : x.description || x.id}</span>
-        <span class="flex items-center gap-3 mt-1.5 font-mono text-[10px] tracking-[0.08em] uppercase text-fg-3">
+        <span class="flex items-center gap-3 mt-1.5 text-[12px] text-fg-3">
           <span>{x.origin}</span>
           <span>{x.tools.length} tool{x.tools.length === 1 ? '' : 's'}</span>
           {x.panels.length > 0 && <span>{x.panels.length} panel{x.panels.length === 1 ? '' : 's'}</span>}
@@ -165,7 +164,6 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
 
   return (
     <Panel
-      code="EVO.12"
       title={d?.name ?? props.id}
       class="flex-1"
       noPad
@@ -197,10 +195,10 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
                   {d.description && <p class="text-[13px] text-fg-2 mt-1 leading-relaxed">{d.description}</p>}
                 </div>
                 <div class="flex items-center gap-1.5 flex-wrap">
-                  <label class="flex items-center gap-2 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-2 mr-1 cursor-pointer">
+                  <label class="flex items-center gap-2 text-[12px] text-fg-2 mr-1 cursor-pointer">
                     <input
                       type="checkbox"
-                      class="toggle toggle-xs rounded-[2px] border-line checked:bg-red checked:border-red checked:text-fg"
+                      class="toggle toggle-xs rounded-[6px] border-line checked:bg-red checked:border-red checked:text-fg"
                       checked={d.enabled}
                       disabled={busy !== null}
                       onChange={() => void act('toggle')}

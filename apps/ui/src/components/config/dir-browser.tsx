@@ -56,7 +56,7 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
 
   return (
     <div class="modal modal-open" role="dialog" aria-modal="true" aria-label={props.title ?? 'Choose folder'}>
-      <div class="modal-box hud-panel p-0 max-w-xl w-[calc(100vw-2rem)] rounded-[2px] bg-surface flex flex-col max-h-[80vh]">
+      <div class="modal-box hud-panel p-0 max-w-xl w-[calc(100vw-2rem)] rounded-[6px] bg-surface flex flex-col max-h-[80vh]">
         <header class="hud-head">
           <span class="hud-code">FS.01</span>
           <h2 class="hud-title">{props.title ?? 'Choose folder'}</h2>
@@ -64,7 +64,7 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
         </header>
         <div class="p-3 flex gap-2 border-b border-line">
           <button
-            class="btn btn-sm btn-outline border-line rounded-[2px] text-fg-2 hover:bg-subtle px-2"
+            class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle px-2"
             disabled={!listing?.parent}
             onClick={() => listing?.parent && void go(listing.parent)}
             title="Parent folder"
@@ -79,7 +79,7 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
             spellcheck={false}
             aria-label="Path"
           />
-          <button class="btn btn-sm btn-outline border-line rounded-[2px] text-fg-2 hover:bg-subtle px-2" onClick={() => void go(pathInput)} title="Go">
+          <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle px-2" onClick={() => void go(pathInput)} title="Go">
             <CornerDownLeft size={13} />
           </button>
         </div>
@@ -90,8 +90,8 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
             value={filter}
             onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
           />
-          <label class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3 cursor-pointer">
-            <input type="checkbox" class="checkbox checkbox-xs rounded-[2px]" checked={showHidden} onChange={(e) => setShowHidden((e.target as HTMLInputElement).checked)} />
+          <label class="flex items-center gap-1.5 text-[12px] text-fg-3 cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-xs rounded-[6px]" checked={showHidden} onChange={(e) => setShowHidden((e.target as HTMLInputElement).checked)} />
             hidden
           </label>
         </div>
@@ -109,10 +109,10 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
           <span class="font-mono text-[11px] text-fg-3 truncate flex-1" title={listing?.path}>
             {listing?.path ?? ''}
           </span>
-          <button class="btn btn-sm btn-ghost rounded-[2px] font-mono font-normal uppercase tracking-wider text-[11px] text-fg-2" onClick={props.onClose}>
+          <button class="btn btn-sm btn-ghost rounded-[6px] font-normal text-[12px] text-fg-2" onClick={props.onClose}>
             Cancel
           </button>
-          <button class="btn btn-sm btn-primary rounded-[2px] font-mono font-normal uppercase tracking-wider text-[11px]" disabled={!listing} onClick={() => listing && props.onPick(listing.path)}>
+          <button class="btn btn-sm btn-primary rounded-[6px] font-normal text-[12px]" disabled={!listing} onClick={() => listing && props.onPick(listing.path)}>
             {props.confirmLabel ?? 'Select folder'}
           </button>
         </div>

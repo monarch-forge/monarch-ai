@@ -23,7 +23,7 @@ export function EvolutionSection() {
 
   return (
     <div class="flex flex-col gap-3">
-      <Panel code="CFG.61" title="Self-modification" right={<Tag tone={draft.enabled ? 'red' : 'plain'}>{draft.enabled ? 'enabled' : 'off'}</Tag>}>
+      <Panel title="Self-modification" right={<Tag tone={draft.enabled ? 'red' : 'plain'}>{draft.enabled ? 'enabled' : 'off'}</Tag>}>
         <div class="flex flex-col divide-y divide-line">
           <ToggleRow
             label="Let Monarch extend itself"
@@ -46,7 +46,7 @@ export function EvolutionSection() {
           />
         </div>
       </Panel>
-      <Panel code="CFG.62" title="Reflection">
+      <Panel title="Reflection">
         <Field label="Automatic reflection" hint="A periodic self-review of recent sessions that turns friction — repeated manual steps, failing tools, missing capabilities — into proposals you can build or dismiss." htmlFor="evo-reflect">
           <select id="evo-reflect" class={`${SELECT} max-w-[240px]`} value={draft.reflect} onChange={(e) => set({ reflect: (e.target as HTMLSelectElement).value as Evo['reflect'] })}>
             <option value="off">Off</option>

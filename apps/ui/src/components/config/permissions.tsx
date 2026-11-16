@@ -53,7 +53,7 @@ export function PermissionsSection() {
 
   return (
     <div class="flex flex-col gap-3">
-      <Panel code="CFG.51" title="Approval mode" right={<Tag tone={MODES.find((m) => m.id === draft.mode)?.tone}>{draft.mode}</Tag>}>
+      <Panel title="Approval mode" right={<Tag tone={MODES.find((m) => m.id === draft.mode)?.tone}>{draft.mode}</Tag>}>
         <div class="flex flex-col gap-2" role="radiogroup">
           {MODES.map((m) => {
             const on = draft.mode === m.id;
@@ -62,7 +62,7 @@ export function PermissionsSection() {
                 <input type="radio" name="perm-mode" class={`${RADIO} mt-0.5`} checked={on} onChange={() => set({ mode: m.id })} />
                 <span class="flex-1">
                   <span class="flex items-center gap-2">
-                    <span class="font-mono text-[12px] tracking-[0.12em] uppercase text-fg">{m.title}</span>
+                    <span class=" text-[12px] text-fg">{m.title}</span>
                     <span class="font-mono text-[10px] text-fg-3">{m.asks}</span>
                   </span>
                   <span class="block text-[12.5px] text-fg-2 mt-1 leading-relaxed">{m.body}</span>
@@ -74,12 +74,12 @@ export function PermissionsSection() {
         <div class="text-[11.5px] text-fg-3 mt-3">Pending approvals appear in the dock at the bottom of the screen. “Always for this session” remembers a tool until the session ends.</div>
       </Panel>
 
-      <Panel code="CFG.52" title="Locations">
+      <Panel title="Locations">
         <div class="grid grid-cols-1 gap-4">
           <Field label="Memory vault" hint="Obsidian-compatible folder of markdown notes. Monarch reads and writes its long-term memory here.">
             <div class="flex gap-2">
               <input class={`${INPUT} font-mono`} value={draft.vaultDir} onInput={(e) => set({ vaultDir: (e.target as HTMLInputElement).value })} placeholder="~/.monarch-ai/vault" spellcheck={false} />
-              <button class="btn btn-sm btn-outline border-line rounded-[2px] text-fg-2 hover:bg-subtle font-mono font-normal uppercase text-[11px]" onClick={() => setBrowse('vault')}>
+              <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('vault')}>
                 <FolderOpen size={12} /> Browse
               </button>
             </div>
@@ -99,7 +99,7 @@ export function PermissionsSection() {
                   <option key={w} value={w} />
                 ))}
               </datalist>
-              <button class="btn btn-sm btn-outline border-line rounded-[2px] text-fg-2 hover:bg-subtle font-mono font-normal uppercase text-[11px]" onClick={() => setBrowse('ws')}>
+              <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('ws')}>
                 <FolderOpen size={12} /> Browse
               </button>
             </div>

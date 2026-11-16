@@ -78,17 +78,17 @@ export async function buildBriefing(): Promise<Briefing> {
       if (d.percent > 90) flags.push({ tag: 'SYS', level: 'warn', href: '#/systems', text: `Disk ${d.mount} at ${Math.round(d.percent)}%` });
   }
 
-  const n = flags.length;
+  // only flags that need the user count toward the headline (informational ones are shown as counts elsewhere)
+  const n = flags.filter((f) => f.level !== 'info').length;
   const count = n < WORDS.length ? WORDS[n] : String(n);
+  const busy = flags.some((f) => f.tag === 'SYS' && f.level !== 'info');
   const headline =
     n === 0
-      ? 'All systems nominal. No items require your attention.'
-      : `All systems nominal. ${count} ${n === 1 ? 'item' : 'items'} flagged for your attention.`;
+      ? 'Nothing needs you right now.'
+      : `${count.charAt(0).toUpperCase()}${count.slice(1)} ${n === 1 ? 'thing needs' : 'things need'} your attention.`;
   return {
     greeting: greeting(now),
-    headline: flags.some((f) => f.tag === 'SYS' && f.level !== 'info')
-      ? headline.replace('All systems nominal.', 'System load elevated.')
-      : headline,
+    headline: busy ? `Your machine is working hard. ${headline}` : headline,
     flags,
     nextEvent,
     unreadMail,

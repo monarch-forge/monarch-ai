@@ -16,7 +16,7 @@ export function EvoNote(props: { label: string; sub?: ComponentChildren; spinner
   return (
     <div class={`flex flex-col items-center justify-center gap-2 text-center px-4 py-10 ${props.class ?? ''}`}>
       {props.icon && <Dna size={26} strokeWidth={1} class="text-fg-3 mb-1" />}
-      <div class="flex items-center gap-2 font-mono text-[10px] tracking-[0.16em] uppercase text-fg-3">
+      <div class="flex items-center gap-2 text-[12px] text-fg-3">
         {props.spinner ? <Spinner /> : <span class="inline-block w-1.5 h-1.5 border border-fg-3" />}
         {props.label}
       </div>
@@ -136,7 +136,7 @@ export function errMsg(e: unknown): string {
 
 /** chunky mono textarea used for source / JSON / markdown editing */
 export const CODE_AREA =
-  'w-full bg-[#121213] border border-line rounded-[2px] font-mono text-[12px] leading-[1.6] text-fg p-3 resize-y focus:border-fg-3 [tab-size:2]';
+  'w-full bg-[#121213] border border-line rounded-[6px] font-mono text-[12px] leading-[1.6] text-fg p-3 resize-y focus:border-fg-3 [tab-size:2]';
 
 /** insert two spaces on Tab inside a textarea instead of moving focus (Esc then Tab still leaves) */
 export function tabIndentHandler(e: KeyboardEvent, onValue: (v: string) => void): void {

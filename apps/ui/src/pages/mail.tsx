@@ -8,7 +8,7 @@ import type { GoogleAccount, MailThread, MailThreadSummary } from '@monarch/shar
 import { Inbox, Star, Send, FileText, Mail as MailIcon, Search, PenSquare, Archive as ArchiveIcon, CircleDot, RefreshCw } from 'lucide-preact';
 import { api, qs } from '../lib/api.ts';
 import { navigate, toast, useResource } from '../lib/store.ts';
-import { Btn, Panel, Tag } from '../components/ui.tsx';
+import { Btn } from '../components/ui.tsx';
 import { AccountMark, displayName, LoadError, Loading, StateBlock, shortStamp, useHotkeys } from '../components/mail/kit.tsx';
 import { ThreadReader, type MailAction } from '../components/mail/reader.tsx';
 import { ComposeModal } from '../components/mail/composer.tsx';
@@ -158,118 +158,131 @@ export default function MailPage(props: { params: string[] }) {
 
   if (accRes.data === undefined) {
     return (
-      <div class="h-full p-3">
-        <Panel code="MAIL.01" title="Mail" class="h-full">
-          <div class="h-full flex items-center justify-center">{accRes.error ? <LoadError error={accRes.error} onRetry={accRes.reload} /> : <Loading label="Linking mailboxes" />}</div>
-        </Panel>
+      <div class="h-full flex items-center justify-center p-4">
+        {accRes.error ? <LoadError error={accRes.error} onRetry={accRes.reload} /> : <Loading label="Opening your mailboxes" />}
       </div>
     );
   }
   if (!accounts.length) {
     return (
-      <div class="h-full p-3">
-        <Panel code="MAIL.01" title="Mail" class="h-full">
-          <div class="h-full flex items-center justify-center">
-            <StateBlock icon={<MailIcon size={28} strokeWidth={1} />} title="No Gmail accounts connected">
-              <div>Connect one or more Google accounts and Monarch can read, triage, search and draft mail across all of them — here and from chat.</div>
-              <div class="mt-4">
-                <Btn variant="primary" onClick={() => navigate('config/accounts')}>
-                  Connect an account
-                </Btn>
-              </div>
-            </StateBlock>
+      <div class="h-full flex items-center justify-center p-4">
+        <StateBlock icon={<MailIcon size={30} strokeWidth={1.25} />} title="No mail connected yet">
+          <div>Connect a Google account and Monarch can read, sort, search and draft mail with you — here and from chat.</div>
+          <div class="mt-5">
+            <Btn variant="primary" onClick={() => navigate('config/accounts')}>
+              Connect an account
+            </Btn>
           </div>
-        </Panel>
+        </StateBlock>
       </div>
     );
   }
 
   const viewAccount = accounts.find((a) => a.id === view);
   const labelName = LABELS.find((l) => l.id === labelId)?.name ?? 'Inbox';
+  const unreadCount = threads.filter((t) => t.unread).length;
+  const navRow = (active: boolean) =>
+    `relative w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-md text-[13.5px] transition-colors ${
+      active ? 'bg-white/[0.05] text-fg' : 'text-fg-2 hover:bg-raised hover:text-fg'
+    }`;
 
   return (
-    <div class="h-full p-3 flex gap-3 min-h-0">
-      {/* ── accounts + labels ── */}
-      <Panel code="MAIL.01" title="Mailboxes" class="w-56 shrink-0" noPad bodyClass="flex flex-col overflow-y-auto">
-        <div class="p-2.5 border-b border-line">
-          <Btn variant="primary" class="w-full" onClick={() => setComposeOpen(true)} title="Compose (c)">
-            <PenSquare size={12} /> Compose
-          </Btn>
-        </div>
-        <div class="py-1.5">
-          <div class="hud-label px-3 pt-1.5 pb-1">Accounts</div>
-          <button class="hud-row w-full text-left" data-active={view === 'all'} onClick={() => navigate('mail/all')}>
-            <span class="inline-grid grid-cols-2 gap-px w-1.5 h-1.5 shrink-0">
-              {accounts.slice(0, 4).map((a) => (
-                <AccountMark key={a.id} id={a.id} size={3} />
-              ))}
-            </span>
-            <span class="truncate text-fg">All inboxes</span>
-            {view === 'all' && labelId === 'INBOX' && !q && threads.some((t) => t.unread) && (
-              <span class="ml-auto font-mono text-[10px] text-fg-2">{threads.filter((t) => t.unread).length}</span>
+    <div class="h-full flex gap-4 min-h-0 p-3 sm:p-4 lg:p-5">
+      {/* ── mailboxes (quiet sidebar, lg+) ── */}
+      <aside class="hidden lg:flex w-52 shrink-0 flex-col min-h-0 overflow-y-auto">
+        <Btn variant="primary" class="w-full mb-5" onClick={() => setComposeOpen(true)} title="Compose (c)">
+          <PenSquare size={13} /> Compose
+        </Btn>
+        <div class="px-3 pb-1.5 text-[11px] text-fg-3">Accounts</div>
+        <button class={navRow(view === 'all')} onClick={() => navigate('mail/all')}>
+          <span class="inline-grid grid-cols-2 gap-[2px] w-2 h-2 shrink-0">
+            {accounts.slice(0, 4).map((a) => (
+              <AccountMark key={a.id} id={a.id} size={3} />
+            ))}
+          </span>
+          <span class="truncate">All inboxes</span>
+          {view === 'all' && labelId === 'INBOX' && !q && unreadCount > 0 && <span class="ml-auto font-mono text-[11px] text-fg-3">{unreadCount}</span>}
+        </button>
+        {accounts.map((a) => (
+          <button key={a.id} class={navRow(view === a.id)} onClick={() => navigate(`mail/${enc(a.id)}`)} title={a.error ?? a.email}>
+            <AccountMark id={a.id} size={7} />
+            <span class={`truncate ${a.error ? 'text-fg-3' : ''}`}>{a.label || a.name || a.email.split('@')[0]}</span>
+            {a.error ? (
+              <span class="ml-auto w-1.5 h-1.5 rounded-full bg-red shrink-0" title={a.error} aria-label="Account error" />
+            ) : (
+              (unreadBy.get(a.id) ?? 0) > 0 && labelId === 'INBOX' && !q && <span class="ml-auto font-mono text-[11px] text-fg-3">{unreadBy.get(a.id)}</span>
             )}
           </button>
-          {accounts.map((a) => (
-            <button key={a.id} class="hud-row w-full text-left" data-active={view === a.id} onClick={() => navigate(`mail/${enc(a.id)}`)} title={a.error ?? a.email}>
-              <AccountMark id={a.id} />
-              <span class="min-w-0 flex-1">
-                <span class={`block truncate text-[13px] ${a.error ? 'text-fg-3' : 'text-fg-2'}`}>{a.label || a.name || a.email.split('@')[0]}</span>
-                <span class="block truncate font-mono text-[10px] text-fg-3">{a.email}</span>
-              </span>
-              {a.error ? (
-                <span class="font-mono text-[10px] text-red" title={a.error}>
-                  ERR
-                </span>
-              ) : (
-                (unreadBy.get(a.id) ?? 0) > 0 && labelId === 'INBOX' && !q && <span class="font-mono text-[10px] text-fg-2">{unreadBy.get(a.id)}</span>
-              )}
+        ))}
+        <div class="px-3 pt-6 pb-1.5 text-[11px] text-fg-3">Folders</div>
+        {LABELS.map((l) => {
+          const Icon = l.icon;
+          return (
+            <button key={l.id} class={navRow(labelId === l.id)} onClick={() => setLabelId(l.id)}>
+              <Icon size={14} strokeWidth={1.6} class="text-fg-3 shrink-0" />
+              <span>{l.name}</span>
             </button>
-          ))}
+          );
+        })}
+        <div class="mt-auto pt-6 px-3 text-[11px] text-fg-3/80 leading-relaxed" title="j/k move · Enter open · e archive · s star · m read/unread · r reply · a reply all · c compose · / search">
+          Tip: j / k to move, e to archive, r to reply.
         </div>
-        <div class="py-1.5 border-t border-line">
-          <div class="hud-label px-3 pt-1.5 pb-1">Labels</div>
-          {LABELS.map((l) => {
-            const Icon = l.icon;
-            return (
-              <button key={l.id} class="hud-row w-full text-left" data-active={labelId === l.id} onClick={() => setLabelId(l.id)}>
-                <Icon size={13} strokeWidth={1.5} class="text-fg-3 shrink-0" />
-                <span class="text-fg-2 text-[13px]">{l.name}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div class="mt-auto px-3 py-2 border-t border-line font-mono text-[10px] text-fg-3 leading-relaxed tracking-wider">
-          J/K MOVE · ⏎ OPEN · E ARCH
-          <br />S STAR · M READ · R REPLY
-        </div>
-      </Panel>
+      </aside>
 
       {/* ── thread list ── */}
-      <Panel
-        code="MAIL.02"
-        title={`${viewAccount ? viewAccount.label || viewAccount.email : 'All'} / ${labelName}`}
-        class="w-[380px] xl:w-[420px] shrink-0"
-        noPad
-        bodyClass="flex flex-col"
-        right={
-          <button class="text-fg-3 hover:text-fg" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
-            <RefreshCw size={12} class={listRes.loading ? 'animate-spin' : ''} />
+      <section class={`${threadId ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 w-full lg:w-[360px] xl:w-[400px] shrink-0 bg-surface rounded-[10px] overflow-hidden`}>
+        {/* narrow-screen mailbox switcher */}
+        <div class="lg:hidden flex items-center gap-2 px-3 pt-3">
+          <select
+            class="flex-1 min-w-0 bg-subtle rounded-md text-[13px] text-fg px-2 py-1.5 outline-none"
+            value={view}
+            onChange={(e) => navigate(`mail/${enc((e.target as HTMLSelectElement).value)}`)}
+            aria-label="Mailbox"
+          >
+            <option value="all">All inboxes</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label || a.name || a.email}
+              </option>
+            ))}
+          </select>
+          <select
+            class="bg-subtle rounded-md text-[13px] text-fg px-2 py-1.5 outline-none"
+            value={labelId}
+            onChange={(e) => setLabelId((e.target as HTMLSelectElement).value)}
+            aria-label="Folder"
+          >
+            {LABELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          <Btn variant="primary" size="sm" onClick={() => setComposeOpen(true)} title="Compose (c)" aria-label="Compose">
+            <PenSquare size={13} />
+          </Btn>
+        </div>
+        <div class="flex items-baseline gap-2 px-4 pt-4 pb-2">
+          <h1 class="text-[16px] font-semibold text-fg truncate">{labelName}</h1>
+          <span class="text-[12.5px] text-fg-3 truncate">{viewAccount ? viewAccount.label || viewAccount.email : 'all inboxes'}</span>
+          <button class="ml-auto p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
+            <RefreshCw size={13} class={listRes.loading ? 'animate-spin' : ''} />
           </button>
-        }
-      >
+        </div>
         <form
-          class="p-2.5 border-b border-line"
+          class="px-3 pb-2"
           onSubmit={(e) => {
             e.preventDefault();
             setQ(qInput.trim());
           }}
         >
           <label class="relative block">
-            <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+            <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="hud-input py-1.5! pl-7! text-[13px]!"
-              placeholder="Search · from:pepper is:unread newer_than:7d"
+              class="w-full bg-white/[0.04] rounded-md pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+              placeholder="Search mail"
+              title="Gmail search syntax works: from:pepper is:unread newer_than:7d"
               value={qInput}
               onInput={(e) => setQInput((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => {
@@ -283,8 +296,8 @@ export default function MailPage(props: { params: string[] }) {
             />
           </label>
           {q && (
-            <div class="flex items-center gap-2 mt-2 font-mono text-[10px] text-fg-3 tracking-wider">
-              QUERY <span class="text-fg-2 truncate">{q}</span>
+            <div class="flex items-center gap-2 mt-2 px-1 text-[12px] text-fg-3">
+              Results for <span class="text-fg-2 truncate">“{q}”</span>
               <button
                 type="button"
                 class="ml-auto hover:text-fg"
@@ -293,18 +306,18 @@ export default function MailPage(props: { params: string[] }) {
                   setQInput('');
                 }}
               >
-                CLEAR
+                Clear
               </button>
             </div>
           )}
         </form>
-        <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto" role="listbox" aria-label="Threads">
+        <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto px-1.5 pb-2" role="listbox" aria-label="Threads">
           {listRes.error && !threads.length ? (
             <LoadError error={listRes.error} onRetry={listRes.reload} />
           ) : listRes.data === undefined ? (
-            <Loading label="Fetching threads" />
+            <Loading label="Fetching mail" />
           ) : !threads.length ? (
-            <StateBlock title={q ? 'No results' : `${labelName} is empty`}>{q ? 'Try a broader Gmail query.' : 'Nothing here. Enjoy the quiet.'}</StateBlock>
+            <StateBlock title={q ? 'Nothing matches that search' : 'All clear'}>{q ? 'Try fewer or broader words.' : `${labelName} is empty. Enjoy the quiet.`}</StateBlock>
           ) : (
             threads.map((t, i) => {
               const active = t.id === threadId;
@@ -315,41 +328,35 @@ export default function MailPage(props: { params: string[] }) {
                   data-idx={i}
                   role="option"
                   aria-selected={active}
-                  class={`w-full text-left px-3 py-2.5 border-b border-line/60 border-l-2 ${
-                    active ? 'bg-subtle border-l-red' : i === cursor ? 'bg-white/[0.025] border-l-fg-3' : 'border-l-transparent hover:bg-white/[0.02]'
+                  class={`relative w-full text-left px-3 py-3 rounded-md transition-colors ${
+                    active ? 'bg-white/[0.06]' : i === cursor ? 'bg-white/[0.035]' : 'hover:bg-raised'
                   }`}
                   onClick={() => {
                     setCursor(i);
                     openThread(t);
                   }}
                 >
+                  {active && <span class="absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-red" />}
                   <div class="flex items-center gap-2">
-                    {t.unread ? <span class="w-1.5 h-1.5 bg-red shrink-0" title="Unread" /> : <span class="w-1.5 shrink-0" />}
-                    <span class={`truncate text-[13px] ${t.unread ? 'text-fg font-semibold' : 'text-fg-2'}`}>{displayName(t.from) || '(unknown)'}</span>
-                    {t.messageCount > 1 && <span class="font-mono text-[10px] text-fg-3">{t.messageCount}</span>}
-                    {starred && <Star size={10} class="text-fg-2 shrink-0" fill="currentColor" />}
-                    <span class="ml-auto flex items-center gap-1.5 shrink-0">
-                      {view === 'all' && <AccountMark id={t.accountId} size={5} title={accounts.find((a) => a.id === t.accountId)?.email} />}
-                      <span class={`font-mono text-[10px] ${t.unread ? 'text-fg-2' : 'text-fg-3'}`} title={t.date}>
-                        {shortStamp(t.date)}
-                      </span>
+                    {view === 'all' && <AccountMark id={t.accountId} size={6} title={accounts.find((a) => a.id === t.accountId)?.email} />}
+                    <span class={`truncate text-[13.5px] ${t.unread ? 'text-fg font-semibold' : 'text-fg-2'}`}>{displayName(t.from) || '(unknown)'}</span>
+                    {t.messageCount > 1 && <span class="font-mono text-[11px] text-fg-3">{t.messageCount}</span>}
+                    {starred && <Star size={11} class="text-warning/80 shrink-0" fill="currentColor" />}
+                    <span class={`ml-auto shrink-0 font-mono text-[11px] ${t.unread ? 'text-fg-2' : 'text-fg-3'}`} title={t.date}>
+                      {shortStamp(t.date)}
                     </span>
                   </div>
-                  <div class={`pl-3.5 truncate text-[13px] mt-0.5 ${t.unread ? 'text-fg' : 'text-fg-2'}`}>{t.subject || '(no subject)'}</div>
-                  <div class="pl-3.5 truncate text-xs text-fg-3 mt-0.5">{t.snippet}</div>
+                  <div class={`truncate text-[13px] mt-0.5 ${t.unread ? 'text-fg font-medium' : 'text-fg-2'}`}>{t.subject || '(no subject)'}</div>
+                  <div class="truncate text-[12.5px] text-fg-3 mt-0.5">{t.snippet}</div>
                 </button>
               );
             })
           )}
         </div>
-        <div class="px-3 py-1.5 border-t border-line font-mono text-[10px] tracking-widest uppercase text-fg-3 flex gap-3">
-          <span>{threads.length} threads</span>
-          {threads.some((t) => t.unread) && <span class="text-fg-2">{threads.filter((t) => t.unread).length} unread</span>}
-        </div>
-      </Panel>
+      </section>
 
       {/* ── reader ── */}
-      <Panel code="MAIL.03" title="Thread" class="flex-1 min-w-0" noPad bodyClass="flex flex-col" right={threadId && threadRes.data ? <Tag>{threadRes.data.messages?.length ?? 0} msg</Tag> : undefined}>
+      <section class={`${threadId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
         {threadId && threadAcct ? (
           <ThreadReader
             accountId={threadAcct}
@@ -366,15 +373,15 @@ export default function MailPage(props: { params: string[] }) {
             setReplyMode={setReplyMode}
           />
         ) : threadId && listRes.data === undefined ? (
-          <Loading label="Locating thread" />
+          <Loading label="Finding that conversation" />
         ) : (
           <div class="h-full flex items-center justify-center">
-            <StateBlock icon={<MailIcon size={26} strokeWidth={1} />} title={threadId ? 'Thread not found' : 'No thread selected'}>
-              {threadId ? 'It may have been archived or belongs to another account.' : 'Pick a thread, or press C to compose. Monarch can also summarize and draft replies for you.'}
+            <StateBlock icon={<MailIcon size={28} strokeWidth={1.25} />} title={threadId ? 'Couldn’t find that conversation' : 'Pick a conversation to read'}>
+              {threadId ? 'It may have been archived, or it lives in another account.' : 'Or press C to write something new. Monarch can also summarize threads and draft replies.'}
             </StateBlock>
           </div>
         )}
-      </Panel>
+      </section>
 
       <ComposeModal open={composeOpen} onClose={() => setComposeOpen(false)} accounts={accounts} defaultAccount={view !== 'all' ? view : undefined} />
     </div>

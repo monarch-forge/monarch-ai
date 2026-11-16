@@ -123,22 +123,22 @@ export function ModelPicker(props: {
     <div ref={rootRef} class={`relative ${props.class ?? ''}`}>
       <button
         type="button"
-        class={`flex items-center gap-1.5 max-w-[240px] h-7 px-2 border font-mono text-[10.5px] tracking-[0.06em] transition-colors ${
-          open ? 'border-fg-3 text-fg' : 'border-line text-fg-2 hover:text-fg hover:border-fg-3'
+        class={`flex items-center gap-1.5 max-w-[240px] h-7 px-2 rounded-[6px] text-[12px] transition-colors duration-150 ${
+          open ? 'bg-[var(--bg-raised,#202023)] text-fg' : 'text-fg-3 hover:text-fg hover:bg-[var(--bg-raised,#202023)]'
         } ${props.buttonClass ?? ''}`}
         onClick={() => setOpen(!open)}
         title={props.title ?? 'Model for this session'}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        {props.leading ?? <span class={`inline-block w-1.5 h-1.5 shrink-0 ${props.value ? 'bg-red' : 'bg-fg-3'}`} />}
+        {props.leading ?? <span class={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${props.value ? 'bg-red' : 'bg-fg-3'}`} />}
         <span class="truncate">{props.renderLabel ? props.renderLabel(shownInfo, shown) : label}</span>
         <ChevronUp size={11} strokeWidth={1.75} class={`shrink-0 transition-transform ${(props.placement === 'down') !== open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div class={`absolute ${props.placement === 'down' ? 'top-full mt-1.5' : 'bottom-full mb-1.5'} right-0 z-50 w-[340px] max-w-[80vw] border border-line bg-surface shadow-[0_8px_24px_rgb(0_0_0/0.45)] flex flex-col`}>
-          <label class="flex items-center gap-2 px-2.5 border-b border-line">
+        <div class={`absolute ${props.placement === 'down' ? 'top-full mt-1.5' : 'bottom-full mb-1.5'} ${props.placement === 'down' ? 'right-0' : 'left-0'} z-50 w-[340px] max-w-[80vw] rounded-[14px] overflow-hidden bg-[var(--bg-surface)] shadow-[0_12px_32px_rgb(0_0_0/.45)] flex flex-col`}>
+          <label class="flex items-center gap-2 px-3 bg-[var(--bg-raised,#202023)]/50">
             <Search size={12} strokeWidth={1.75} class="text-fg-3 shrink-0" />
             <input
               ref={searchRef}
@@ -152,7 +152,7 @@ export function ModelPicker(props: {
             {!props.noDefault && !q && (
               <Row selected={!props.value} onClick={() => pick(null)} name={`Default`} sub={def ? `${def.engine === 'pi' ? 'pi' : 'claude'} · ${def.model} — set in Config` : 'set in Config'} />
             )}
-            {models.loading && !models.data && <div class="px-3 py-3 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3">Loading models…</div>}
+            {models.loading && !models.data && <div class="px-3 py-3 text-[12px] text-fg-3">Loading models…</div>}
             {models.error && <div class="px-3 py-3 font-mono text-[11px] text-red">{models.error}</div>}
             {models.data && !groups.length && (
               <div class="px-3 py-3 text-[12px] text-fg-3">{q ? 'No matching models.' : 'No configured providers. Add one in Config → Providers.'}</div>
@@ -161,7 +161,7 @@ export function ModelPicker(props: {
               const locked = !!props.lockEngine && g.engine !== props.lockEngine;
               return (
                 <div key={g.key} class="py-1">
-                  <div class="flex items-center justify-between px-3 pt-1.5 pb-1 font-mono text-[9.5px] tracking-[0.16em] uppercase text-fg-3">
+                  <div class="flex items-center justify-between px-3 pt-1.5 pb-1 text-[11.5px] font-medium text-fg-3">
                     <span>{g.label}</span>
                     {locked && <span class="normal-case tracking-normal">new session only</span>}
                   </div>
@@ -182,12 +182,12 @@ export function ModelPicker(props: {
             })}
           </div>
           {props.placement === 'down' && !props.lockEngine && (
-            <div class="px-3 py-1.5 border-t border-line text-[10.5px] text-fg-3">
+            <div class="px-3 py-2 text-[11.5px] text-fg-3 bg-[var(--bg-primary)]/40">
               Default for new sessions. Open sessions keep their own model.
             </div>
           )}
           {props.lockEngine && (
-            <div class="px-3 py-1.5 border-t border-line text-[10.5px] text-fg-3">
+            <div class="px-3 py-2 text-[11.5px] text-fg-3 bg-[var(--bg-primary)]/40">
               Switching applies from your next message. Other engines need a new session.
             </div>
           )}
@@ -204,9 +204,9 @@ function Row(props: { name: string; sub?: string; selected: boolean; disabled?: 
       role="option"
       aria-selected={props.selected}
       disabled={props.disabled}
-      class={`w-full flex items-center gap-2 px-3 py-1.5 text-left border-l-2 ${
-        props.selected ? 'border-red bg-subtle' : 'border-transparent'
-      } ${props.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/[0.03]'}`}
+      class={`w-full flex items-center gap-2 px-3 py-2 text-left ${props.selected ? 'bg-[var(--bg-raised,#202023)]' : ''} ${
+        props.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[var(--bg-raised,#202023)]'
+      }`}
       onClick={props.onClick}
     >
       <span class="flex-1 min-w-0">

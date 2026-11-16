@@ -37,7 +37,7 @@ export function AccountMark(props: { id?: string | null; size?: number; title?: 
   return (
     <span
       class={`inline-block shrink-0 ${props.class ?? ''}`}
-      style={{ width: `${s}px`, height: `${s}px`, background: accountColor(props.id) }}
+      style={{ width: `${s}px`, height: `${s}px`, background: accountColor(props.id), borderRadius: '999px' }}
       title={props.title}
       aria-hidden={props.title ? undefined : 'true'}
     />
@@ -81,7 +81,7 @@ export function Modal(props: {
       const box = boxRef.current;
       const el =
         box?.querySelector<HTMLElement>('[data-autofocus]') ??
-        box?.querySelector<HTMLElement>('.hud-body input:not([type=checkbox]):not([type=hidden]), .hud-body textarea, .hud-body select') ??
+        box?.querySelector<HTMLElement>('[data-modal-body] input:not([type=checkbox]):not([type=hidden]), [data-modal-body] textarea, [data-modal-body] select') ??
         box?.querySelector<HTMLElement>('footer button:last-child');
       el?.focus();
     }, 20);
@@ -96,21 +96,26 @@ export function Modal(props: {
   // overflow / stacking context (e.g. the automation editor's Delete button)
   return createPortal(
     <div
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 backdrop-blur-[2px] p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) props.onClose();
       }}
     >
-      <div ref={boxRef} role="dialog" aria-modal="true" aria-label={props.title} class={`hud-panel w-full max-h-[90vh] ${props.width ?? 'max-w-lg'}`}>
-        <header class="hud-head">
-          {props.code && <span class="hud-code">{props.code}</span>}
-          <h2 class="hud-title">{props.title}</h2>
-          <button class="ml-auto text-fg-3 hover:text-fg" onClick={props.onClose} title="Close (Esc)" aria-label="Close">
-            <X size={14} />
+      <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={props.title}
+        class={`w-full max-h-[90vh] flex flex-col bg-surface rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] overflow-hidden ${props.width ?? 'max-w-lg'}`}
+      >
+        <header class="flex items-center gap-3 px-5 pt-4 pb-2">
+          <h2 class="text-[15px] font-semibold text-fg">{props.title}</h2>
+          <button class="ml-auto -mr-1 p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" onClick={props.onClose} title="Close (Esc)" aria-label="Close">
+            <X size={15} />
           </button>
         </header>
-        <div class="hud-body overflow-y-auto">{props.children}</div>
-        {props.footer && <footer class="flex items-center gap-2 justify-end px-3.5 py-2.5 border-t border-line">{props.footer}</footer>}
+        <div data-modal-body class="px-5 pb-4 pt-1 overflow-y-auto min-h-0 flex-1">{props.children}</div>
+        {props.footer && <footer class="flex items-center gap-2 justify-end px-5 py-3.5 bg-black/10">{props.footer}</footer>}
       </div>
     </div>
     ,document.body,
@@ -128,7 +133,6 @@ export function useConfirm(): [ComponentChildren, (o: { title: string; body?: Co
     <Modal
       open={!!state}
       onClose={() => close(false)}
-      code="CNF"
       title={state?.title ?? ''}
       width="max-w-md"
       footer={
@@ -156,9 +160,9 @@ export function useConfirm(): [ComponentChildren, (o: { title: string; body?: Co
 export function StateBlock(props: { icon?: ComponentChildren; title: string; children?: ComponentChildren; class?: string }) {
   return (
     <div class={`flex flex-col items-center justify-center text-center gap-3 px-6 py-10 ${props.class ?? ''}`}>
-      {props.icon && <div class="text-fg-3">{props.icon}</div>}
-      <div class="hud-label text-fg-2">{props.title}</div>
-      {props.children && <div class="text-xs text-fg-3 max-w-sm leading-relaxed">{props.children}</div>}
+      {props.icon && <div class="text-fg-3/80">{props.icon}</div>}
+      <div class="text-[14.5px] font-medium text-fg-2">{props.title}</div>
+      {props.children && <div class="text-[13px] text-fg-3 max-w-sm leading-relaxed">{props.children}</div>}
     </div>
   );
 }
@@ -166,8 +170,8 @@ export function StateBlock(props: { icon?: ComponentChildren; title: string; chi
 /** inline loading line */
 export function Loading(props: { label?: string; class?: string }) {
   return (
-    <div class={`flex items-center gap-2 hud-label px-3 py-4 ${props.class ?? ''}`}>
-      <Spinner /> {props.label ?? 'Loading'}
+    <div class={`flex items-center gap-2 text-[12.5px] text-fg-3 px-4 py-5 ${props.class ?? ''}`}>
+      <Spinner /> {props.label ?? 'Loading'}…
     </div>
   );
 }
@@ -177,8 +181,8 @@ export function LoadError(props: { error?: string; onRetry?: () => void; class?:
   if (!props.error) return null;
   const offline = conn.value !== 'open' || /offline/i.test(props.error);
   return (
-    <StateBlock class={props.class} title={offline ? 'Core offline' : 'Request failed'}>
-      <div>{offline ? 'The Monarch core is unreachable. Retrying automatically when the link is back.' : props.error}</div>
+    <StateBlock class={props.class} title={offline ? 'Monarch is offline' : 'That didn’t work'}>
+      <div>{offline ? 'The core can’t be reached right now. We’ll try again as soon as it’s back.' : props.error}</div>
       {props.onRetry && (
         <div class="mt-3">
           <Btn size="xs" onClick={props.onRetry}>

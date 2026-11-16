@@ -4,7 +4,7 @@ import type { Automation } from '@monarch/shared';
 import { Play, Pencil, Plus, Trash, ArrowUpRight } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Btn, Panel, Tag } from '../ui.tsx';
+import { Btn } from '../ui.tsx';
 import { Button, LoadError, Loading, Modal, relTime, StateBlock, useConfirm } from '../mail/kit.tsx';
 
 const PRESETS: { id: string; label: string; schedule: string }[] = [
@@ -96,32 +96,30 @@ export function AutomationsPanel(props: { class?: string }) {
   };
 
   return (
-    <Panel
-      code="AUT.01"
-      title="Automations"
-      class={props.class}
-      noPad
-      bodyClass="flex flex-col min-h-0"
-      right={
-        <>
-          <Tag>{list.filter((a) => a.enabled).length} active</Tag>
-          <button class="text-fg-3 hover:text-fg" title="New automation" aria-label="New automation" onClick={() => setEdit({ notify: true, enabled: true, schedule: '0 8 * * 1-5' })}>
-            <Plus size={14} />
-          </button>
-        </>
-      }
-    >
-      <div class="flex-1 min-h-0 overflow-y-auto">
+    <section class={`flex flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden ${props.class ?? ''}`}>
+      <header class="flex items-baseline gap-2 px-4 pt-4 pb-2">
+        <h2 class="text-[14.5px] font-semibold text-fg">Automations</h2>
+        {list.length > 0 && <span class="text-[12px] text-fg-3">{list.filter((a) => a.enabled).length} running on a schedule</span>}
+        <button
+          class="ml-auto self-center p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
+          title="New automation"
+          aria-label="New automation"
+          onClick={() => setEdit({ notify: true, enabled: true, schedule: '0 8 * * 1-5' })}
+        >
+          <Plus size={15} />
+        </button>
+      </header>
+      <div class="flex-1 min-h-0 overflow-y-auto px-1.5 pb-3">
         {res.error && !res.data ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : res.data === undefined ? (
           <Loading label="Loading automations" />
         ) : !list.length ? (
-          <StateBlock title="No automations">
-            <div>Let Monarch work on a schedule. Start from an example:</div>
+          <StateBlock title="Nothing scheduled">
+            <div>Let Monarch do things on a schedule. Start from an example:</div>
             <div class="flex flex-wrap justify-center gap-1.5 mt-3">
               {EXAMPLES.map((x) => (
-                <Btn key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
+                <Btn key={x.name} size="xs" variant="ghost" onClick={() => setEdit({ ...x, enabled: true })}>
                   {x.name}
                 </Btn>
               ))}
@@ -129,46 +127,47 @@ export function AutomationsPanel(props: { class?: string }) {
           </StateBlock>
         ) : (
           list.map((a) => (
-            <div key={a.id} class={`group px-3 py-2.5 border-b border-line/60 ${a.enabled ? '' : 'opacity-60'}`}>
+            <div key={a.id} class={`group px-2.5 py-2.5 rounded-md hover:bg-raised transition-colors ${a.enabled ? '' : 'opacity-60'}`}>
               <div class="flex items-center gap-2">
                 <span
-                  class={`w-1.5 h-1.5 shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success' : 'border border-fg-3'}`}
+                  class={`w-1.5 h-1.5 rounded-full shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success/80' : 'border border-fg-3'}`}
                   title={a.lastStatus === 'error' ? 'Last run failed' : a.enabled ? 'Enabled' : 'Disabled'}
                 />
-                <button class="text-[13px] text-fg truncate text-left hover:underline decoration-fg-3 underline-offset-2" onClick={() => setEdit(a)}>
+                <button class="text-[13.5px] text-fg truncate text-left" onClick={() => setEdit(a)}>
                   {a.name}
                 </button>
                 <span class="ml-auto flex items-center gap-1">
-                  <button class="p-1 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
+                  <button class="p-1 rounded-md text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100 focus:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
                     <Pencil size={12} />
                   </button>
-                  <button class="p-1 text-fg-3 hover:text-fg disabled:opacity-40" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>
+                  <button class="p-1 rounded-md text-fg-3 hover:text-fg disabled:opacity-40 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>
                     {running[a.id] ? <span class="loading loading-spinner loading-xs" /> : <Play size={12} />}
                   </button>
                   <input
                     type="checkbox"
-                    class="toggle toggle-xs ml-1 checked:bg-red checked:border-red"
+                    class="toggle toggle-xs ml-1"
                     checked={a.enabled}
                     onChange={() => void patch(a, { enabled: !a.enabled })}
                     aria-label={a.enabled ? `Disable ${a.name}` : `Enable ${a.name}`}
                   />
                 </span>
               </div>
-              <div class="flex items-center gap-2 mt-1 pl-3.5 font-mono text-[10px] text-fg-3">
-                <span class="text-fg-2" title={a.schedule}>
+              <div class="flex items-center gap-2 mt-0.5 pl-3.5 text-[12px] text-fg-3">
+                <span title={a.schedule}>
                   {describeSchedule(a.schedule)}
                 </span>
                 {a.enabled && a.nextRunAt && <span title={new Date(a.nextRunAt).toLocaleString()}>· next {relTime(a.nextRunAt)}</span>}
                 {a.lastRunAt && (
                   <span class="ml-auto" title={new Date(a.lastRunAt).toLocaleString()}>
-                    {a.lastStatus === 'error' ? <span class="text-red">ERR</span> : a.lastStatus === 'ok' ? 'OK' : ''} {relTime(a.lastRunAt)}
+                    {a.lastStatus === 'error' ? <span class="text-red/90">failed</span> : 'ran'} {relTime(a.lastRunAt)}
                   </span>
                 )}
               </div>
-              {a.lastResult && <div class={`pl-3.5 mt-1 text-[11px] leading-snug line-clamp-2 ${a.lastStatus === 'error' ? 'text-red/90' : 'text-fg-3'}`}>{a.lastResult}</div>}
+              {a.lastResult && a.lastStatus === 'error' && <div class="pl-3.5 mt-1 text-[12px] leading-snug line-clamp-2 text-red/80">{a.lastResult}</div>}
+              {a.lastResult && a.lastStatus !== 'error' && <div class="pl-3.5 mt-1 text-[12px] leading-snug line-clamp-1 text-fg-3 hidden group-hover:block">{a.lastResult}</div>}
               {runs[a.id] && (
-                <a href={`#/comms/${encodeURIComponent(runs[a.id])}`} class="pl-3.5 mt-1 inline-flex items-center gap-1 font-mono text-[10px] tracking-wider text-fg-2 hover:text-fg">
-                  VIEW RUN <ArrowUpRight size={10} />
+                <a href={`#/comms/${encodeURIComponent(runs[a.id])}`} class="pl-3.5 mt-1 inline-flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg">
+                  View run <ArrowUpRight size={10} />
                 </a>
               )}
             </div>
@@ -176,7 +175,7 @@ export function AutomationsPanel(props: { class?: string }) {
         )}
       </div>
       <AutomationModal value={edit} onClose={() => setEdit(null)} onSaved={() => void res.reload()} />
-    </Panel>
+    </section>
   );
 }
 
@@ -226,13 +225,12 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
     }
   };
 
-  const lab = 'hud-label';
+  const lab = 'text-[12.5px] text-fg-2';
   return (
     <>
       <Modal
         open={!!v}
         onClose={props.onClose}
-        code="AUT.E"
         title={editing ? 'Edit automation' : 'New automation'}
         width="max-w-xl"
         footer={
@@ -258,7 +256,7 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
               {EXAMPLES.map((x) => (
                 <button
                   key={x.name}
-                  class="font-mono text-[10px] tracking-wider uppercase border border-line px-1.5 py-0.5 text-fg-2 hover:text-fg hover:border-fg-3"
+                  class="text-[12px] rounded-full bg-subtle px-2.5 py-0.5 text-fg-2 hover:text-fg hover:bg-white/[0.08] transition-colors"
                   onClick={() => {
                     setF({ ...f, name: x.name, schedule: x.schedule, prompt: x.prompt, notify: x.notify });
                     setPreset(PRESETS.find((p) => p.schedule === x.schedule)?.id ?? 'custom');
@@ -277,7 +275,7 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
             <label class="flex flex-col gap-1.5">
               <span class={lab}>Schedule</span>
               <select
-                class="select select-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px]"
+                class="select select-sm w-full bg-white/[0.04] border-line text-[13px] rounded-md"
                 value={preset}
                 onChange={(e) => {
                   const id = (e.target as HTMLSelectElement).value;
@@ -308,7 +306,7 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
               />
             </label>
           </div>
-          <div class="font-mono text-[10px] text-fg-3 -mt-1.5">→ {describeSchedule(f.schedule)} · cron (5 fields), “every 30m / 2h” or “daily HH:MM”</div>
+          <div class="text-[11.5px] text-fg-3 -mt-1.5">→ {describeSchedule(f.schedule)} · cron (5 fields), “every 30m / 2h” or “daily HH:MM”</div>
           <label class="flex flex-col gap-1.5">
             <span class={lab}>Prompt</span>
             <textarea
@@ -319,12 +317,12 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
             />
           </label>
           <div class="flex items-center gap-5">
-            <label class="flex items-center gap-2 text-xs text-fg-2 cursor-pointer">
-              <input type="checkbox" class="toggle toggle-xs checked:bg-red checked:border-red" checked={f.notify} onChange={(e) => setF({ ...f, notify: (e.target as HTMLInputElement).checked })} />
+            <label class="flex items-center gap-2 text-[13px] text-fg-2 cursor-pointer">
+              <input type="checkbox" class="toggle toggle-xs" checked={f.notify} onChange={(e) => setF({ ...f, notify: (e.target as HTMLInputElement).checked })} />
               Notify me with the result
             </label>
-            <label class="flex items-center gap-2 text-xs text-fg-2 cursor-pointer">
-              <input type="checkbox" class="toggle toggle-xs checked:bg-red checked:border-red" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: (e.target as HTMLInputElement).checked })} />
+            <label class="flex items-center gap-2 text-[13px] text-fg-2 cursor-pointer">
+              <input type="checkbox" class="toggle toggle-xs" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: (e.target as HTMLInputElement).checked })} />
               Enabled
             </label>
           </div>
@@ -379,10 +377,10 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
   };
 
   return (
-    <div class="border-b border-line">
+    <div class="pb-2">
       <div class="flex items-center gap-2 px-3 pt-2 pb-1">
-        <span class="hud-label">Active</span>
-        <span class="font-mono text-[10px] text-fg-3">{list.filter((a) => a.enabled).length}/{list.length}</span>
+        <span class="text-[12px] text-fg-2">Automations</span>
+        <span class="font-mono text-[11px] text-fg-3">{list.filter((a) => a.enabled).length}/{list.length}</span>
         <button class="ml-auto text-fg-3 hover:text-fg" title="New automation" aria-label="New automation" onClick={() => setEdit({ notify: true, enabled: true, schedule: '0 8 * * 1-5' })}>
           <Plus size={13} />
         </button>
@@ -390,9 +388,9 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
       {res.error && !res.data ? (
         <LoadError error={res.error} onRetry={res.reload} />
       ) : res.data === undefined ? (
-        <div class="px-3 pb-2 font-mono text-[10px] text-fg-3">Loading…</div>
+        <div class="px-3 pb-2 text-[12px] text-fg-3">Loading…</div>
       ) : !list.length ? (
-        <div class="px-3 pb-2.5 text-[11.5px] text-fg-3 leading-snug">None registered. Ask Monarch (“remind me every morning…”) or add one with +.</div>
+        <div class="px-3 pb-2.5 text-[12px] text-fg-3 leading-snug">Nothing scheduled yet. Ask Monarch (“remind me every morning…”) or add one with +.</div>
       ) : (
         <div class="max-h-[40vh] overflow-y-auto pb-1">
           {list.map((a) => {
@@ -401,12 +399,13 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
               <div
                 key={a.id}
                 data-automation={a.id}
-                class={`group px-3 py-1.5 cursor-pointer border-l-2 ${sel ? 'border-red bg-white/[0.03]' : props.highlight === a.id ? 'border-fg-3' : 'border-transparent hover:bg-white/[0.02]'} ${a.enabled ? '' : 'opacity-60'}`}
+                class={`relative group mx-1 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${sel ? 'bg-white/[0.05]' : props.highlight === a.id ? 'bg-white/[0.03]' : 'hover:bg-raised'} ${a.enabled ? '' : 'opacity-60'}`}
                 onClick={() => props.onSelect(sel ? null : a)}
                 title={sel ? 'Show all runs' : 'Show runs of this automation'}
               >
                 <div class="flex items-center gap-1.5">
-                  <span class={`w-1.5 h-1.5 shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success' : 'border border-fg-3'}`} />
+                  {sel && <span class="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red" />}
+                  <span class={`w-1.5 h-1.5 rounded-full shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success/80' : 'border border-fg-3'}`} />
                   <span class="text-[12.5px] text-fg truncate">{a.name}</span>
                   <span class="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                     <button class="p-0.5 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
@@ -417,17 +416,17 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
                     </button>
                     <input
                       type="checkbox"
-                      class="toggle toggle-xs ml-0.5 checked:bg-red checked:border-red"
+                      class="toggle toggle-xs ml-0.5"
                       checked={a.enabled}
                       onChange={() => void patch(a, { enabled: !a.enabled })}
                       aria-label={a.enabled ? `Disable ${a.name}` : `Enable ${a.name}`}
                     />
                   </span>
                 </div>
-                <div class="flex items-center gap-1.5 pl-3 font-mono text-[10px] text-fg-3 min-w-0">
-                  <span class="text-fg-2 truncate" title={a.schedule}>{describeSchedule(a.schedule)}</span>
+                <div class="flex items-center gap-1.5 pl-3 text-[11.5px] text-fg-3 min-w-0">
+                  <span class="truncate" title={a.schedule}>{describeSchedule(a.schedule)}</span>
                   {a.enabled && a.nextRunAt && <span class="shrink-0" title={new Date(a.nextRunAt).toLocaleString()}>· {relTime(a.nextRunAt)}</span>}
-                  {a.lastStatus && <span class={`ml-auto shrink-0 ${a.lastStatus === 'error' ? 'text-red' : ''}`} title={a.lastRunAt ? `Last run ${new Date(a.lastRunAt).toLocaleString()}` : ''}>{a.lastStatus === 'error' ? 'ERR' : 'OK'}</span>}
+                  {a.lastStatus && <span class={`ml-auto shrink-0 ${a.lastStatus === 'error' ? 'text-red' : ''}`} title={a.lastRunAt ? `Last run ${new Date(a.lastRunAt).toLocaleString()}` : ''}>{a.lastStatus === 'error' ? 'failed' : 'ok'}</span>}
                 </div>
               </div>
             );

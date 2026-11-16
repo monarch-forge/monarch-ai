@@ -6,7 +6,7 @@ import { qs } from '../../lib/api.ts';
 import { settings, useResource } from '../../lib/store.ts';
 import { Panel, Tag, Spinner, ErrorLine } from '../ui.tsx';
 import { ModelPicker, type ModelChoice } from '../chat/model-picker.tsx';
-import { Field, INPUT, SELECT, RADIO, ToggleRow, SaveBar, saveSettings, useDraft, Kbd } from './fields.tsx';
+import { Field, INPUT, SELECT, RADIO, ToggleRow, SaveBar, saveSettings, useDraft, Kbd, Advanced } from './fields.tsx';
 
 type Slice = Pick<Settings, 'engine' | 'claudeSdk' | 'pi'>;
 
@@ -58,10 +58,10 @@ function ModelSelect(props: { models: ModelInfo[] | undefined; loading: boolean;
 function EngineCard(props: { id: EngineId; current: EngineId; title: string; body: string; onPick: (e: EngineId) => void }) {
   const on = props.id === props.current;
   return (
-    <label class={`flex-1 flex gap-3 border p-3 cursor-pointer ${on ? 'border-red/60 bg-red/[0.04]' : 'border-line hover:border-fg-3'}`}>
+    <label class={`flex-1 flex gap-3 rounded-[10px] border p-4 cursor-pointer transition-colors duration-150 ${on ? 'border-fg-3 bg-raised' : 'border-transparent bg-raised/40 hover:bg-raised'}`}>
       <input type="radio" name="engine" class={`${RADIO} mt-0.5`} checked={on} onChange={() => props.onPick(props.id)} />
       <span>
-        <span class="block font-mono text-[12px] tracking-[0.12em] uppercase text-fg">{props.title}</span>
+        <span class="block text-[14px] font-medium text-fg">{props.title}</span>
         <span class="block text-[12px] text-fg-3 mt-1 leading-relaxed">{props.body}</span>
       </span>
     </label>
@@ -96,8 +96,8 @@ export function ModelsSection() {
   };
 
   return (
-    <div class="flex flex-col gap-3">
-      <Panel code="CFG.21" title="Default engine" right={<Tag tone="red">{draft.engine === 'pi' ? 'pi' : 'claude sdk'}</Tag>}>
+    <div class="flex flex-col gap-4">
+      <Panel title="Default engine" right={<Tag>{draft.engine === 'pi' ? 'pi' : 'claude sdk'}</Tag>}>
         <div class="flex flex-col md:flex-row gap-3">
           <EngineCard
             id="claude-sdk"
@@ -118,7 +118,6 @@ export function ModelsSection() {
       </Panel>
 
       <Panel
-        code="CFG.22"
         title="Claude Agent SDK"
         active={draft.engine === 'claude-sdk'}
         right={
@@ -144,9 +143,6 @@ export function ModelsSection() {
               ))}
             </select>
           </Field>
-          <Field label="Claude executable" hint="Absolute path to the `claude` CLI. Leave empty to auto-detect." class="md:col-span-2">
-            <input class={`${INPUT} font-mono`} value={c.executablePath} onInput={(e) => setC({ executablePath: (e.target as HTMLInputElement).value })} placeholder="auto-detect" spellcheck={false} />
-          </Field>
         </div>
         <div class="mt-3">
           <ToggleRow
@@ -155,21 +151,26 @@ export function ModelsSection() {
             checked={c.useSubscription}
             onChange={(v) => setC({ useSubscription: v })}
           />
+          <Advanced>
+          <Field label="Claude executable" hint="Absolute path to the `claude` CLI. Leave empty to auto-detect.">
+            <input class={`${INPUT} font-mono`} value={c.executablePath} onInput={(e) => setC({ executablePath: (e.target as HTMLInputElement).value })} placeholder="auto-detect" spellcheck={false} />
+          </Field>
+          </Advanced>
         </div>
-        <div class="mt-2 border border-line bg-[#121213] px-3 py-2.5 text-[12.5px]">
+        <div class="mt-3 rounded-[8px] bg-raised px-4 py-3 text-[12.5px]">
           {providers.error && !providers.data ? (
             <ErrorLine error={providers.error} />
           ) : claudeProv?.configured ? (
             <div class="flex items-center gap-3 flex-wrap">
-              <span class="inline-block w-1.5 h-1.5 bg-success" />
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-success" />
               <span class="text-fg">Signed in</span>
               {claudeProv.account && <span class="font-mono text-[11.5px] text-fg-2">{claudeProv.account}</span>}
-              {claudeProv.source && <span class="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3">via {claudeProv.source}</span>}
+              {claudeProv.source && <span class=" text-[12px] text-fg-3">via {claudeProv.source}</span>}
             </div>
           ) : (
             <div class="text-fg-2 leading-relaxed">
               <div class="flex items-center gap-2 mb-1">
-                <span class="inline-block w-1.5 h-1.5 bg-warning" />
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-warning" />
                 <span class="text-fg">No Claude Code login detected.</span>
               </div>
               Run <Kbd>claude auth login</Kbd> in a terminal, sign in with your Claude account, then come back — status refreshes automatically.
@@ -179,7 +180,7 @@ export function ModelsSection() {
         </div>
       </Panel>
 
-      <Panel code="CFG.23" title="Pi" active={draft.engine === 'pi'}>
+      <Panel title="Pi" active={draft.engine === 'pi'}>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Provider">
             {piProviders.length ? (
@@ -228,9 +229,11 @@ export function ModelsSection() {
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
 
-      <ContextPanel />
+      <h2 class="text-[14.5px] font-semibold text-fg mt-4 px-1">Fine-tuning</h2>
+      <p class="text-[12.5px] text-fg-3 -mt-2 px-1">Helpers, small models and how long conversations are kept in memory.</p>
       <WorkerModelPanel />
       <SmallModelPanel />
+      <ContextPanel />
     </div>
   );
 }
@@ -249,7 +252,7 @@ function ContextPanel() {
     if (ok) reset();
   };
   return (
-    <Panel code="CFG.24" title="Context" right={<Tag tone={on ? 'ok' : 'warn'}>{on ? `auto ${draft.pct}%` : 'auto off'}</Tag>}>
+    <Panel title="Context" right={<Tag tone={on ? 'ok' : 'warn'}>{on ? `auto ${draft.pct}%` : 'auto off'}</Tag>}>
       <ToggleRow
         label="Auto-compact context"
         hint="When a session's context reaches the threshold, older turns are summarized so the conversation keeps fitting the model window. /compact does it on demand."
@@ -292,7 +295,7 @@ function SmallModelPanel() {
     if (ok) reset();
   };
   return (
-    <Panel code="CFG.25" title="Small-model mode" right={<Tag tone={draft.mode === 'off' ? 'warn' : 'ok'}>{draft.mode}</Tag>}>
+    <Panel title="Small-model mode" right={<Tag tone={draft.mode === 'off' ? 'warn' : 'ok'}>{draft.mode}</Tag>}>
       <div class="max-w-[260px]">
         <Field
           label="Mode"
@@ -318,7 +321,7 @@ function WorkerModelPanel() {
     await saveSettings({ agent: { ...(s.agent ?? {}), workerModel: c ? { engine: c.engine, model: c.model } : null } }, c ? `Worker agents: ${c.model}` : 'Worker agents use the default model');
   };
   return (
-    <Panel code="CFG.26" title="Worker agents" right={<Tag tone={w ? 'ok' : undefined}>{w ? w.model : 'same as default'}</Tag>}>
+    <Panel title="Worker agents" right={<Tag tone={w ? 'ok' : undefined}>{w ? w.model : 'same as default'}</Tag>}>
       <div class="flex flex-col gap-2 max-w-[560px]">
         <div class="text-[12.5px] text-fg-2 leading-relaxed">
           Monarch does quick things itself and hands heavy work (code, full inbox triage, research, planning, long drafts) to worker agents in the Workshop. Give them a stronger model here so

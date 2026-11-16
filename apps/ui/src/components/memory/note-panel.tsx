@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { MemoryNote, MemoryNoteSummary } from '@monarch/shared';
-import { ArrowLeft, Crosshair, FilePlus, Pencil, Search, Sparkles, Trash, Link2, CornerDownLeft } from 'lucide-preact';
+import { ArrowLeft, Crosshair, FilePlus, Pencil, Search, Sparkles, Trash, Link2 } from 'lucide-preact';
 import { api, ApiError, openExternal, qs } from '../../lib/api.ts';
 import { navigate, toast, useResource } from '../../lib/store.ts';
 import { Btn, Tag } from '../ui.tsx';
@@ -73,12 +73,17 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
 
   return (
     <div class="flex flex-col h-full min-h-0">
-      <div class="flex items-center gap-2 p-2.5 border-b border-line">
+      <div class="flex items-baseline gap-2 px-4 pt-4 pb-2">
+        <h2 class="text-[14.5px] font-semibold text-fg">Notes</h2>
+        <span class="text-[12px] text-fg-3">{notes.length}</span>
+      </div>
+      <div class="flex items-center gap-2 px-3 pb-2">
         <label class="relative flex-1">
-          <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+          <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
           <input
-            class="hud-input py-1.5! pl-7! text-[13px]!"
-            placeholder="Search vault…"
+            class="w-full bg-white/[0.04] rounded-md pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+            placeholder="Search notes"
+            title="↑↓ to move, Enter to open"
             value={q}
             onInput={(e) => setQ((e.target as HTMLInputElement).value)}
             onKeyDown={onKey}
@@ -86,17 +91,17 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
             data-note-search
           />
         </label>
-        <Btn size="xs" onClick={props.onNew} title="New note (n)">
-          <FilePlus size={12} /> New
+        <Btn size="sm" variant="ghost" onClick={props.onNew} title="New note (n)">
+          <FilePlus size={13} /> New
         </Btn>
       </div>
-      <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto" role="listbox" aria-label="Notes">
+      <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto px-1.5 pb-3" role="listbox" aria-label="Notes">
         {res.error && !notes.length ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : res.loading && !res.data && !props.demoNodes ? (
           <Loading label="Reading vault" />
         ) : !notes.length ? (
-          <StateBlock title={debounced ? 'No matches' : 'Vault is empty'}>
+          <StateBlock title={debounced ? 'No matches' : 'No notes yet'}>
             {debounced ? `Nothing matches “${debounced}”.` : 'Create a note, or ask Monarch to remember something — it writes notes here as it learns.'}
           </StateBlock>
         ) : (
@@ -106,18 +111,17 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
               data-idx={i}
               role="option"
               aria-selected={i === cursor}
-              class={`w-full text-left px-3 py-2.5 border-b border-line/60 border-l-2 hover:bg-white/[0.02] ${i === cursor ? 'border-l-fg-3 bg-white/[0.02]' : 'border-l-transparent'}`}
+              class={`w-full text-left px-3 py-3 rounded-md transition-colors ${i === cursor ? 'bg-white/[0.04]' : ''}`}
               onClick={() => openNote(n.id)}
               onMouseEnter={() => setCursor(i)}
             >
               <div class="flex items-baseline gap-2">
-                <span class="text-[13px] text-fg truncate">{n.title || n.id}</span>
-                <span class="ml-auto font-mono text-[10px] text-fg-3 shrink-0">{relTime(n.updatedAt)}</span>
+                <span class="text-[13.5px] font-medium text-fg truncate">{n.title || n.id}</span>
+                <span class="ml-auto font-mono text-[11px] text-fg-3 shrink-0">{relTime(n.updatedAt)}</span>
               </div>
-              <div class="font-mono text-[10px] text-fg-3 truncate mt-0.5">{n.id}</div>
-              {n.excerpt && <div class="text-xs text-fg-2 mt-1 line-clamp-2 leading-relaxed">{plainExcerpt(n.excerpt, 160)}</div>}
+                            {n.excerpt && <div class="text-[12.5px] text-fg-3 mt-0.5 line-clamp-2 leading-relaxed">{plainExcerpt(n.excerpt, 160)}</div>}
               {(n.tags?.length > 0 || n.linkCount > 0) && (
-                <div class="flex items-center gap-2 mt-1.5 font-mono text-[10px] text-fg-3">
+                <div class="flex items-center gap-2 mt-1.5 text-[11.5px] text-fg-3">
                   {(n.tags ?? []).slice(0, 4).map((t) => (
                     <span key={t}>#{t}</span>
                   ))}
@@ -131,12 +135,6 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
             </button>
           ))
         )}
-      </div>
-      <div class="px-3 py-1.5 border-t border-line font-mono text-[10px] tracking-widest uppercase text-fg-3 flex gap-3">
-        <span>{notes.length} notes</span>
-        <span class="ml-auto inline-flex items-center gap-1">
-          ↑↓ <CornerDownLeft size={10} /> open
-        </span>
       </div>
     </div>
   );
@@ -229,20 +227,20 @@ export function NoteView(props: {
   const titleOf = (id: string) => props.nodes.find((n) => n.id === id)?.title ?? id.split('/').pop() ?? id;
 
   const header = (
-    <div class="flex items-center gap-1 px-2 py-1.5 border-b border-line">
-      <button class="p-1.5 text-fg-3 hover:text-fg" onClick={() => navigate('memory')} title="All notes (Esc)" aria-label="Back to all notes">
+    <div class="flex items-center gap-0.5 px-3 pt-3 pb-1">
+      <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" onClick={() => navigate('memory')} title="All notes (Esc)" aria-label="Back to all notes">
         <ArrowLeft size={14} />
       </button>
-      <span class="font-mono text-[10px] text-fg-3 truncate flex-1" title={props.id}>
+      <span class="text-[12px] text-fg-3 truncate flex-1 px-1" title={props.id}>
         {props.id}
       </span>
       {note && !editing && (
         <>
-          <button class="p-1.5 text-fg-3 hover:text-fg" title="Locate in graph" aria-label="Locate in graph" onClick={() => props.onLocate(props.id)}>
+          <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" title="Locate in graph" aria-label="Locate in graph" onClick={() => props.onLocate(props.id)}>
             <Crosshair size={13} />
           </button>
           <button
-            class="p-1.5 text-fg-3 hover:text-fg"
+            class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle"
             title="Ask Monarch to enrich & link this note"
             aria-label="Ask Monarch about this note"
             onClick={() =>
@@ -253,10 +251,10 @@ export function NoteView(props: {
           >
             <Sparkles size={13} />
           </button>
-          <button class="p-1.5 text-fg-3 hover:text-fg" title="Edit (e)" aria-label="Edit note" onClick={() => startEdit()}>
+          <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" title="Edit (e)" aria-label="Edit note" onClick={() => startEdit()}>
             <Pencil size={13} />
           </button>
-          <button class="p-1.5 text-fg-3 hover:text-red" title="Delete" aria-label="Delete note" onClick={remove}>
+          <button class="p-1.5 rounded-md text-fg-3 hover:text-red hover:bg-subtle" title="Delete" aria-label="Delete note" onClick={remove}>
             <Trash size={13} />
           </button>
         </>
@@ -290,9 +288,9 @@ export function NoteView(props: {
     return (
       <div class="flex flex-col h-full min-h-0">
         {header}
-        <div class="p-3 flex flex-col gap-2 flex-1 min-h-0">
+        <div class="px-4 py-3 flex flex-col gap-2 flex-1 min-h-0">
           <input
-            class="hud-input text-base! font-medium"
+            class="hud-input text-[17px]! font-semibold"
             value={draft.title}
             placeholder="Title"
             aria-label="Title"
@@ -306,7 +304,7 @@ export function NoteView(props: {
             onInput={(e) => setDraft({ ...draft, tags: (e.target as HTMLInputElement).value })}
           />
           <textarea
-            class="hud-input font-mono text-[12.5px]! leading-relaxed flex-1 min-h-40 resize-none"
+            class="hud-input font-mono text-[13px]! leading-[1.7] flex-1 min-h-40 resize-none"
             value={draft.body}
             placeholder={'# Heading\n\nWrite markdown. Link notes with [[Note name]], tag with #tag.'}
             aria-label="Markdown body"
@@ -314,11 +312,11 @@ export function NoteView(props: {
             autoFocus
           />
           {note && draft.base && note.updatedAt !== draft.base && (
-            <div class="text-[11px] font-mono text-warning">Note changed on disk while editing — saving will overwrite it.</div>
+            <div class="text-[12px] text-warning">Note changed on disk while editing — saving will overwrite it.</div>
           )}
         </div>
-        <div class="flex items-center gap-2 px-3 py-2 border-t border-line">
-          <span class="font-mono text-[10px] text-fg-3 tracking-widest uppercase">Ctrl+S save · Esc cancel</span>
+        <div class="flex items-center gap-2 px-4 py-3">
+          <span class="text-[11.5px] text-fg-3">Ctrl+S to save · Esc to cancel</span>
           <Btn variant="ghost" size="xs" class="ml-auto" onClick={cancel}>
             Cancel
           </Btn>
@@ -336,7 +334,7 @@ export function NoteView(props: {
       {header}
       <div class="flex-1 min-h-0 overflow-y-auto">
         {!note && notFound ? (
-          <StateBlock title="Note not written yet">
+          <StateBlock title="This note doesn’t exist yet">
             <div>
               <span class="font-mono text-fg-2">{props.id}</span> is linked but has no file.
             </div>
@@ -351,25 +349,25 @@ export function NoteView(props: {
         ) : !note ? (
           <Loading label="Opening note" />
         ) : (
-          <article class="px-4 py-3">
-            <h1 class="text-lg text-fg font-medium leading-snug">{note.title || props.id}</h1>
-            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+          <article class="max-w-[68ch] mx-auto px-5 sm:px-6 pt-2 pb-10">
+            <h1 class="text-[21px] text-fg font-semibold tracking-[-0.01em] leading-snug">{note.title || props.id}</h1>
+            <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
               {note.source === 'agent' && <Tag title="Written by Monarch">agent</Tag>}
               {(note.tags ?? []).map((t) => (
-                <button key={t} class="hud-tag hover:text-fg hover:border-fg-3" data-tone="plain" onClick={() => props.onTag(t)} title={`Highlight #${t} in graph`}>
+                <button key={t} class="text-[11.5px] rounded-full bg-subtle px-2 py-0.5 text-fg-2 hover:text-fg transition-colors" onClick={() => props.onTag(t)} title={`Highlight #${t} in graph`}>
                   #{t}
                 </button>
               ))}
-              <span class="ml-auto font-mono text-[10px] text-fg-3" title={note.updatedAt}>
-                UPD {relTime(note.updatedAt)}
+              <span class="ml-auto text-[11.5px] text-fg-3" title={note.updatedAt}>
+                updated {relTime(note.updatedAt)}
               </span>
             </div>
             {note.body?.trim() ? (
-              <div class={`${MD_CLASS} mt-3`} onClick={onBodyClick} dangerouslySetInnerHTML={{ __html: html }} />
+              <div class={`${MD_CLASS} mt-5 text-[14.5px] leading-[1.7]`} onClick={onBodyClick} dangerouslySetInnerHTML={{ __html: html }} />
             ) : (
-              <div class="mt-4 text-xs text-fg-3 font-mono">
+              <div class="mt-5 text-[13px] text-fg-3">
                 Empty note.{' '}
-                <button class="underline decoration-red underline-offset-2 text-fg-2" onClick={() => startEdit()}>
+                <button class="underline decoration-fg-3 underline-offset-2 text-fg-2 hover:text-fg" onClick={() => startEdit()}>
                   Write something
                 </button>
               </div>
@@ -393,8 +391,8 @@ export function NoteView(props: {
 function LinkList(props: { title: string; ids: string[]; titleOf: (id: string) => string; empty: string; ghost?: (id: string) => boolean }) {
   const ids = [...new Set(props.ids.filter((x) => typeof x === 'string' && x))];
   return (
-    <section class="mt-5 border-t border-line pt-3">
-      <div class="hud-label flex items-center gap-2">
+    <section class="mt-8">
+      <div class="text-[12px] text-fg-3 flex items-center gap-2">
         {props.title} <span class="text-fg-3">{ids.length}</span>
       </div>
       {ids.length ? (
@@ -403,17 +401,17 @@ function LinkList(props: { title: string; ids: string[]; titleOf: (id: string) =
             const ghost = props.ghost?.(id) ?? false;
             return (
               <li key={id}>
-                <button class="hud-row w-full text-left py-1! px-1.5!" onClick={() => openNote(id)}>
+                <button class="group w-full flex items-center gap-2.5 text-left px-2 py-1.5 rounded-md text-[13px] hover:bg-raised transition-colors" onClick={() => openNote(id)}>
                   <span class={`inline-block w-1.5 h-1.5 shrink-0 ${ghost ? 'border border-fg-3' : 'bg-fg-2'} rounded-full`} />
                   <span class={`truncate ${ghost ? 'text-fg-3' : 'text-fg-2'}`}>{props.titleOf(id)}</span>
-                  <span class="ml-auto font-mono text-[10px] text-fg-3 truncate max-w-[45%]">{id}</span>
+                  <span class="ml-auto text-[11px] text-fg-3 truncate max-w-[45%] opacity-0 group-hover:opacity-100">{id}</span>
                 </button>
               </li>
             );
           })}
         </ul>
       ) : (
-        <div class="text-xs text-fg-3 mt-1.5">{props.empty}</div>
+        <div class="text-[12.5px] text-fg-3 mt-1.5 px-2">{props.empty}</div>
       )}
     </section>
   );
@@ -456,7 +454,6 @@ export function NewNoteModal(props: { open: boolean; onClose: () => void; nodes:
     <Modal
       open={props.open}
       onClose={props.onClose}
-      code="MEM.N"
       title="New note"
       footer={
         <>
@@ -477,13 +474,13 @@ export function NewNoteModal(props: { open: boolean; onClose: () => void; nodes:
         }}
       >
         <label class="flex flex-col gap-1.5">
-          <span class="hud-label">Path in vault</span>
+          <span class="text-[12.5px] text-fg-2">Where to save it</span>
           <input class="hud-input font-mono text-[13px]!" placeholder="People/Pepper Potts" value={path} onInput={(e) => setPath((e.target as HTMLInputElement).value)} />
           <span class="text-[11px] text-fg-3">Folders with “/”. Saved as markdown — {id ? <span class="font-mono text-fg-2">{id}.md</span> : '…'}</span>
-          {clash && <span class="text-[11px] text-warning font-mono">A note with this path already exists.</span>}
+          {clash && <span class="text-[12px] text-warning">A note with this path already exists.</span>}
         </label>
         <label class="flex flex-col gap-1.5">
-          <span class="hud-label">Title</span>
+          <span class="text-[12.5px] text-fg-2">Title</span>
           <input class="hud-input" placeholder={id.split('/').pop() || 'Title'} value={title} onInput={(e) => setTitle((e.target as HTMLInputElement).value)} />
         </label>
         <button type="submit" class="hidden" />

@@ -231,7 +231,6 @@ export function NewExtension() {
   return (
     <div class="flex flex-col gap-3 min-h-0 flex-1">
       <Panel
-        code="EVO.13"
         title="New extension"
         class="flex-1"
         bodyClass="overflow-y-auto"
@@ -253,7 +252,7 @@ export function NewExtension() {
             onSaved={(id) => navigate(`evolve/extensions/${encodeURIComponent(id)}`)}
           />
         ) : (
-          <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3 py-6 text-center">Loading template…</div>
+          <div class=" text-[12px] text-fg-3 py-6 text-center">Loading template…</div>
         )}
       </Panel>
       <ApiReference res={ref} />

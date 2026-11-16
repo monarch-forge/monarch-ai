@@ -72,7 +72,7 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
     <div class={`border ${tone} bg-[#121213] p-3 flex flex-col gap-2.5`}>
       <div class="flex items-center gap-2">
         <span class={`inline-block w-1.5 h-1.5 ${flow.status === 'done' ? 'bg-success' : flow.status === 'error' ? 'bg-red' : 'bg-warning hud-blink'}`} />
-        <span class="font-mono text-[11px] tracking-[0.12em] uppercase text-fg">{STATUS_TEXT[flow.status]}</span>
+        <span class=" text-[12px] text-fg">{STATUS_TEXT[flow.status]}</span>
         <span class="font-mono text-[10px] text-fg-3">{flow.provider}</span>
         <button class="ml-auto text-fg-3 hover:text-fg" title={terminal ? 'Dismiss' : 'Cancel login'} onClick={() => (terminal ? props.onDismiss?.() : void cancel())}>
           <X size={13} />
@@ -94,10 +94,10 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
           <span class="font-mono text-[11px] text-fg-3 truncate flex-1 border border-line px-2 py-1 bg-surface" title={flow.url}>
             {flow.url}
           </span>
-          <button class="btn btn-xs btn-primary rounded-[2px] font-mono font-normal uppercase text-[10px]" onClick={() => void openExternal(flow.url!)}>
+          <button class="btn btn-xs btn-primary rounded-[6px] font-normal text-[12px]" onClick={() => void openExternal(flow.url!)}>
             <ExternalLink size={11} /> Open
           </button>
-          <button class="btn btn-xs btn-outline border-line rounded-[2px] font-mono font-normal uppercase text-[10px] text-fg-2" onClick={() => void copyText(flow.url!, 'Link copied')}>
+          <button class="btn btn-xs btn-outline border-line rounded-[6px] font-normal text-[12px] text-fg-2" onClick={() => void copyText(flow.url!, 'Link copied')}>
             <Copy size={11} /> Copy
           </button>
         </div>
@@ -113,7 +113,7 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
             autoFocus
             spellcheck={false}
           />
-          <button class="btn btn-sm btn-primary rounded-[2px] font-mono font-normal uppercase text-[11px]" disabled={busy || !code.trim()} onClick={() => void submitCode()}>
+          <button class="btn btn-sm btn-primary rounded-[6px] font-normal text-[12px]" disabled={busy || !code.trim()} onClick={() => void submitCode()}>
             {busy && <span class="loading loading-spinner loading-xs" />}Submit
           </button>
         </div>

@@ -4,7 +4,7 @@
  */
 import { useState } from 'preact/hooks';
 import type { ChatItem, ToolStatus } from '@monarch/shared';
-import { ChevronRight, Copy } from 'lucide-preact';
+import { ChevronRight, Copy, Check, X, Loader2, Hand } from 'lucide-preact';
 import { approvals } from '../../lib/store.ts';
 import { displayToolName, findApproval, respondApproval } from '../approvals.tsx';
 import { copyText } from './markdown.tsx';
@@ -99,20 +99,54 @@ const STATUS_LABEL: Record<ToolStatus, string> = {
   denied: 'denied',
 };
 
-function StatusDot(props: { status: ToolStatus }) {
+function StatusIcon(props: { status: ToolStatus }) {
   const s = props.status;
-  const cls =
-    s === 'running' ? 'bg-red hud-blink' : s === 'ok' ? 'bg-success/70' : s === 'pending-approval' ? 'bg-warning hud-blink' : 'bg-red';
-  return <span class={`inline-block w-1.5 h-1.5 shrink-0 ${cls}`} title={STATUS_LABEL[s]} />;
+  const tip = STATUS_LABEL[s];
+  if (s === 'running') return <Loader2 size={14} strokeWidth={1.75} class="text-fg-3 animate-spin shrink-0" aria-label={tip} />;
+  if (s === 'ok') return <Check size={14} strokeWidth={2} class="text-success/80 shrink-0" aria-label={tip} />;
+  if (s === 'pending-approval') return <Hand size={14} strokeWidth={1.75} class="text-warning shrink-0 hud-blink" aria-label={tip} />;
+  return <X size={14} strokeWidth={2} class="text-red shrink-0" aria-label={tip} />;
 }
 
-const PRE = 'bg-[#121213] border border-line p-2 font-mono text-[11.5px] leading-[1.55] text-fg-2 overflow-auto max-h-80 whitespace-pre-wrap break-all';
+function shortPath(p: string): string {
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : p;
+}
+
+/** "Ran git status", "Read app.tsx", "Searched the web for …" */
+export function toolHeadline(name: string, input: unknown, status: ToolStatus): { verb: string; object: string; mono: boolean } {
+  const summary = toolSummary(name, input).split('\n')[0];
+  const done = status === 'ok';
+  const pick2 = (doing: string, did: string) => (done ? did : doing);
+  switch (family(name)) {
+    case 'shell':
+      return { verb: pick2('Running', 'Ran'), object: summary, mono: true };
+    case 'edit':
+      return { verb: pick2('Editing', 'Edited'), object: shortPath(summary), mono: true };
+    case 'write':
+      return { verb: pick2('Writing', 'Wrote'), object: shortPath(summary), mono: true };
+    case 'read':
+      return { verb: pick2('Reading', 'Read'), object: shortPath(summary), mono: true };
+    case 'search':
+      return { verb: pick2('Searching', 'Searched'), object: summary, mono: true };
+    case 'web':
+      return { verb: pick2('Browsing', 'Looked up'), object: summary, mono: false };
+    case 'todo':
+      return { verb: 'Updated the plan', object: summary, mono: false };
+    default: {
+      const n = displayToolName(name).replace(/[_-]+/g, ' ');
+      return { verb: n.charAt(0).toUpperCase() + n.slice(1), object: summary, mono: false };
+    }
+  }
+}
+
+const PRE = 'bg-[var(--bg-primary)] rounded-[8px] p-2.5 font-mono text-[11.5px] leading-[1.55] text-fg-2 overflow-auto max-h-80 whitespace-pre-wrap break-all';
 
 function Section(props: { label: string; copy?: string; children: any }) {
   return (
     <div class="mt-2 first:mt-0">
       <div class="flex items-center gap-2 mb-1">
-        <span class="hud-label text-[10px]">{props.label}</span>
+        <span class="text-[11.5px] text-fg-3">{props.label}</span>
         {props.copy !== undefined && props.copy !== '' && (
           <button class="text-fg-3 hover:text-fg-2" title="Copy" onClick={() => void copyText(props.copy!)}>
             <Copy size={10} strokeWidth={1.5} />
@@ -128,7 +162,7 @@ function Diff(props: { oldText: string; newText: string }) {
   const oldLines = props.oldText ? props.oldText.split('\n') : [];
   const newLines = props.newText ? props.newText.split('\n') : [];
   return (
-    <div class="bg-[#121213] border border-line py-1 font-mono text-[11.5px] leading-[1.55] overflow-auto max-h-80 whitespace-pre">
+    <div class="bg-[var(--bg-primary)] rounded-[8px] py-1.5 font-mono text-[11.5px] leading-[1.55] overflow-auto max-h-80 whitespace-pre">
       {oldLines.map((l, i) => (
         <div key={`o${i}`} class="px-2 min-w-max bg-red/[0.07] text-[#d9a0a2]">
           <span class="select-none text-red/70 mr-2">-</span>
@@ -155,8 +189,8 @@ function Truncated(props: { text: string; maxLines?: number }) {
     <div>
       <pre class={PRE}>{cut ? lines.slice(0, max).join('\n') : props.text}</pre>
       {cut && (
-        <button class="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3 hover:text-fg-2" onClick={() => setAll(true)}>
-          show {lines.length - max} more lines
+        <button class="mt-1 text-[11.5px] text-fg-3 hover:text-fg-2" onClick={() => setAll(true)}>
+          Show {lines.length - max} more lines
         </button>
       )}
     </div>
@@ -173,7 +207,7 @@ function Details(props: { item: ToolItem }) {
       <Truncated text={out} maxLines={60} />
     </Section>
   ) : item.status === 'running' ? (
-    <div class="mt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3">waiting for output…</div>
+    <div class="mt-2 text-[11.5px] text-fg-3">Waiting for output…</div>
   ) : null;
 
   if (fam === 'shell') {
@@ -301,75 +335,73 @@ function codingAgentSession(item: ToolItem): string | undefined {
 export function ToolCard(props: { item: ToolItem; sessionId?: string | null; defaultOpen?: boolean }) {
   const { item } = props;
   const [open, setOpen] = useState(!!props.defaultOpen);
-  const name = displayToolName(item.name);
-  const summary = toolSummary(item.name, item.input);
   const pendingApproval = item.status === 'pending-approval';
   const approval = pendingApproval ? findApproval(props.sessionId, item.name, item.input, approvals.value) : undefined;
   const bad = item.status === 'error' || item.status === 'denied';
-  const fam = family(item.name);
   const agentSession = codingAgentSession(item);
+  const h = toolHeadline(item.name, item.input, item.status);
 
   return (
     <div
-      class={`border bg-[#18181a] rounded-[2px] ${pendingApproval ? 'border-warning/50' : bad ? 'border-red/40' : 'border-line'}`}
+      class={`rounded-[10px] transition-colors duration-150 ${pendingApproval ? 'bg-warning/[0.07] my-1' : open ? 'bg-[var(--bg-surface)] my-1' : ''}`}
       data-tool-status={item.status}
     >
       <button
-        class="w-full flex items-center gap-2.5 px-2.5 h-8 text-left hover:bg-white/[0.02] min-w-0"
+        class="group w-full flex items-center gap-2.5 px-2.5 h-8 text-left rounded-[10px] hover:bg-[var(--bg-surface)] min-w-0"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
+        title={`${displayToolName(item.name)} — ${STATUS_LABEL[item.status]}`}
       >
-        <ChevronRight size={12} strokeWidth={1.5} class={`text-fg-3 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
-        <StatusDot status={item.status} />
-        <span class="font-mono text-[12px] text-fg shrink-0">{name}</span>
-        <span class={`font-mono text-[11.5px] truncate min-w-0 flex-1 ${fam === 'shell' ? 'text-fg-2' : 'text-fg-3'}`} title={summary}>
-          {fam === 'shell' && summary ? `$ ${summary.split('\n')[0]}` : summary.split('\n')[0]}
-        </span>
-        {item.risk && item.risk !== 'safe' && (
-          <span class="hud-tag shrink-0 hidden sm:inline-flex" data-tone={item.risk === 'dangerous' ? 'red' : 'warn'}>
-            {item.risk}
+        <StatusIcon status={item.status} />
+        <span class="text-[13px] text-fg-2 shrink-0">{h.verb}</span>
+        {h.object && (
+          <span class={`truncate min-w-0 text-fg-3 ${h.mono ? 'font-mono text-[12px]' : 'text-[13px]'}`} title={h.object}>
+            {h.object}
           </span>
         )}
-        {bad && <span class="font-mono text-[10px] uppercase tracking-[0.12em] text-red shrink-0">{item.status}</span>}
-        {item.status === 'running' && <span class="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3 shrink-0">running</span>}
-        {item.durationMs !== undefined && item.status !== 'running' && (
-          <span class="font-mono text-[10px] text-fg-3 tabular-nums shrink-0">{fmtDuration(item.durationMs)}</span>
+        <span class="flex-1" />
+        {item.risk === 'dangerous' && <span class="shrink-0 hidden sm:inline text-[11px] text-red/80">risky</span>}
+        {bad && <span class="text-[11.5px] text-red shrink-0">{item.status === 'denied' ? 'Denied' : 'Failed'}</span>}
+        {item.durationMs !== undefined && item.status !== 'running' && !bad && (
+          <span class="text-[11px] text-fg-3 tabular-nums shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">{fmtDuration(item.durationMs)}</span>
         )}
+        <ChevronRight size={13} strokeWidth={1.75} class={`text-fg-3 shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : 'opacity-0 group-hover:opacity-100'}`} />
       </button>
       {agentSession && (
-        <div class="px-2.5 pb-1.5 -mt-0.5">
-          <a href={`#/workshop/${encodeURIComponent(agentSession)}`} class="font-mono text-[10.5px] tracking-wider text-fg-2 underline decoration-red underline-offset-2 hover:text-fg">
-            Open worker agent in Workshop →
+        <div class="pl-[34px] pb-1.5">
+          <a href={`#/workshop/${encodeURIComponent(agentSession)}`} class="text-[12.5px] text-fg-2 hover:text-fg underline decoration-fg-3 underline-offset-[3px]">
+            Open the worker agent in Workshop →
           </a>
         </div>
       )}
       {pendingApproval && (
-        <div class="flex items-center gap-2 px-2.5 pb-2 -mt-0.5 flex-wrap">
-          <span class="font-mono text-[10px] uppercase tracking-[0.12em] text-warning">Awaiting approval</span>
+        <div class="flex items-center gap-2 pl-[34px] pr-2.5 pb-2.5 flex-wrap">
+          <span class="text-[12.5px] text-warning">Needs your approval</span>
           <div class="ml-auto flex gap-1.5">
             {approval ? (
               <>
-                <button class="btn btn-xs btn-ghost rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] text-fg-2" onClick={() => respondApproval(approval.id, false)}>
+                <button class="h-7 px-3 rounded-[6px] text-[12.5px] text-fg-2 hover:text-fg hover:bg-[var(--bg-raised,#202023)]" onClick={() => respondApproval(approval.id, false)}>
                   Deny
                 </button>
                 <button
-                  class="btn btn-xs btn-outline rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] border-line text-fg-2 hover:bg-subtle hover:text-fg"
+                  class="h-7 px-3 rounded-[6px] text-[12.5px] text-fg-2 hover:text-fg bg-[var(--bg-subtle)] hover:bg-[var(--bg-raised,#202023)]"
                   onClick={() => respondApproval(approval.id, true, true)}
+                  title="Approve, and don't ask again for this tool"
                 >
-                  Always
+                  Always allow
                 </button>
-                <button class="btn btn-xs btn-primary rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]" onClick={() => respondApproval(approval.id, true)}>
+                <button class="h-7 px-3 rounded-[6px] text-[12.5px] bg-red hover:bg-red-hover text-fg" onClick={() => respondApproval(approval.id, true)}>
                   Approve
                 </button>
               </>
             ) : (
-              <span class="font-mono text-[10px] text-fg-3">see approval dock</span>
+              <span class="text-[12px] text-fg-3">Answer in the approvals panel</span>
             )}
           </div>
         </div>
       )}
       {open && (
-        <div class="px-2.5 pb-2.5 pt-1 border-t border-line">
+        <div class="px-3 pb-3 pt-1">
           <Details item={item} />
         </div>
       )}

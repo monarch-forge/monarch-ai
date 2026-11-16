@@ -79,9 +79,9 @@ export function Composer(props: {
     }
   };
 
-  const field = 'w-full bg-transparent outline-none text-[13px] text-fg placeholder:text-fg-3 py-1.5';
-  const row = 'flex items-center gap-3 border-b border-line px-3';
-  const lab = 'hud-label w-12 shrink-0';
+  const field = 'w-full bg-transparent outline-none text-[13.5px] text-fg placeholder:text-fg-3 py-2';
+  const row = 'flex items-center gap-3 border-b border-white/[0.05] px-5';
+  const lab = 'text-[12.5px] text-fg-3 w-14 shrink-0';
   const from = props.accounts.find((a) => a.id === d.accountId);
 
   return (
@@ -119,8 +119,8 @@ export function Composer(props: {
         <span class={lab}>To</span>
         <input class={field} value={d.to} onInput={(e) => setD({ ...d, to: (e.target as HTMLInputElement).value })} placeholder="name@example.com, …" aria-label="To" />
         {!showCc && (
-          <button class="font-mono text-[10px] text-fg-3 hover:text-fg tracking-widest" onClick={() => setShowCc(true)}>
-            CC
+          <button class="text-[12px] text-fg-3 hover:text-fg" onClick={() => setShowCc(true)}>
+            Cc
           </button>
         )}
       </div>
@@ -131,19 +131,19 @@ export function Composer(props: {
         </div>
       )}
       <div class={row}>
-        <span class={lab}>Subj</span>
+        <span class={lab}>Subject</span>
         <input class={field} value={d.subject} onInput={(e) => setD({ ...d, subject: (e.target as HTMLInputElement).value })} aria-label="Subject" />
       </div>
       <textarea
         ref={bodyRef}
-        class={`flex-1 w-full bg-transparent outline-none resize-none px-3 py-2.5 text-[13px] leading-relaxed text-fg placeholder:text-fg-3 ${props.compact ? 'min-h-36' : 'min-h-64'}`}
+        class={`flex-1 w-full bg-transparent outline-none resize-none px-5 py-3 text-[14px] leading-[1.65] text-fg placeholder:text-fg-3 ${props.compact ? 'min-h-36' : 'min-h-64'}`}
         value={d.body}
         onInput={(e) => setD({ ...d, body: (e.target as HTMLTextAreaElement).value })}
         placeholder="Write your message…"
         aria-label="Message body"
       />
-      <div class="flex items-center gap-2 px-3 py-2 border-t border-line">
-        <span class="font-mono text-[10px] text-fg-3 tracking-widest uppercase hidden md:inline">Ctrl+Enter send</span>
+      <div class="flex items-center gap-2 px-5 py-3">
+        <span class="text-[11.5px] text-fg-3 hidden md:inline">Ctrl+Enter to send</span>
         <Btn variant="ghost" size="xs" class="ml-auto" onClick={() => props.onDone(false)}>
           Discard
         </Btn>
@@ -164,8 +164,8 @@ export function ComposeModal(props: { open: boolean; onClose: () => void; accoun
     if (props.open) setInit({ accountId: props.defaultAccount && props.accounts.some((a) => a.id === props.defaultAccount) ? props.defaultAccount : (props.accounts[0]?.id ?? ''), to: '', subject: '', body: '' });
   }, [props.open]);
   return (
-    <Modal open={props.open} onClose={props.onClose} code="MAIL.N" title="New message" width="max-w-2xl">
-      <div class="-m-3.5 h-[60vh] flex flex-col">
+    <Modal open={props.open} onClose={props.onClose} title="New message" width="max-w-2xl">
+      <div class="-mx-5 -mb-4 h-[60vh] flex flex-col">
         <Composer init={init} accounts={props.accounts} onDone={() => props.onClose()} />
       </div>
     </Modal>

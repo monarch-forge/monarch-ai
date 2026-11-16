@@ -73,15 +73,17 @@ export function CommandConsole() {
 
   return (
     <div class="flex flex-col gap-2.5 w-full">
-      <div class={`flex items-stretch border bg-[#121213] transition-colors ${isListening ? 'border-red/60' : 'border-line '}`}>
-        <span class="flex items-center pl-3 pr-1 font-mono text-[12px] text-fg-3 select-none" aria-hidden="true">
-          {isListening ? <span class="inline-block w-1.5 h-1.5 bg-red hud-blink" /> : '›'}
-        </span>
+      <div class={`flex items-stretch gap-1 p-1.5 rounded-[14px] border bg-surface transition-colors duration-150 focus-within:border-line ${isListening ? 'border-red/50' : 'border-transparent'}`}>
+        {isListening && (
+          <span class="flex items-center pl-3 select-none" aria-hidden="true">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-red hud-blink" />
+          </span>
+        )}
         <input
           ref={inputRef}
           type="text"
-          class="flex-1 min-w-0 bg-transparent px-2 py-2.5 text-[14px] text-fg placeholder:text-fg-3 outline-none"
-          placeholder={isListening ? 'Listening…' : conv ? `Continue, ${honorific}… (/new to start over)` : `Speak or type a command, ${honorific}…`}
+          class="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-[15px] text-fg placeholder:text-fg-3 outline-none"
+          placeholder={isListening ? 'Listening…' : conv ? `Continue, ${honorific}… (/new to start over)` : `What can I do for you, ${honorific}?`}
           value={shown}
           onInput={(e) => {
             histIdx.current = -1;
@@ -96,7 +98,7 @@ export function CommandConsole() {
         {conv && (
           <button
             type="button"
-            class="flex items-center gap-1.5 px-2.5 border-l border-line font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2 hover:text-fg hover:bg-white/[0.03]"
+            class="flex items-center gap-1.5 px-2.5 rounded-md text-[12.5px] text-fg-2 hover:text-fg hover:bg-raised transition-colors"
             onClick={() => {
               newConsoleConversation();
               inputRef.current?.focus();
@@ -110,8 +112,8 @@ export function CommandConsole() {
         <div class={voiceSupport.listen ? 'flex' : 'tooltip tooltip-top flex'} data-tip={voiceSupport.listen ? undefined : UNSUPPORTED_LISTEN}>
           <button
             type="button"
-            class={`w-10 flex items-center justify-center border-l border-line ${
-              !voiceSupport.listen ? 'text-fg-3/60 hover:text-fg-2' : isListening ? 'text-red' : 'text-fg-2 hover:text-fg hover:bg-white/[0.03]'
+            class={`w-10 flex items-center justify-center rounded-md transition-colors ${
+              !voiceSupport.listen ? 'text-fg-3/60 hover:text-fg-2' : isListening ? 'text-red bg-red/10' : 'text-fg-2 hover:text-fg hover:bg-raised'
             }`}
             onClick={onMic}
             aria-label={voiceSupport.listen ? (isListening ? 'Stop listening' : 'Voice input') : UNSUPPORTED_LISTEN}
@@ -123,8 +125,8 @@ export function CommandConsole() {
         </div>
         <button
           type="button"
-          class={`flex items-center gap-2 px-3.5 border-l font-mono text-[10.5px] tracking-[0.14em] uppercase transition-colors ${
-            text.trim() ? 'bg-red border-red text-fg hover:bg-red-hover' : 'border-line text-fg-3'
+          class={`flex items-center gap-2 px-3.5 rounded-[10px] text-[13px] font-medium transition-colors duration-150 ${
+            text.trim() ? 'bg-red text-fg hover:bg-red-hover' : 'bg-raised text-fg-3'
           }`}
           onClick={() => submit(text)}
           disabled={!text.trim()}
@@ -137,12 +139,12 @@ export function CommandConsole() {
       {run ? (
         <ReplyPreview />
       ) : (
-        <div class="flex flex-wrap justify-center gap-1">
+        <div class="flex flex-wrap justify-center gap-1.5">
           {QUICK.map((q) => (
             <button
               type="button"
               key={q}
-              class="font-mono text-[10px] tracking-[0.05em] uppercase text-fg-2 border border-line px-[7px] py-1 hover:text-fg hover:border-fg-3 focus-visible:border-fg-3 outline-none transition-colors"
+              class="text-[12.5px] text-fg-2 bg-surface rounded-full px-3 py-1 hover:text-fg hover:bg-raised outline-none transition-colors duration-150"
               onClick={() => submit(q)}
             >
               {q}
@@ -167,16 +169,15 @@ function ReplyPreview() {
     run.status === 'sending' ? 'Sending' : run.status === 'thinking' ? 'Thinking' : run.status === 'tool' ? 'Tool' : run.status === 'streaming' ? 'Responding' : run.status === 'done' ? 'Done' : 'Error';
   const reply = stripMarkdown(run.reply);
   return (
-    <div class="border border-line bg-surface/80 flex flex-col min-h-0" role="region" aria-label="Assistant reply" aria-live="polite">
-      <div class="flex items-center gap-2 px-3 py-1.5 border-b border-line">
-        <span class="font-mono text-[11px] text-fg-3">›</span>
-        {(run.turn ?? 1) > 1 && <span class="font-mono text-[10px] tracking-[0.1em] text-fg-3" title="Turn in this conversation">T{run.turn}</span>}
+    <div class="rounded-[10px] bg-surface flex flex-col min-h-0 animate-monarch-fade" role="region" aria-label="Assistant reply" aria-live="polite">
+      <div class="flex items-center gap-2 px-4 pt-3 pb-1">
+        {(run.turn ?? 1) > 1 && <span class="text-[11px] text-fg-3" title="Turn in this conversation">#{run.turn}</span>}
         <span class="flex-1 min-w-0 truncate text-[12px] text-fg-2" title={run.prompt}>
           {run.prompt}
         </span>
-        <Tag tone={run.status === 'error' ? 'red' : working ? 'red' : 'plain'}>{statusLabel}</Tag>
+        <Tag tone={run.status === 'error' ? 'red' : working ? 'default' : 'plain'}>{statusLabel}</Tag>
         {run.sessionId && (
-          <a href={`#/comms/${run.sessionId}`} class="flex items-center gap-1 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-2 hover:text-fg whitespace-nowrap">
+          <a href={`#/comms/${run.sessionId}`} class="flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg whitespace-nowrap">
             Open in Comms <ArrowRight size={11} strokeWidth={1.75} />
           </a>
         )}
@@ -184,21 +185,21 @@ function ReplyPreview() {
           <X size={13} strokeWidth={1.5} />
         </button>
       </div>
-      <div ref={bodyRef} class="px-3 py-2 max-h-[clamp(4.5rem,12vh,9rem)] overflow-y-auto text-[13px] leading-relaxed text-fg whitespace-pre-wrap">
+      <div ref={bodyRef} class="px-4 pt-1 pb-3 max-h-[clamp(5rem,18vh,12rem)] overflow-y-auto text-[13px] leading-relaxed text-fg whitespace-pre-wrap">
         {reply ? (
           <>
             {reply}
             {run.status === 'streaming' && <span class="inline-block w-1.5 h-3 bg-fg-2 ml-0.5 align-[-1px] hud-blink" />}
           </>
         ) : run.status === 'error' ? (
-          <span class="text-red font-mono text-[11px]">{run.error ?? 'The request failed.'}</span>
+          <span class="text-[#f0686d] text-[12.5px]">{run.error ?? 'The request failed.'}</span>
         ) : (
-          <span class="font-mono text-[11px] tracking-[0.1em] uppercase text-fg-3">
+          <span class="text-[12.5px] text-fg-3">
             {run.status === 'tool' && run.tool ? `Using ${run.tool}…` : conn.value === 'open' ? 'Working…' : 'Queued — core offline'}
           </span>
         )}
-        {reply && run.status === 'tool' && run.tool && <div class="font-mono text-[10.5px] tracking-[0.1em] uppercase text-fg-3 mt-1">◇ {run.tool}</div>}
-        {reply && run.error && run.status !== 'streaming' && <div class="font-mono text-[11px] text-red mt-1">{run.error}</div>}
+        {reply && run.status === 'tool' && run.tool && <div class="text-[11.5px] text-fg-3 mt-1">Using {run.tool}…</div>}
+        {reply && run.error && run.status !== 'streaming' && <div class="text-[12px] text-[#f0686d] mt-1">{run.error}</div>}
       </div>
     </div>
   );

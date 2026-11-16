@@ -32,7 +32,7 @@ export function GeneralSection() {
 
   return (
     <div class="flex flex-col gap-3">
-      <Panel code="CFG.11" title="Identity">
+      <Panel title="Identity">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Your name" hint="Used in greetings and briefings.">
             <input class={INPUT} value={u.name} onInput={(e) => setUser({ name: (e.target as HTMLInputElement).value })} placeholder="Tony" />
@@ -57,7 +57,7 @@ export function GeneralSection() {
         </div>
       </Panel>
 
-      <Panel code="CFG.12" title="Assistant">
+      <Panel title="Assistant">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Assistant name">
             <input class={INPUT} value={a.name} onInput={(e) => setAsst({ name: (e.target as HTMLInputElement).value })} placeholder="Monarch" />
@@ -142,7 +142,7 @@ function LocationPicker() {
           onInput={(e) => setQ((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && void search()}
         />
-        <button class="btn btn-sm btn-outline border-line rounded-[2px] text-fg-2 hover:bg-subtle font-mono font-normal uppercase text-[11px]" onClick={() => void search()} disabled={loading || !q.trim()}>
+        <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => void search()} disabled={loading || !q.trim()}>
           {loading ? <Spinner /> : <Search size={12} />} Search
         </button>
       </div>

@@ -4,7 +4,7 @@
  */
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { CornerDownLeft, Mic, Square } from 'lucide-preact';
+import { ArrowUp, Mic, Square } from 'lucide-preact';
 import { conn, navigate, toast } from '../../lib/store.ts';
 import { listen, listening, micLevel, stopListening, voiceSupport, UNSUPPORTED_LISTEN } from '../../lib/voice.ts';
 
@@ -172,74 +172,71 @@ export function Composer(props: {
   };
 
   return (
-    <div class="border-t border-line bg-surface">
-      {slash.length > 0 && (
-        <div class="border-b border-line">
-          {slash.map((c, i) => (
-            <button
-              key={c.cmd}
-              class={`w-full flex items-center gap-3 px-4 py-1.5 text-left ${i === sel ? 'bg-subtle' : 'hover:bg-white/[0.02]'}`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setText('');
-                c.run('');
-              }}
-            >
-              <span class="font-mono text-[12px] text-fg w-20">{c.cmd}</span>
-              <span class="text-[12px] text-fg-3">{c.description}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      <div class="flex items-end gap-2 px-3 pt-3">
-        <span class="font-mono text-[13px] text-red pb-[9px] pl-1 select-none">›</span>
-        <textarea
-          ref={ta}
-          rows={1}
-          value={text}
-          onInput={(e) => {
-            setText((e.target as HTMLTextAreaElement).value);
-            setSel(0);
-          }}
-          onKeyDown={onKey}
-          placeholder={offline ? 'Core offline — reconnecting…' : listening.value && props.onVoiceSend ? 'Listening… speak now (■ to finish)' : (props.placeholder ?? 'Message Monarch…')}
-          disabled={offline}
-          class="flex-1 resize-none bg-transparent outline-none text-[14px] leading-[1.55] text-fg placeholder:text-fg-3 py-1.5 max-h-[260px] min-h-[34px] disabled:opacity-60"
-          aria-label="Message"
-        />
-        {props.onVoiceSend && <MicButton disabled={disabled || !!props.running} onText={(t) => void props.onVoiceSend!(t)} />}
-        {props.running ? (
-          <button
-            class="btn btn-sm btn-outline border-red/60 text-fg hover:bg-red hover:border-red rounded-[2px] font-mono font-normal uppercase tracking-wider text-[11px] mb-0.5"
-            onClick={() => props.onAbort?.()}
-            title="Stop (Esc)"
-          >
-            <Square size={10} fill="currentColor" /> Stop
-          </button>
-        ) : (
-          <button
-            class="btn btn-sm btn-primary rounded-[2px] font-mono font-normal uppercase tracking-wider text-[11px] mb-0.5"
-            onClick={submit}
-            disabled={disabled || !text.trim()}
-            title="Send (Enter)"
-          >
-            Send <CornerDownLeft size={11} />
-          </button>
+    <div class="shrink-0 px-3 md:px-6 pb-3 md:pb-4 pt-1">
+      <div class="relative max-w-[760px] mx-auto">
+        {slash.length > 0 && (
+          <div class="absolute bottom-full left-0 right-0 mb-2 z-30 rounded-[14px] bg-[var(--bg-surface)] p-1.5 shadow-[0_12px_32px_rgb(0_0_0/.45)]">
+            {slash.map((c, i) => (
+              <button
+                key={c.cmd}
+                class={`w-full flex items-center gap-3 px-3 py-2 rounded-[8px] text-left ${i === sel ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setText('');
+                  c.run('');
+                }}
+              >
+                <span class="font-mono text-[12.5px] text-fg w-20">{c.cmd}</span>
+                <span class="text-[12.5px] text-fg-3 truncate">{c.description}</span>
+              </button>
+            ))}
+          </div>
         )}
-      </div>
-      <div class="flex items-center gap-3 px-4 pb-2 pt-1.5 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 min-h-7">
-        <div class="flex items-center gap-3 min-w-0 truncate">{props.meta}</div>
-        <div class="ml-auto flex items-center gap-3 shrink-0">
-          {props.tools}
-          <span class="hidden md:inline">
-            <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3">↵</kbd> send <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3 ml-1">⇧↵</kbd> newline
-            {props.commands?.length ? (
-              <>
-                {' '}
-                <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3 ml-1">/</kbd> commands
-              </>
-            ) : null}
-          </span>
+        <div class="flex items-end gap-1.5 rounded-[14px] bg-[var(--bg-surface)] border border-[var(--border-default)] focus-within:border-fg-3/60 transition-colors duration-150 pl-4 pr-2 py-2">
+          <textarea
+            ref={ta}
+            rows={1}
+            value={text}
+            onInput={(e) => {
+              setText((e.target as HTMLTextAreaElement).value);
+              setSel(0);
+            }}
+            onKeyDown={onKey}
+            placeholder={offline ? 'Reconnecting to Monarch…' : listening.value && props.onVoiceSend ? 'Listening… tap the square when you’re done' : (props.placeholder ?? 'Message Monarch…')}
+            disabled={offline}
+            class="flex-1 resize-none bg-transparent outline-none text-[14.5px] leading-[1.55] text-fg placeholder:text-fg-3 py-1.5 max-h-[260px] min-h-[34px] disabled:opacity-60"
+            aria-label="Message"
+          />
+          {props.onVoiceSend && <MicButton disabled={disabled || !!props.running} onText={(t) => void props.onVoiceSend!(t)} />}
+          {props.running ? (
+            <button
+              class="w-9 h-9 shrink-0 rounded-full flex items-center justify-center bg-[var(--bg-subtle)] text-fg hover:bg-[var(--bg-raised,#202023)] transition-colors duration-150"
+              onClick={() => props.onAbort?.()}
+              title="Stop (Esc)"
+              aria-label="Stop"
+            >
+              <Square size={12} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              class="w-9 h-9 shrink-0 rounded-full flex items-center justify-center bg-red text-fg hover:bg-red-hover disabled:bg-[var(--bg-subtle)] disabled:text-fg-3 transition-colors duration-150"
+              onClick={submit}
+              disabled={disabled || !text.trim()}
+              title="Send (Enter)"
+              aria-label="Send"
+            >
+              <ArrowUp size={17} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+        <div class="flex items-center gap-3 px-1 pt-2 text-[11.5px] text-fg-3 min-h-7">
+          <div class="flex items-center gap-3 min-w-0">{props.tools}</div>
+          <div class="flex items-center gap-3 min-w-0 truncate">{props.meta}</div>
+          {props.commands?.length ? (
+            <span class="ml-auto hidden md:inline shrink-0">
+              Type <span class="font-mono text-fg-2">/</span> for commands
+            </span>
+          ) : null}
         </div>
       </div>
     </div>
@@ -270,17 +267,17 @@ function MicButton(props: { disabled?: boolean; onText: (text: string) => void }
   return (
     <button
       type="button"
-      class={`relative btn btn-sm rounded-[2px] mb-0.5 px-2.5 border ${
-        on ? 'bg-transparent border-red text-red' : ready ? 'btn-ghost border-line text-fg-2 hover:text-fg hover:border-fg-3' : 'btn-ghost border-line text-fg-3/60 hover:text-fg-2'
+      class={`relative w-9 h-9 shrink-0 rounded-full flex items-center justify-center overflow-hidden transition-colors duration-150 ${
+        on ? 'bg-red/15 text-red' : ready ? 'text-fg-3 hover:text-fg hover:bg-[var(--bg-raised,#202023)]' : 'text-fg-3/60 hover:text-fg-2 hover:bg-[var(--bg-raised,#202023)]'
       }`}
       onClick={() => void click()}
       disabled={props.disabled && !on}
       title={on ? 'Stop listening' : ready ? 'Speak your message' : UNSUPPORTED_LISTEN}
       aria-label={on ? 'Stop listening' : 'Voice input'}
     >
-      {on ? <Square size={11} fill="currentColor" /> : <Mic size={14} strokeWidth={1.5} />}
+      {on ? <Square size={11} fill="currentColor" /> : <Mic size={17} strokeWidth={1.75} />}
       {on && (
-        <span class="absolute left-0 bottom-0 h-0.5 bg-red transition-[width] duration-100" style={{ width: `${Math.round(Math.max(0.08, micLevel.value) * 100)}%` }} />
+        <span class="absolute inset-0 rounded-full border-2 border-red transition-opacity duration-100" style={{ opacity: Math.max(0.15, Math.min(1, micLevel.value * 1.6)) }} />
       )}
     </button>
   );

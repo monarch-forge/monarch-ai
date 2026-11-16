@@ -34,18 +34,18 @@ function UsageBody(props: { u: UsageReport }) {
       <div class="flex items-end justify-between gap-3">
         <div>
           <div class="font-mono font-light text-[32px] leading-none tracking-tight tabular-nums text-fg">{fmt.num(total)}</div>
-          <div class="hud-label text-[10px] mt-1.5">Tokens · 24h</div>
+          <div class="hud-label text-[11px] mt-1.5">Tokens · 24h</div>
         </div>
         <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 text-right">
-          <span class="hud-label text-[10px]">Cost</span>
-          <span class="hud-label text-[10px]">Req</span>
+          <span class="hud-label text-[11px]">Cost</span>
+          <span class="hud-label text-[11px]">Req</span>
           <span class="hud-value text-[13px]">{fmt.usd(totals.costUsd ?? 0)}</span>
           <span class="hud-value text-[13px]">{fmt.num(totals.requests ?? 0)}</span>
         </div>
       </div>
       <div class="relative">
         <Sparkline values={series.length > 1 ? series : [0, 0]} height={34} min={0} stroke="#D71921" fill="rgb(215 25 33 / 0.08)" />
-        <div class="flex justify-between font-mono text-[9px] text-fg-3 tracking-[0.1em] mt-0.5">
+        <div class="flex justify-between font-mono text-[9px] text-fg-3 mt-0.5">
           <span>−24H</span>
           <span>
             IN {fmt.num(totals.inputTokens ?? 0)} · OUT {fmt.num(totals.outputTokens ?? 0)}
@@ -54,7 +54,7 @@ function UsageBody(props: { u: UsageReport }) {
         </div>
       </div>
       {byModel.length > 0 ? (
-        <div class="flex flex-col gap-1 border-t border-line pt-2">
+        <div class="flex flex-col gap-1 pt-1">
           {byModel.map((m) => (
             <div key={m.model} class="grid grid-cols-[1fr_64px_52px_48px] items-center gap-2 text-[11px]">
               <span class="font-mono text-fg-2 truncate" title={m.model}>
@@ -67,7 +67,7 @@ function UsageBody(props: { u: UsageReport }) {
           ))}
         </div>
       ) : (
-        <div class="border-t border-line pt-2 font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3">No model calls in 24h</div>
+        <div class="pt-1 font-mono text-[10px] text-fg-3">No model calls in 24h</div>
       )}
     </div>
   );
@@ -161,7 +161,7 @@ export function UplinksPanel(props: { class?: string }) {
           label="No uplinks"
           sub="Connect a model provider, Gmail or Slack."
           action={
-            <button type="button" class="mt-1 font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2 hover:text-fg underline decoration-line underline-offset-4" onClick={() => navigate('config')}>
+            <button type="button" class="mt-1 text-[12.5px] text-fg-2 hover:text-fg underline decoration-fg-3/50 underline-offset-4" onClick={() => navigate('config')}>
               Open Config →
             </button>
           }
@@ -170,13 +170,12 @@ export function UplinksPanel(props: { class?: string }) {
         <div class="flex-1 min-h-0 overflow-y-auto px-2 py-1.5">
           {links.map((l) => (
             <button type="button" key={l.key} class="hud-row w-full text-left !py-1.5" onClick={() => navigate(l.href)} title={l.title}>
-              <span class={`font-mono text-[11px] tabular-nums w-12 shrink-0 ${l.tone === 'red' ? 'text-red' : 'text-fg'}`}>{l.code}</span>
               <span class="flex-1 min-w-0 flex items-baseline gap-2">
-                <span class="font-mono text-[9.5px] tracking-[0.12em] text-fg-3 w-11 shrink-0">{l.kind}</span>
+                <span class="font-mono text-[9.5px] text-fg-3 w-11 shrink-0">{l.kind}</span>
                 <span class="text-[12px] text-fg-2 truncate">{l.name}</span>
               </span>
               <SegBar value={l.strength} segments={10} tone={l.tone} class="w-[76px] shrink-0" />
-              <span class={`font-mono text-[10px] tracking-[0.08em] tabular-nums w-14 text-right shrink-0 ${l.statusTone === 'red' ? 'text-red' : l.statusTone === 'fg' ? 'text-fg' : 'text-fg-2'}`}>
+              <span class={`font-mono text-[10px] tabular-nums w-14 text-right shrink-0 ${l.statusTone === 'red' ? 'text-red' : l.statusTone === 'fg' ? 'text-fg' : 'text-fg-2'}`}>
                 {l.status}
               </span>
             </button>
@@ -217,9 +216,9 @@ export function LogPanel(props: { class?: string }) {
           {entries.map((e) => {
             const err = e.tag === 'ERR' || e.level === 'error';
             return (
-              <li key={e.id} class="grid grid-cols-[58px_38px_1fr] gap-2 py-1.5 border-b border-line/50 last:border-b-0">
+              <li key={e.id} class="grid grid-cols-[58px_38px_1fr] gap-2 py-1.5">
                 <span class="font-mono text-[10.5px] text-fg-3 tabular-nums pt-px">{fmt.timeSec(e.ts)}</span>
-                <span class={`font-mono text-[10.5px] tracking-[0.06em] pt-px ${err ? 'text-red' : e.level === 'warn' ? 'text-warning' : e.tag === 'AGT' ? 'text-red/80' : 'text-fg-3'}`}>{e.tag}</span>
+                <span class={`font-mono text-[10.5px] pt-px ${err ? 'text-red' : e.level === 'warn' ? 'text-warning' : e.tag === 'AGT' ? 'text-red/80' : 'text-fg-3'}`}>{e.tag}</span>
                 {e.sessionId ? (
                   <a href={`#/comms/${e.sessionId}`} class={`text-[12px] leading-snug line-clamp-2 hover:text-fg ${err ? 'text-fg' : 'text-fg-2'}`} title={e.text}>
                     {e.text}

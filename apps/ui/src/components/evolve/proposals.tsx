@@ -17,7 +17,6 @@ export function ProposalsTab() {
 
   return (
     <Panel
-      code="EVO.31"
       title="Proposals"
       class="h-full"
       noPad
@@ -104,7 +103,7 @@ function ProposalCard(props: { p: EvolutionProposal; onChanged: () => Promise<vo
       </header>
       <p class="px-3.5 pl-[38px] mt-1.5 text-[12.5px] text-fg-2 leading-relaxed">{p.rationale}</p>
       <div class="px-3.5 pl-[34px] mt-2">
-        <button class="flex items-center gap-1 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 hover:text-fg-2 py-1" onClick={() => setPlanOpen(!planOpen)} aria-expanded={planOpen}>
+        <button class="flex items-center gap-1 text-[12px] text-fg-3 hover:text-fg-2 py-1" onClick={() => setPlanOpen(!planOpen)} aria-expanded={planOpen}>
           {planOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Plan
         </button>
         {planOpen && (
@@ -118,12 +117,12 @@ function ProposalCard(props: { p: EvolutionProposal; onChanged: () => Promise<vo
           {ago(p.ts)}
         </span>
         {p.sessionId && (
-          <button class="font-mono text-[10px] tracking-[0.1em] uppercase text-fg-3 hover:text-fg-2 flex items-center gap-1" onClick={() => openSession(p.sessionId)} title="Session that proposed this">
+          <button class=" text-[12px] text-fg-3 hover:text-fg-2 flex items-center gap-1" onClick={() => openSession(p.sessionId)} title="Session that proposed this">
             <MessageSquare size={10} /> origin
           </button>
         )}
         {p.buildSessionId && (
-          <button class="font-mono text-[10px] tracking-[0.1em] uppercase text-fg-2 hover:text-fg flex items-center gap-1" onClick={() => openSession(p.buildSessionId)}>
+          <button class=" text-[12px] text-fg-2 hover:text-fg flex items-center gap-1" onClick={() => openSession(p.buildSessionId)}>
             <Hammer size={10} /> build session
           </button>
         )}

@@ -6,7 +6,6 @@
 import { useMemo, useRef, useState } from 'preact/hooks';
 import type { MemoryGraph, MemoryNote } from '@monarch/shared';
 import { Search, Network } from 'lucide-preact';
-import { Panel, Tag } from '../components/ui.tsx';
 import { useResource } from '../lib/store.ts';
 import { GraphCanvas, type GraphCanvasHandle } from '../components/graph/graph-view.tsx';
 import { filterGraph, normalizeGraph } from '../components/graph/model.ts';
@@ -74,29 +73,17 @@ export default function MemoryPage(props: { params: string[] }) {
   const noteCount = graph.nodes.filter((n) => n.kind === 'note').length;
 
   return (
-    <div class="h-full p-3 flex gap-3 min-h-0">
-      <Panel
-        code="MEM.01"
-        title="Knowledge graph"
-        class="flex-1 min-w-0"
-        noPad
-        bodyClass="flex flex-col"
-        right={
-          <>
-            {demo && <Tag tone="warn">demo</Tag>}
-            {res.loading && hasData && !demo && <span class="loading loading-spinner loading-xs text-fg-3" />}
-            <Tag>{noteCount} notes</Tag>
-          </>
-        }
-      >
-        {/* toolbar */}
-        <div class="flex items-center gap-2 px-3 py-2 border-b border-line flex-wrap">
-          <label class="relative w-60">
-            <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+    <div class="h-full flex flex-col lg:flex-row gap-4 min-h-0 p-3 sm:p-4 lg:p-5">
+      <section class={`${noteId ? 'hidden lg:flex' : 'flex'} flex-1 min-w-0 min-h-[320px] flex-col bg-surface rounded-[10px] overflow-hidden relative`}>
+        {/* floating toolbar over the graph */}
+        <div class="absolute top-3 left-3 right-3 z-10 flex items-start gap-2 flex-wrap pointer-events-none">
+          <label class="relative w-56 max-w-full pointer-events-auto">
+            <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="hud-input py-1.5! pl-7! text-[13px]!"
-              placeholder="Highlight nodes… (#tag)"
+              class="w-full bg-[#121213]/80 backdrop-blur rounded-md pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-[#121213]"
+              placeholder="Find in graph"
+              title="Highlight matching notes; #tag works too. Enter to focus, Shift+Enter to open."
               value={search}
               aria-label="Highlight nodes in graph"
               onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
@@ -112,8 +99,12 @@ export default function MemoryPage(props: { params: string[] }) {
               }}
             />
           </label>
-          {search.trim() && <span class="font-mono text-[10px] tracking-widest uppercase text-fg-3">{matches.length} match{matches.length === 1 ? '' : 'es'}</span>}
-          <div class="ml-auto flex items-center gap-1.5">
+          {search.trim() && (
+            <span class="pointer-events-auto self-center text-[12px] text-fg-3">
+              {matches.length} match{matches.length === 1 ? '' : 'es'}
+            </span>
+          )}
+          <div class="ml-auto flex items-center gap-1 pointer-events-auto bg-[#121213]/70 backdrop-blur rounded-md p-0.5">
             <Toggle on={local} onClick={() => setLocal(!local)} title="Only the open note and neighbours within 2 hops (l)" disabled={!noteId && !local}>
               Local
             </Toggle>
@@ -125,6 +116,12 @@ export default function MemoryPage(props: { params: string[] }) {
             </Toggle>
           </div>
         </div>
+        <div class="absolute bottom-3 left-4 z-10 flex items-center gap-2 text-[11.5px] text-fg-3 pointer-events-none">
+          {demo && <span class="text-warning/80">demo</span>}
+          {res.loading && hasData && !demo && <span class="loading loading-spinner loading-xs text-fg-3" />}
+          {hasData && graph.nodes.length > 0 && <span>{noteCount} notes</span>}
+          {view.local && <span>· local view</span>}
+        </div>
         <div class="flex-1 min-h-0 relative">
           {!hasData && res.error ? (
             <div class="absolute inset-0 flex items-center justify-center">
@@ -132,12 +129,12 @@ export default function MemoryPage(props: { params: string[] }) {
             </div>
           ) : !hasData ? (
             <div class="absolute inset-0 flex items-center justify-center">
-              <Loading label="Mapping vault" />
+              <Loading label="Mapping your notes" />
             </div>
           ) : !graph.nodes.length ? (
             <div class="absolute inset-0 flex items-center justify-center">
-              <StateBlock icon={<Network size={28} strokeWidth={1} />} title="No notes yet">
-                Notes you or Monarch write into the vault appear here as a living graph. Link notes with [[wikilinks]] to connect them.
+              <StateBlock icon={<Network size={30} strokeWidth={1.25} />} title="Your memory is empty">
+                Notes you or Monarch write show up here as a living graph. Link them with [[wikilinks]] to watch them connect.
               </StateBlock>
             </div>
           ) : (
@@ -155,27 +152,22 @@ export default function MemoryPage(props: { params: string[] }) {
                 handle={(h) => (handle.current = h)}
               />
               {localUnavailable && (
-                <div class="absolute top-3 left-3 font-mono text-[10px] tracking-widest uppercase text-fg-3 bg-surface/90 border border-line px-2 py-1">
-                  {noteId ? 'Open note not in graph — showing full vault' : 'Open a note to see its local graph'}
-                </div>
-              )}
-              {view.local && (
-                <div class="absolute top-3 left-3 font-mono text-[10px] tracking-widest uppercase text-fg-2 bg-surface/90 border border-line px-2 py-1">
-                  Local · depth 2
+                <div class="absolute top-14 left-3 text-[12px] text-fg-3 bg-[#121213]/80 rounded-md px-2.5 py-1">
+                  {noteId ? 'That note isn’t in the graph, so here’s everything' : 'Open a note to see its neighbourhood'}
                 </div>
               )}
             </>
           )}
         </div>
-      </Panel>
+      </section>
 
-      <Panel code="MEM.02" title={noteId ? 'Note' : 'Vault'} class="w-[400px] xl:w-[440px] shrink-0" noPad bodyClass="flex flex-col">
+      <section class={`flex w-full lg:w-[400px] xl:w-[460px] shrink-0 flex-col min-h-0 ${noteId ? 'flex-1 lg:flex-none' : 'max-h-[45%] lg:max-h-none'} bg-surface rounded-[10px] overflow-hidden`}>
         {noteId ? (
           <NoteView id={noteId} nodes={graph.nodes} demo={demo ? demoNote : undefined} onTag={onTag} onLocate={(id) => handle.current?.focus(id)} />
         ) : (
           <NoteList demoNodes={demo ? graph.nodes : null} onNew={() => setNewOpen(true)} />
         )}
-      </Panel>
+      </section>
       <NewNoteModal open={newOpen} onClose={() => setNewOpen(false)} nodes={graph.nodes} demo={demo} />
     </div>
   );
@@ -184,15 +176,12 @@ export default function MemoryPage(props: { params: string[] }) {
 function Toggle(props: { on: boolean; onClick: () => void; title?: string; disabled?: boolean; children: string }) {
   return (
     <button
-      class={`font-mono text-[10px] tracking-[0.12em] uppercase px-2 py-1 border inline-flex items-center gap-1.5 disabled:opacity-40 ${
-        props.on ? 'border-fg-3 text-fg bg-subtle' : 'border-line text-fg-3 hover:text-fg-2'
-      }`}
+      class={`text-[12px] px-2.5 py-1 rounded-[5px] transition-colors disabled:opacity-40 ${props.on ? 'bg-white/[0.08] text-fg' : 'text-fg-3 hover:text-fg-2'}`}
       aria-pressed={props.on}
       title={props.title}
       disabled={props.disabled}
       onClick={props.onClick}
     >
-      <span class={`inline-block w-1.5 h-1.5 ${props.on ? 'bg-red' : 'border border-fg-3'}`} />
       {props.children}
     </button>
   );

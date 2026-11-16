@@ -17,35 +17,40 @@ import { VoiceSection } from '../components/config/voice.tsx';
 import { SyncSection } from '../components/config/sync.tsx';
 
 const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
-  { id: 'general', label: 'General', icon: UserRound, desc: 'Identity, location, persona', page: GeneralSection, needsSettings: true },
-  { id: 'models', label: 'Models', icon: Cpu, desc: 'Engine and default models', page: ModelsSection, needsSettings: true },
-  { id: 'providers', label: 'Providers', icon: KeyRound, desc: 'API keys and logins', page: ProvidersSection, needsSettings: false },
-  { id: 'voice', label: 'Voice', icon: AudioLines, desc: 'Cloud speech in and out', page: VoiceSection, needsSettings: true },
+  { id: 'general', label: 'General', icon: UserRound, desc: 'Who you are, where you are, and how Monarch talks', page: GeneralSection, needsSettings: true },
+  { id: 'models', label: 'Models', icon: Cpu, desc: 'Which models do the thinking', page: ModelsSection, needsSettings: true },
+  { id: 'providers', label: 'Providers', icon: KeyRound, desc: 'Connect the services Monarch can use', page: ProvidersSection, needsSettings: false },
+  { id: 'voice', label: 'Voice', icon: AudioLines, desc: 'Listening and speaking', page: VoiceSection, needsSettings: true },
   { id: 'accounts', label: 'Accounts', icon: Link2, desc: 'Google and Slack', page: AccountsSection, needsSettings: false },
-  { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'Approvals and folders', page: PermissionsSection, needsSettings: true },
-  { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'Self-extension and reflection', page: EvolutionSection, needsSettings: true },
-  { id: 'sync', label: 'Sync', icon: RefreshCcw, desc: 'Encrypted backup across devices', page: SyncSection, needsSettings: true },
+  { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'What Monarch may do without asking', page: PermissionsSection, needsSettings: true },
+  { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'How Monarch grows new abilities', page: EvolutionSection, needsSettings: true },
+  { id: 'sync', label: 'Sync', icon: RefreshCcw, desc: 'Keep your devices in step, end-to-end encrypted', page: SyncSection, needsSettings: true },
 ];
 
 export default function ConfigPage(props: { params: string[] }) {
   const tab = TABS.find((t) => t.id === props.params[0]) ?? TABS[0];
   const Page = tab.page;
-  const idx = TABS.indexOf(tab);
-  const s = settings.value;
+    const s = settings.value;
 
   return (
-    <div class="h-full p-3 grid gap-3 grid-cols-[220px_minmax(0,1fr)]">
-      <Panel code="CFG.00" title="Config" noPad bodyClass="flex flex-col">
-        <nav class="py-1.5 flex-1" aria-label="Config sections">
+    <div class="h-full overflow-y-auto lg:overflow-hidden">
+      <div class="lg:h-full flex flex-col lg:grid lg:grid-cols-[232px_minmax(0,1fr)] gap-2 lg:gap-6 px-4 lg:px-6 pt-4 lg:pt-6">
+        <nav
+          class="flex lg:flex-col gap-0.5 overflow-x-auto [scrollbar-width:none] lg:overflow-visible shrink-0 -mx-1 px-1 lg:mx-0 lg:px-0"
+          aria-label="Settings sections"
+        >
+          <div class="hidden lg:block px-3 pb-3 text-[18px] font-semibold text-fg">Settings</div>
           {TABS.map((t, i) => {
             const Icon = t.icon;
+            const on = t.id === tab.id;
             return (
               <a
                 key={t.id}
                 href={`#/config/${t.id}`}
-                class="hud-row !items-start !py-2.5"
-                data-active={t.id === tab.id ? 'true' : 'false'}
-                aria-current={t.id === tab.id ? 'page' : undefined}
+                class={`relative flex items-center gap-2.5 shrink-0 rounded-[6px] px-3 py-2 text-[13.5px] transition-colors duration-150 ${
+                  on ? 'bg-raised text-fg' : 'text-fg-2 hover:bg-raised/60 hover:text-fg'
+                }`}
+                aria-current={on ? 'page' : undefined}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                     e.preventDefault();
@@ -55,59 +60,47 @@ export default function ConfigPage(props: { params: string[] }) {
                   }
                 }}
               >
-                <Icon size={14} strokeWidth={1.5} class={`mt-0.5 shrink-0 ${t.id === tab.id ? 'text-fg' : 'text-fg-3'}`} />
-                <span class="flex-1 min-w-0">
-                  <span class={`block font-mono text-[11px] tracking-[0.14em] uppercase ${t.id === tab.id ? 'text-fg' : 'text-fg-2'}`}>{t.label}</span>
-                  <span class="block text-[11px] text-fg-3 truncate mt-0.5">{t.desc}</span>
-                </span>
-                <span class="font-mono text-[10px] text-fg-3">{String(i + 1).padStart(2, '0')}</span>
+                {on && <span class="hidden lg:block absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red" aria-hidden="true" />}
+                <Icon size={15} strokeWidth={1.6} class={on ? 'text-fg' : 'text-fg-3'} />
+                <span>{t.label}</span>
               </a>
             );
           })}
-        </nav>
-        <div class="border-t border-line px-3.5 py-3 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 flex flex-col gap-1">
-          <div class="flex justify-between">
-            <span>core</span>
-            <span class={conn.value === 'open' ? 'text-fg-2' : 'text-warning'}>{conn.value === 'open' ? 'online' : conn.value}</span>
-          </div>
-          {health.value && (
-            <div class="flex justify-between">
-              <span>version</span>
-              <span class="text-fg-2">{health.value.version}</span>
-            </div>
-          )}
-          {s && (
-            <div class="flex justify-between">
-              <span>engine</span>
-              <span class="text-fg-2">{s.engine === 'pi' ? 'pi' : 'claude sdk'}</span>
-            </div>
-          )}
-        </div>
-      </Panel>
-
-      <div class="min-h-0 overflow-y-auto pr-1">
-        <div class="max-w-[960px] flex flex-col gap-3 pb-6">
-          <div class="flex items-end gap-3 px-1 pt-1">
-            <span class="font-mono text-[11px] text-fg-3">CFG.{String(idx + 1).padStart(2, '0')}</span>
-            <h1 class="font-mono text-[13px] tracking-[0.2em] uppercase text-fg">{tab.label}</h1>
-            <span class="text-[12px] text-fg-3">{tab.desc}</span>
-            {conn.value !== 'open' && (
-              <span class="ml-auto">
-                <Tag tone="warn">core offline</Tag>
+          <div class="hidden lg:flex flex-col gap-1 mt-auto px-3 py-4 text-[12px] text-fg-3">
+            <span class="flex items-center gap-2">
+              <span class={`inline-block w-1.5 h-1.5 rounded-full ${conn.value === 'open' ? 'bg-success' : 'bg-warning'}`} />
+              {conn.value === 'open' ? 'Core connected' : 'Core offline'}
+            </span>
+            {(health.value || s) && (
+              <span class="font-mono text-[11px]">
+                {health.value ? `v${health.value.version}` : ''}
+                {s ? ` · ${s.engine === 'pi' ? 'pi' : 'claude sdk'}` : ''}
               </span>
             )}
           </div>
-          {conn.value !== 'open' && !s && tab.needsSettings ? (
-            <Panel code="ERR" title="Core unreachable">
-              <ErrorLine error="The Monarch core is not reachable at the moment. Settings will load as soon as it reconnects." />
-            </Panel>
-          ) : tab.needsSettings ? (
-            <SettingsGate>
+        </nav>
+
+        <div class="lg:min-h-0 lg:overflow-y-auto">
+          <div class="max-w-[760px] flex flex-col gap-4 pb-10">
+            <header class="pt-1 pb-1">
+              <h1 class="text-[20px] font-semibold text-fg flex items-center gap-3">
+                {tab.label}
+                {conn.value !== 'open' && <Tag tone="warn">core offline</Tag>}
+              </h1>
+              <p class="text-[13px] text-fg-3 mt-0.5">{tab.desc}</p>
+            </header>
+            {conn.value !== 'open' && !s && tab.needsSettings ? (
+              <Panel title="Can't reach the core">
+                <ErrorLine error="The Monarch core is not reachable at the moment. Settings will load as soon as it reconnects." />
+              </Panel>
+            ) : tab.needsSettings ? (
+              <SettingsGate>
+                <Page key={tab.id} />
+              </SettingsGate>
+            ) : (
               <Page key={tab.id} />
-            </SettingsGate>
-          ) : (
-            <Page key={tab.id} />
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

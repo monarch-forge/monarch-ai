@@ -63,7 +63,7 @@ export function ExtOverview(props: { d: ExtensionDetail; onChanged: () => Promis
               <div key={j.id} class="px-3 py-2 flex items-start gap-3 flex-wrap">
                 <span class={`inline-block w-1.5 h-1.5 mt-1.5 ${j.lastError ? 'bg-red' : j.lastRunAt ? 'bg-fg-2' : 'border border-fg-3'}`} />
                 <span class="font-mono text-[12px] text-fg">{j.id}</span>
-                <span class="font-mono text-[10px] tracking-[0.1em] uppercase text-fg-3 mt-0.5">every {everyLabel(j.everyMinutes)}</span>
+                <span class=" text-[12px] text-fg-3 mt-0.5">every {everyLabel(j.everyMinutes)}</span>
                 <span class="ml-auto font-mono text-[10px] text-fg-3 mt-0.5" title={j.lastRunAt ? stamp(j.lastRunAt) : undefined}>
                   {j.lastRunAt ? `ran ${ago(j.lastRunAt)}` : 'not run yet'}
                 </span>
@@ -251,7 +251,7 @@ function ToolRow(props: { extId: string; tool: ExtensionToolInfo; disabled: bool
             </Btn>
             <span class="font-mono text-[10px] text-fg-3">{props.disabled ? 'extension must be active' : tool.risk !== 'safe' ? `runs for real · ${tool.risk}` : 'Ctrl+Enter'}</span>
             {result && (
-              <span class="ml-auto font-mono text-[10px] tracking-[0.1em] uppercase flex items-center gap-1.5">
+              <span class="ml-auto text-[12px] flex items-center gap-1.5">
                 <span class={result.ok ? 'text-fg-2' : 'text-red'}>{result.ok ? 'ok' : 'failed'}</span>
                 {result.durationMs > 0 && <span class="text-fg-3">{result.durationMs} ms</span>}
               </span>
@@ -288,7 +288,7 @@ function ExtPanelView(props: { extId: string; panelId: string; title: string; ac
   return (
     <section class="border border-line bg-[#121213]/40 min-w-0">
       <header class="flex items-center gap-2 px-3 py-2 border-b border-line">
-        <span class="font-mono text-[11px] tracking-[0.14em] uppercase text-fg truncate">{c?.title || props.title}</span>
+        <span class=" text-[12px] text-fg truncate">{c?.title || props.title}</span>
         <span class="ml-auto font-mono text-[10px] text-fg-3">{c ? ago(c.updatedAt) : ''}</span>
         <button class="text-fg-3 hover:text-fg disabled:opacity-40" onClick={() => void res.reload()} disabled={!props.active || res.loading} aria-label={`Refresh ${props.title}`} title="Refresh">
           {res.loading && c ? <Spinner /> : <RefreshCw size={12} />}
@@ -357,7 +357,7 @@ export function PanelBody(props: { c: PanelContent }) {
           })}
         </ul>
       )}
-      {empty && <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3 text-center py-3">Empty panel</div>}
+      {empty && <div class=" text-[12px] text-fg-3 text-center py-3">Empty panel</div>}
     </div>
   );
 }
@@ -376,22 +376,22 @@ export function ExtLogs(props: { d: ExtensionDetail }) {
   return (
     <div class="flex flex-col h-full min-h-[320px]">
       <div class="flex items-center gap-2 px-4 py-2 border-b border-line flex-wrap">
-        <span class="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3">
+        <span class="flex items-center gap-1.5 text-[12px] text-fg-3">
           <span class="inline-block w-1.5 h-1.5 bg-fg-2 hud-blink" /> live · 3s
         </span>
         <div class="ml-auto flex items-center gap-1" role="group" aria-label="Log level">
           {(['all', 'warn', 'error'] as const).map((l) => (
             <button
               key={l}
-              class={`font-mono text-[10px] tracking-[0.12em] uppercase px-2 py-0.5 border ${level === l ? 'border-fg-3 text-fg bg-subtle' : 'border-line text-fg-3 hover:text-fg-2'}`}
+              class={` text-[12px] px-2 py-0.5 border ${level === l ? 'border-fg-3 text-fg bg-subtle' : 'border-line text-fg-3 hover:text-fg-2'}`}
               aria-pressed={level === l}
               onClick={() => setLevel(l)}
             >
               {l}
             </button>
           ))}
-          <label class="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 ml-2 cursor-pointer">
-            <input type="checkbox" class="checkbox checkbox-xs rounded-[2px] border-line" checked={follow} onChange={(e) => setFollow((e.target as HTMLInputElement).checked)} />
+          <label class="flex items-center gap-1.5 text-[12px] text-fg-3 ml-2 cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-xs rounded-[6px] border-line" checked={follow} onChange={(e) => setFollow((e.target as HTMLInputElement).checked)} />
             follow
           </label>
         </div>
@@ -401,12 +401,12 @@ export function ExtLogs(props: { d: ExtensionDetail }) {
           shown.map((l, i) => (
             <div key={i} class="flex gap-3 min-w-0">
               <span class="text-fg-3 shrink-0 tabular-nums">{fmt.timeSec(l.ts)}</span>
-              <span class={`shrink-0 w-10 uppercase text-[10px] pt-[2px] ${l.level === 'error' ? 'text-red' : l.level === 'warn' ? 'text-warning' : 'text-fg-3'}`}>{l.level}</span>
+              <span class={`shrink-0 w-10 text-[12px] pt-[2px] ${l.level === 'error' ? 'text-red' : l.level === 'warn' ? 'text-warning' : 'text-fg-3'}`}>{l.level}</span>
               <span class={`whitespace-pre-wrap break-words min-w-0 ${l.level === 'error' ? 'text-fg' : 'text-fg-2'}`}>{l.text}</span>
             </div>
           ))
         ) : (
-          <div class="text-fg-3 py-8 text-center text-[10px] tracking-[0.16em] uppercase">No log lines{level !== 'all' ? ` at ${level}` : ''}</div>
+          <div class="text-fg-3 py-8 text-center text-[12px]">No log lines{level !== 'all' ? ` at ${level}` : ''}</div>
         )}
       </div>
     </div>
@@ -451,7 +451,7 @@ export function ExtHistory(props: { d: ExtensionDetail; onChanged: () => Promise
                 <span class="font-mono text-[12px] text-fg">rev {h.revision}</span>
                 <Tag tone="plain">{h.actor}</Tag>
                 {current && (
-                  <span class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-2 flex items-center gap-1">
+                  <span class=" text-[12px] text-fg-2 flex items-center gap-1">
                     <Check size={10} /> current
                   </span>
                 )}

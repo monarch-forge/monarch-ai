@@ -29,7 +29,7 @@ export function FlagsPanel(props: { res: Resource<Briefing>; class?: string }) {
                   const body = (
                     <>
                       <span class={`inline-block w-1.5 h-1.5 shrink-0 ${f.level === 'error' ? 'bg-red' : f.level === 'warn' ? 'bg-warning' : 'bg-fg-3'}`} />
-                      <span class={`font-mono text-[10.5px] tracking-[0.06em] w-9 shrink-0 ${f.level === 'error' ? 'text-red' : 'text-fg-3'}`}>{f.tag}</span>
+                      <span class={`font-mono text-[10.5px] w-9 shrink-0 ${f.level === 'error' ? 'text-red' : 'text-fg-3'}`}>{f.tag}</span>
                       <span class={`flex-1 min-w-0 truncate ${f.level === 'info' ? 'text-fg-2' : 'text-fg'}`}>{f.text}</span>
                       {f.href && <span class="font-mono text-[10px] text-fg-3">→</span>}
                     </>
@@ -61,7 +61,7 @@ export function FlagsPanel(props: { res: Resource<Briefing>; class?: string }) {
 function Counter(props: { label: string; value: number | undefined; onClick: () => void; attention?: boolean }) {
   return (
     <button type="button" class="flex-1 flex items-center justify-between gap-2 px-3.5 py-1.5 text-left hover:bg-white/[0.02] group" onClick={props.onClick}>
-      <span class="hud-label text-[10px] group-hover:text-fg-2">{props.label}</span>
+      <span class="hud-label text-[11px] group-hover:text-fg-2">{props.label}</span>
       <span class="flex items-center gap-2">
         <span class={`hud-value text-[18px] font-light ${props.attention ? 'text-fg' : 'text-fg-2'}`}>{typeof props.value === 'number' ? props.value : '—'}</span>
         <span class="font-mono text-[10px] text-fg-3 group-hover:text-fg-2">→</span>
@@ -76,7 +76,7 @@ function NextEvent(props: { br: Briefing }) {
   return (
     <button type="button" class="flex-1 flex flex-col justify-center gap-0.5 px-3.5 py-1.5 text-left hover:bg-white/[0.02] min-w-0" onClick={() => navigate('agenda')}>
       <span class="flex items-center justify-between gap-2">
-        <span class="hud-label text-[10px]">Next</span>
+        <span class="hud-label text-[11px]">Next</span>
         {e && <span class="hud-value text-[10.5px] text-fg-2">{fmt.countdown(e.start, now)}</span>}
       </span>
       <span class="text-[11.5px] text-fg-2 truncate">{e ? e.title : 'No upcoming events'}</span>

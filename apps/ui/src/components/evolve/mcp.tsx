@@ -9,9 +9,9 @@ import { Panel, Tag, Spinner, Empty, Btn } from '../ui.tsx';
 import { Modal, useConfirm } from '../mail/kit.tsx';
 import { Field, INPUT, SELECT, TEXTAREA, TOGGLE, ToggleRow } from '../config/fields.tsx';
 
-const BTN = 'btn btn-xs rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]';
+const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
 const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
-const SEL_XS = 'select select-xs bg-[#121213] border-line rounded-[2px] font-mono text-[10px] uppercase';
+const SEL_XS = 'select select-xs bg-[#121213] border-line rounded-[6px] text-[12px]';
 const RISKS: ToolRisk[] = ['safe', 'sensitive', 'dangerous'];
 
 const STATUS_TONE: Record<McpServer['status'], 'ok' | 'warn' | 'red' | 'plain'> = { connected: 'ok', connecting: 'warn', error: 'red', disabled: 'plain' };
@@ -51,7 +51,6 @@ export function McpSection() {
   return (
     <>
       <Panel
-        code="CFG.91"
         title="MCP servers"
         right={
           <>
@@ -84,7 +83,7 @@ export function McpSection() {
         </div>
       </Panel>
 
-      <Panel code="CFG.92" title="Servers" noPad>
+      <Panel title="Servers" noPad>
         {res.loading && !res.data ? (
           <div class="flex justify-center py-8">
             <Spinner />
@@ -97,7 +96,7 @@ export function McpSection() {
             <div class="hud-label text-[10px]">Quick add</div>
             <div class="grid gap-2 sm:grid-cols-3">
               {EXAMPLES.map((ex) => (
-                <button key={ex.label} class="text-left border border-line rounded-[2px] p-3 hover:border-fg-3 hover:bg-subtle/50" onClick={() => setEditor({ preset: ex.draft })}>
+                <button key={ex.label} class="text-left border border-line rounded-[6px] p-3 hover:border-fg-3 hover:bg-subtle/50" onClick={() => setEditor({ preset: ex.draft })}>
                   <div class="flex items-center gap-2 text-[13px] text-fg">
                     <Plug size={12} class="text-fg-3" /> {ex.label}
                   </div>
@@ -224,7 +223,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             {target(s) || '—'}
           </div>
         </div>
-        <div class="hidden sm:flex flex-col items-end font-mono text-[10px] uppercase tracking-[0.1em] text-fg-3 shrink-0">
+        <div class="hidden sm:flex flex-col items-end text-[12px] text-fg-3 shrink-0">
           <span>
             <span class="text-fg-2">{enabledTools}</span>
             {enabledTools !== s.tools.length ? `/${s.tools.length}` : ''} tools
@@ -302,10 +301,10 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             {s.tools.length === 0 ? (
               <div class="text-[12px] text-fg-3">{s.status === 'connected' ? 'This server exposes no tools.' : 'Tools appear once the server is connected.'}</div>
             ) : (
-              <div class="border border-line rounded-[2px] overflow-x-auto">
+              <div class="border border-line rounded-[6px] overflow-x-auto">
                 <table class="table table-sm">
                   <thead>
-                    <tr class="border-line font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3">
+                    <tr class="border-line text-[12px] text-fg-3">
                       <th class="w-8">On</th>
                       <th>Tool</th>
                       <th class="w-32">Risk</th>
@@ -319,7 +318,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                           <td>
                             <input
                               type="checkbox"
-                              class="checkbox checkbox-xs rounded-[2px] border-line checked:bg-red checked:border-red checked:text-fg"
+                              class="checkbox checkbox-xs rounded-[6px] border-line checked:bg-red checked:border-red checked:text-fg"
                               checked={t.enabled}
                               disabled={busy === `tool:${t.name}`}
                               aria-label={`Enable ${t.name}`}
@@ -366,7 +365,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                 <ChevronRight size={10} class={showLogs ? 'rotate-90' : ''} /> Stderr ({s.logs.length})
               </button>
               {showLogs && (
-                <pre class="mt-1.5 max-h-48 overflow-auto bg-[#121213] border border-line rounded-[2px] p-2 font-mono text-[10.5px] text-fg-2 whitespace-pre-wrap break-all">
+                <pre class="mt-1.5 max-h-48 overflow-auto bg-[#121213] border border-line rounded-[6px] p-2 font-mono text-[10.5px] text-fg-2 whitespace-pre-wrap break-all">
                   {s.logs.join('\n')}
                 </pre>
               )}
@@ -469,7 +468,7 @@ function ToolTester(props: { serverId: string; tool: McpToolInfo; onClose: () =>
         </button>
       </div>
       {result && (
-        <div class="border border-line rounded-[2px]">
+        <div class="border border-line rounded-[6px]">
           <div class="flex items-center gap-2 px-2 py-1 border-b border-line">
             <Tag tone={result.ok ? 'ok' : 'red'}>{result.ok ? 'ok' : 'error'}</Tag>
             {result.durationMs > 0 && <span class="font-mono text-[10px] text-fg-3">{result.durationMs} ms</span>}
@@ -577,7 +576,6 @@ function ServerEditor(props: { server?: McpServer; preset?: Partial<Draft>; onCl
     <Modal
       open
       onClose={props.onClose}
-      code="MCP"
       title={editing ? `Edit ${props.server!.name}` : 'Add MCP server'}
       width="max-w-xl"
       footer={
@@ -604,14 +602,14 @@ function ServerEditor(props: { server?: McpServer; preset?: Partial<Draft>; onCl
         </Field>
 
         <Field label="Transport">
-          <div class="flex border border-line rounded-[2px] w-fit" role="radiogroup">
+          <div class="flex border border-line rounded-[6px] w-fit" role="radiogroup">
             {(['stdio', 'http', 'sse'] as McpTransport[]).map((t) => (
               <button
                 type="button"
                 key={t}
                 role="radio"
                 aria-checked={d.transport === t}
-                class={`px-3 py-1 font-mono text-[11px] uppercase tracking-wider border-r border-line last:border-r-0 ${d.transport === t ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2'}`}
+                class={`px-3 py-1 text-[12px] border-r border-line last:border-r-0 ${d.transport === t ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2'}`}
                 onClick={() => set({ transport: t })}
               >
                 {t}
@@ -755,7 +753,6 @@ function ImportModal(props: { onClose: () => void; onDone: () => void }) {
     <Modal
       open
       onClose={props.onClose}
-      code="MCP"
       title="Import MCP servers"
       width="max-w-xl"
       footer={

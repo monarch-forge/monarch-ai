@@ -1,5 +1,4 @@
 /** Config → Providers: status table, ping, API keys, OAuth login/logout. */
-import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import type { CustomModel, OAuthFlowState, ProviderStatus } from '@monarch/shared';
 import { ChevronRight, Activity, KeyRound, LogIn, LogOut, RefreshCw, Link2, Search, Plus, Check, Trash2 } from 'lucide-preact';
@@ -9,7 +8,7 @@ import { Panel, Tag, Spinner, ErrorLine, Empty } from '../ui.tsx';
 import { INPUT, Kbd } from './fields.tsx';
 import { OAuthFlowView } from './oauth-flow.tsx';
 
-const BTN = 'btn btn-xs rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]';
+const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
 const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
 
 export function ProvidersSection() {
@@ -34,6 +33,8 @@ export function ProvidersSection() {
   };
 
   const [adding, setAdding] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [query, setQuery] = useState('');
   const addCustom = async () => {
     setAdding(true);
     try {
@@ -56,127 +57,154 @@ export function ProvidersSection() {
     .sort((a, b) => Number(b.configured) - Number(a.configured) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   const configured = (res.data ?? []).filter((p) => p.configured).length;
 
+  const q = query.trim().toLowerCase();
+  const connected = list.filter((p) => p.configured || p.error || p.custom);
+  const catalog = list.filter((p) => !(p.configured || p.error || p.custom)).filter((p) => !q || `${p.name} ${p.id}`.toLowerCase().includes(q));
+  const row = (p: ProviderStatus) => (
+    <ProviderRow
+      key={p.id}
+      p={p}
+      open={open === p.id}
+      pinging={!!pinging[p.id]}
+      onToggle={() => setOpen(open === p.id ? null : p.id)}
+      onPing={() => void ping(p.id)}
+      onChanged={(np) => (np ? replace(np) : void res.reload())}
+      onRemoved={() => {
+        setOpen(null);
+        void res.reload();
+      }}
+    />
+  );
+
   return (
-    <Panel
-      code="CFG.31"
-      title="Providers"
-      noPad
-      right={
-        <>
-          {res.data && (
-            <Tag tone={configured ? 'ok' : 'warn'}>
-              {configured}/{res.data.length} ready
-            </Tag>
-          )}
-          <select
-            class="select select-xs bg-[#121213] border-line rounded-[2px] font-mono text-[10px] uppercase w-28"
-            value={engineFilter}
-            onChange={(e) => setEngineFilter((e.target as HTMLSelectElement).value as typeof engineFilter)}
-            aria-label="Filter by engine"
-          >
-            <option value="all">all</option>
-            <option value="claude-sdk">claude sdk</option>
-            <option value="pi">pi</option>
-          </select>
-          <button class={BTN_OUT} onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
-            {adding ? <span class="loading loading-spinner loading-xs" /> : <Plus size={11} />} Custom provider
-          </button>
-          <button key="refresh-btn" class="text-fg-3 hover:text-fg-2" title="Refresh" onClick={() => void res.reload()}>
-            <RefreshCw size={12} strokeWidth={1.5} class={res.loading ? 'animate-spin' : ''} />
-          </button>
-        </>
-      }
-    >
-      {res.loading && !res.data ? (
-        <div class="flex justify-center py-8">
-          <Spinner />
-        </div>
-      ) : res.error && !res.data ? (
-        <div class="p-4">
+    <div class="flex flex-col gap-4">
+      <Panel
+        title="Connected"
+        right={
+          <>
+            {res.data && <span class="text-[12px] text-fg-3">{configured} ready</span>}
+            <select
+              class="select select-xs h-7 bg-transparent border-line rounded-[6px] text-[12px] w-[120px]"
+              value={engineFilter}
+              onChange={(e) => setEngineFilter((e.target as HTMLSelectElement).value as typeof engineFilter)}
+              aria-label="Filter by engine"
+            >
+              <option value="all">All engines</option>
+              <option value="claude-sdk">Claude SDK</option>
+              <option value="pi">pi</option>
+            </select>
+            <button key="refresh-btn" class="text-fg-3 hover:text-fg-2 p-1" title="Refresh" onClick={() => void res.reload()}>
+              <RefreshCw size={13} strokeWidth={1.5} class={res.loading ? 'animate-spin' : ''} />
+            </button>
+          </>
+        }
+      >
+        {res.loading && !res.data ? (
+          <div class="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : res.error && !res.data ? (
           <ErrorLine error={res.error} />
+        ) : connected.length === 0 ? (
+          <Empty>Nothing connected yet. Add a provider below to get started.</Empty>
+        ) : (
+          <div class="flex flex-col gap-1 -mx-2">{connected.map(row)}</div>
+        )}
+      </Panel>
+
+      <Panel
+        title="Add a provider"
+        right={
+          <button class={BTN_OUT} onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
+            {adding ? <span class="loading loading-spinner loading-xs" /> : <Plus size={12} />} Custom provider
+          </button>
+        }
+      >
+        {!browsing ? (
+          <div class="flex flex-wrap items-center gap-3">
+            <p class="text-[13px] text-fg-2 flex-1 min-w-[220px]">
+              {catalog.length} more providers are available, from Anthropic and OpenAI to local servers.
+            </p>
+            <button class={BTN_OUT} onClick={() => setBrowsing(true)}>
+              <Search size={12} /> Browse providers
+            </button>
+          </div>
+        ) : (
+          <div class="flex flex-col gap-3">
+            <label class={`${INPUT} flex items-center gap-2`}>
+              <Search size={14} class="text-fg-3" />
+              <input
+                class="grow"
+                placeholder="Search providers…"
+                value={query}
+                autoFocus
+                onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+                aria-label="Search providers"
+              />
+            </label>
+            {catalog.length === 0 ? <Empty>No providers match “{query}”.</Empty> : <div class="flex flex-col gap-1 -mx-2">{catalog.map(row)}</div>}
+            <button class="self-start text-[12.5px] text-fg-3 hover:text-fg-2" onClick={() => (setBrowsing(false), setQuery(''))}>
+              Hide catalog
+            </button>
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+function ProviderRow(props: {
+  p: ProviderStatus;
+  open: boolean;
+  pinging: boolean;
+  onToggle: () => void;
+  onPing: () => void;
+  onChanged: (p?: ProviderStatus) => void;
+  onRemoved: () => void;
+}) {
+  const { p } = props;
+  const status = p.error ? (
+    <Tag tone="red" title={p.error}>
+      error
+    </Tag>
+  ) : p.configured ? (
+    <Tag tone="ok">ready</Tag>
+  ) : null;
+  return (
+    <div id={`prov-${p.id}`} class={`rounded-[8px] transition-colors duration-150 ${props.open ? 'bg-raised' : 'hover:bg-raised/60'}`}>
+      <div class="flex items-center gap-3 px-3 py-2.5 cursor-pointer" onClick={props.onToggle} role="button" aria-expanded={props.open}>
+        <ChevronRight size={13} class={`text-fg-3 shrink-0 transition-transform duration-150 ${props.open ? 'rotate-90' : ''}`} />
+        <div class="flex-1 min-w-0">
+          <div class="text-[13.5px] text-fg truncate">
+            {p.name}
+            {p.custom && <span class="text-fg-3 text-[12px]"> · custom</span>}
+          </div>
+          <div class="text-[12px] text-fg-3 truncate">
+            {p.account ? p.account : p.source && p.source !== 'none' ? p.source : p.authKinds.join(' or ')}
+            {p.configured && p.modelCount ? ` · ${p.modelCount} models` : ''}
+            {p.latencyMs !== undefined ? <span class={p.latencyMs > 2000 ? 'text-warning' : ''}> · {Math.round(p.latencyMs)} ms</span> : null}
+          </div>
         </div>
-      ) : list.length === 0 ? (
-        <Empty>No providers</Empty>
-      ) : (
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr class="border-line font-mono text-[10px] uppercase tracking-[0.12em] text-fg-3">
-                <th class="w-6" />
-                <th>Provider</th>
-                <th>Engine</th>
-                <th>Status</th>
-                <th>Account / source</th>
-                <th class="text-right">Models</th>
-                <th class="text-right">Latency</th>
-                <th class="w-20" />
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((p) => {
-                const isOpen = open === p.id;
-                return (
-                  <Fragment key={p.id}>
-                    <tr id={`prov-${p.id}`} class={`border-line cursor-pointer hover:bg-white/[0.02] ${isOpen ? 'bg-subtle/50' : ''}`} onClick={() => setOpen(isOpen ? null : p.id)}>
-                      <td>
-                        <ChevronRight size={12} class={`text-fg-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-                      </td>
-                      <td>
-                        <div class="text-[13px] text-fg">{p.name}</div>
-                        <div class="font-mono text-[10px] text-fg-3">
-                          {p.id}
-                          {p.custom && <span class="text-red/80"> · custom</span>}
-                        </div>
-                      </td>
-                      <td class="font-mono text-[11px] text-fg-2 uppercase">{p.engine === 'pi' ? 'pi' : 'claude'}</td>
-                      <td>
-                        {p.error ? (
-                          <Tag tone="red" title={p.error}>
-                            error
-                          </Tag>
-                        ) : p.configured ? (
-                          <Tag tone="ok">ready</Tag>
-                        ) : (
-                          <Tag>not set</Tag>
-                        )}
-                      </td>
-                      <td class="text-[12px]">
-                        {p.account && <div class="text-fg-2 truncate max-w-[220px]">{p.account}</div>}
-                        <div class="font-mono text-[10px] text-fg-3 uppercase">{p.source && p.source !== 'none' ? p.source : p.authKinds.join(' · ')}</div>
-                      </td>
-                      <td class="text-right font-mono text-[12px] text-fg-2 tabular-nums">{p.modelCount}</td>
-                      <td class="text-right font-mono text-[12px] tabular-nums">
-                        {p.latencyMs !== undefined ? <span class={p.latencyMs > 2000 ? 'text-warning' : 'text-fg-2'}>{Math.round(p.latencyMs)}ms</span> : <span class="text-fg-3">—</span>}
-                      </td>
-                      <td class="text-right" onClick={(e) => e.stopPropagation()}>
-                        <button class={BTN_OUT} disabled={pinging[p.id] || !p.configured} onClick={() => void ping(p.id)} title={p.configured ? 'Measure round-trip' : 'Configure first'}>
-                          {pinging[p.id] ? <span class="loading loading-spinner loading-xs" /> : <Activity size={11} />} Ping
-                        </button>
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr class="border-line bg-subtle/30">
-                        <td />
-                        <td colSpan={7} class="py-3">
-                          <ProviderDetail
-                            p={p}
-                            onChanged={(np) => (np ? replace(np) : void res.reload())}
-                            onRemoved={() => {
-                              setOpen(null);
-                              void res.reload();
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+        <span class="hidden sm:inline font-mono text-[11px] text-fg-3">{p.engine === 'pi' ? 'pi' : 'claude'}</span>
+        {status}
+        {p.configured && (
+          <button
+            class="text-fg-3 hover:text-fg-2 p-1 disabled:opacity-40"
+            disabled={props.pinging}
+            onClick={(e) => (e.stopPropagation(), props.onPing())}
+            title="Measure round-trip"
+            aria-label={`Ping ${p.name}`}
+          >
+            {props.pinging ? <span class="loading loading-spinner loading-xs" /> : <Activity size={13} />}
+          </button>
+        )}
+      </div>
+      {props.open && (
+        <div class="px-3 pb-4 pl-9">
+          <ProviderDetail p={p} onChanged={props.onChanged} onRemoved={props.onRemoved} />
         </div>
       )}
-    </Panel>
+    </div>
   );
 }
 
@@ -441,7 +469,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
       {found && (
         <div class="border border-line">
           <div class="flex items-center gap-2 px-2.5 py-1.5 border-b border-line">
-            <span class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3">{found.length} available</span>
+            <span class=" text-[12px] text-fg-3">{found.length} available</span>
             {found.length > 8 && <input class={`${INPUT} input-xs font-mono max-w-[220px]`} placeholder="Filter…" value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />}
             {shown.some((m) => !have.has(m.id)) && shown.length <= 50 && (
               <button class={`${BTN_OUT} ml-auto`} disabled={busy === 'models'} onClick={() => add(shown.map((m) => m.id))}>
@@ -459,7 +487,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
                 <span class="font-mono text-[12px] text-fg truncate">{m.id}</span>
                 {m.ownedBy && <span class="font-mono text-[10px] text-fg-3 truncate">{m.ownedBy}</span>}
                 {have.has(m.id) ? (
-                  <span class="ml-auto flex items-center gap-1 font-mono text-[10px] uppercase text-fg-3">
+                  <span class="ml-auto flex items-center gap-1 text-[12px] text-fg-3">
                     <Check size={11} /> Added
                   </span>
                 ) : (

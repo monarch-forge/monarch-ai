@@ -39,7 +39,7 @@ export function ToolsTab() {
   const defer = settings.value?.evolution?.deferTools;
 
   return (
-    <Panel code="EVO.51" title="Tool catalog" class="h-full" noPad bodyClass="flex flex-col" right={res.data && <Tag tone="plain">{shown === all.length ? all.length : `${shown}/${all.length}`}</Tag>}>
+    <Panel title="Tool catalog" class="h-full" noPad bodyClass="flex flex-col" right={res.data && <Tag tone="plain">{shown === all.length ? all.length : `${shown}/${all.length}`}</Tag>}>
       <div class="flex items-center gap-2 px-3 py-2 border-b border-line flex-wrap">
         <label class="relative w-full sm:w-64">
           <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
@@ -82,7 +82,7 @@ export function ToolsTab() {
                 {groups.map(({ g, items }) => (
                   <section key={g} class="border border-line min-w-0">
                     <header class="flex items-center gap-2 px-3 py-1.5 border-b border-line bg-[#121213]/40">
-                      <span class="font-mono text-[11px] tracking-[0.14em] uppercase text-fg">{g}</span>
+                      <span class=" text-[12px] text-fg">{g}</span>
                       <span class="font-mono text-[10px] text-fg-3">{items.length}</span>
                     </header>
                     <ul class="divide-y divide-line">
@@ -101,7 +101,7 @@ export function ToolsTab() {
                               {t.description}
                             </div>
                           </div>
-                          <div class="flex flex-col items-end gap-1 shrink-0 font-mono text-[10px] tracking-[0.1em] uppercase">
+                          <div class="flex flex-col items-end gap-1 shrink-0 text-[12px]">
                             <span class={t.loading === 'always' ? 'text-fg-2' : 'text-fg-3'}>{t.loading === 'always' ? 'always' : 'on demand'}</span>
                             {t.source === 'extension' ? (
                               <a href={`#/evolve/extensions/${encodeURIComponent(t.extensionId ?? '')}`} class="text-fg-3 hover:text-fg-2 normal-case tracking-normal max-w-[14ch] truncate" title={`From extension ${t.extensionId}`}>

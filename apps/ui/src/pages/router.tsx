@@ -3,7 +3,7 @@
  * OWNED BY UI-A.
  */
 import { useEffect, useState } from 'preact/hooks';
-import { Tag } from '../components/ui.tsx';
+import { ExternalLink } from 'lucide-preact';
 
 /** 9Router base URL; override with localStorage['monarch.router.url'] (loopback only in the desktop app). */
 const ROUTER_URL = (() => {
@@ -60,8 +60,8 @@ export default function RouterPage(_props: { params: string[] }) {
 
   if (loading) {
     return (
-      <div class="h-full flex items-center justify-center font-mono text-xs text-fg-3">
-        CONNECTING TO 9ROUTER ({ROUTER_LABEL})…
+      <div class="h-full flex items-center justify-center gap-2 text-[13px] text-fg-3">
+        <span class="loading loading-spinner loading-xs" /> Connecting to 9Router…
       </div>
     );
   }
@@ -69,15 +69,16 @@ export default function RouterPage(_props: { params: string[] }) {
   if (!available) {
     return (
       <div class="h-full flex items-center justify-center p-6">
-        <div class="hud-panel max-w-md w-full p-6 space-y-4 text-center">
-          <div class="font-mono text-xs tracking-widest text-red uppercase">9Router Not Available</div>
-          <div class="font-mono text-sm text-fg">9Router is not available on this device or has not been started.</div>
-          <div class="font-mono text-xs text-fg-3">Expected service at <code class="text-fg">{ROUTER_URL}</code></div>
+        <div class="max-w-sm w-full bg-surface rounded-[14px] px-6 py-7 text-center">
+          <div class="text-[15px] font-semibold text-fg">9Router isn’t running</div>
+          <div class="mt-2 text-[13px] text-fg-2 leading-relaxed">
+            Start it on this device and we’ll pick it up. Monarch looks for it at <code class="font-mono text-[12px] text-fg">{ROUTER_URL}</code>.
+          </div>
           <button
             onClick={checkRouter}
-            class="px-4 py-2 font-mono text-xs uppercase border border-line bg-subtle hover:border-fg-2 text-fg transition"
+            class="mt-5 px-3.5 py-1.5 rounded-md text-[13px] bg-subtle text-fg hover:bg-white/[0.1] transition-colors"
           >
-            Retry Connection
+            Try again
           </button>
         </div>
       </div>
@@ -85,27 +86,25 @@ export default function RouterPage(_props: { params: string[] }) {
   }
 
   return (
-    <div class="h-full flex flex-col p-3 xl:p-4 gap-3">
-      <div class="flex items-center justify-between px-1">
-        <div class="font-mono text-xs tracking-wider uppercase text-fg-2 flex items-center gap-2">
-          <span class="w-2 h-2 bg-success inline-block" />
-          9Router Gateway Console
-        </div>
-        <span class="flex items-center gap-2">
-          {openError && <span class="font-mono text-[10px] text-red truncate max-w-[320px]" title={openError}>{openError}</span>}
+    <div class="h-full flex flex-col p-3 sm:p-4 lg:p-5 gap-2.5">
+      <div class="flex items-center gap-2 px-1 min-w-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-success/80 shrink-0" title="Connected" />
+        <span class="text-[13px] font-medium text-fg-2">9Router</span>
+        <span class="font-mono text-[11px] text-fg-3 truncate" title={ROUTER_URL}>{ROUTER_LABEL.toLowerCase()}</span>
+        <span class="ml-auto flex items-center gap-2 min-w-0">
+          {openError && <span class="text-[12px] text-red/90 truncate max-w-[320px]" title={openError}>{openError}</span>}
           {IN_TAURI && (
             <button
               onClick={() => void openRouterWindow().then(setOpenError)}
-              class="font-mono text-[10px] tracking-wider uppercase border border-line px-2 py-0.5 text-fg-2 hover:text-fg hover:border-fg-3"
+              class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
               title="Pop 9Router out into its own window"
             >
-              Open in window
+              <ExternalLink size={13} /> Open in window
             </button>
           )}
-          <Tag tone="ok">{ROUTER_LABEL}</Tag>
         </span>
       </div>
-      <div class="flex-1 min-h-0 hud-panel overflow-hidden">
+      <div class="flex-1 min-h-0 rounded-[10px] overflow-hidden bg-[#121213]">
         <iframe
           src={`${ROUTER_URL}/dashboard/usage`}
           title="9Router Dashboard"

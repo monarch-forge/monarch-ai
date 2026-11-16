@@ -8,19 +8,21 @@ import { Minus, Plus, Scan } from 'lucide-preact';
 import { ForceSim, type SimNode } from './sim.ts';
 import type { GEdge, GNode, GraphView } from './model.ts';
 
+// soft, low-contrast palette: the graph is the hero, but it should feel like a quiet night sky
 const C = {
-  note: '#9E9EA4',
+  note: '#8E8E96',
   noteHi: '#F4F4F6',
-  tag: '#5E5E64',
-  ghost: '#5E5E64',
-  edge: '#3C3C41',
-  edgeHi: '#9E9EA4',
+  tag: '#6B7A8A',
+  ghost: '#55555B',
+  edge: '#3A3A40',
+  edgeHi: '#8E8E96',
   red: '#D71921',
-  label: '#9E9EA4',
+  hoverRing: '#C8C8CC',
+  label: '#8E8E96',
   labelHi: '#F4F4F6',
-  bg: '#121213',
+  bg: '#1c1c1e',
 };
-const FONT = '10px "Geist Mono Variable", ui-monospace, monospace';
+const FONT = '11px "Geist Variable", ui-sans-serif, system-ui, sans-serif';
 
 interface VNode {
   g: GNode;
@@ -358,7 +360,7 @@ export class GraphEngine {
     // edges — base layer
     ctx.lineWidth = lw;
     ctx.strokeStyle = C.edge;
-    ctx.globalAlpha = focusSet ? 0.18 : 0.7;
+    ctx.globalAlpha = focusSet ? 0.12 : 0.5;
     ctx.beginPath();
     const hiEdges: VEdge[] = [];
     for (const e of this.edges) {
@@ -440,7 +442,8 @@ export class GraphEngine {
         ctx.stroke();
       } else ctx.fill();
       if (ringFor.has(n)) {
-        ctx.strokeStyle = C.red;
+        // red only marks the open note; hover gets a quiet light ring
+        ctx.strokeStyle = n === selNode ? C.red : C.hoverRing;
         ctx.lineWidth = 1.5 * lw;
         ctx.beginPath();
         ctx.arc(x, y, r + 3 * lw + 1.2, 0, Math.PI * 2);
@@ -454,8 +457,8 @@ export class GraphEngine {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const k = cam.k;
-    const showAll = k >= 1.5;
-    const degThreshold = k >= 0.85 ? this.degreeQuantile(0.85) : k >= 0.45 ? this.degreeQuantile(0.97) : Infinity;
+    const showAll = k >= 2.2;
+    const degThreshold = k >= 1.3 ? this.degreeQuantile(0.8) : k >= 0.8 ? this.degreeQuantile(0.94) : k >= 0.5 ? this.degreeQuantile(0.99) : Infinity;
     const placed: [number, number, number, number][] = [];
     const drawLabel = (n: VNode, strong: boolean) => {
       const sx = n.s.x * k + cam.x;
@@ -463,15 +466,17 @@ export class GraphEngine {
       if (sx < -80 || sx > this.w + 80 || sy < -20 || sy > this.h + 20) return;
       const text = truncate(n.g.title, strong ? 48 : 28);
       const tw = ctx.measureText(text).width;
-      const box: [number, number, number, number] = [sx - tw / 2 - 2, sy, sx + tw / 2 + 2, sy + 12];
+      const box: [number, number, number, number] = [sx - tw / 2 - 4, sy - 1, sx + tw / 2 + 4, sy + 14];
       if (!strong && placed.some((p) => box[0] < p[2] && box[2] > p[0] && box[1] < p[3] && box[3] > p[1])) return;
       placed.push(box);
       if (strong) {
-        ctx.globalAlpha = 0.85;
+        ctx.globalAlpha = 0.9;
         ctx.fillStyle = C.bg;
-        ctx.fillRect(box[0], box[1] - 1, box[2] - box[0], 13);
+        ctx.beginPath();
+        ctx.roundRect?.(box[0], box[1] - 1, box[2] - box[0], 16, 4);
+        ctx.fill();
       }
-      ctx.globalAlpha = strong ? 1 : focusSet && !focusSet.has(n.g.id) ? 0.25 : 0.85;
+      ctx.globalAlpha = strong ? 1 : focusSet && !focusSet.has(n.g.id) ? 0.18 : 0.7;
       ctx.fillStyle = strong ? C.labelHi : C.label;
       ctx.fillText(text, sx, sy);
     };
@@ -719,31 +724,27 @@ export function GraphCanvas(props: {
         class="absolute inset-0 outline-none touch-none select-none focus-visible:outline-1 focus-visible:outline-fg-3"
       />
       {/* zoom controls */}
-      <div class="absolute right-3 bottom-3 flex flex-col border border-line bg-surface/90">
-        <button class="p-1.5 text-fg-2 hover:text-fg hover:bg-subtle" title="Zoom in (+)" aria-label="Zoom in" onClick={() => engine.current?.zoomBy(1.3)}>
+      <div class="absolute right-3 bottom-3 flex flex-col rounded-md bg-[#121213]/70 backdrop-blur p-0.5">
+        <button class="p-1.5 rounded-[5px] text-fg-3 hover:text-fg hover:bg-white/[0.06]" title="Zoom in (+)" aria-label="Zoom in" onClick={() => engine.current?.zoomBy(1.3)}>
           <Plus size={13} />
         </button>
-        <button class="p-1.5 text-fg-2 hover:text-fg hover:bg-subtle border-t border-line" title="Zoom out (−)" aria-label="Zoom out" onClick={() => engine.current?.zoomBy(1 / 1.3)}>
+        <button class="p-1.5 rounded-[5px] text-fg-3 hover:text-fg hover:bg-white/[0.06]" title="Zoom out (−)" aria-label="Zoom out" onClick={() => engine.current?.zoomBy(1 / 1.3)}>
           <Minus size={13} />
         </button>
-        <button class="p-1.5 text-fg-2 hover:text-fg hover:bg-subtle border-t border-line" title="Fit (0 / double-click)" aria-label="Fit graph" onClick={() => engine.current?.fit(true)}>
+        <button class="p-1.5 rounded-[5px] text-fg-3 hover:text-fg hover:bg-white/[0.06]" title="Fit (0 / double-click)" aria-label="Fit graph" onClick={() => engine.current?.fit(true)}>
           <Scan size={13} />
         </button>
       </div>
-      {/* hover read-out */}
-      <div class="absolute left-3 bottom-3 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 pointer-events-none flex items-center gap-2 max-w-[70%]">
-        {hover ? (
-          <>
-            <span class="text-fg-2">{hover.kind}</span>
-            <span class="text-fg truncate normal-case tracking-normal text-[11px]">{hover.title}</span>
-            <span>· {hover.degree} links</span>
-          </>
-        ) : (
-          <span>
-            {props.view.nodes.length} nodes · {props.view.edges.length} edges
+      {/* hover read-out (only while hovering; the page shows the totals) */}
+      {hover && (
+        <div class="absolute left-1/2 -translate-x-1/2 bottom-3 text-[12px] text-fg-3 pointer-events-none flex items-center gap-2 max-w-[60%] bg-[#121213]/80 backdrop-blur rounded-full px-3 py-1">
+          <span class="text-fg truncate">{hover.title}</span>
+          <span class="shrink-0">
+            {hover.kind !== 'note' ? `${hover.kind} · ` : ''}
+            {hover.degree} link{hover.degree === 1 ? '' : 's'}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

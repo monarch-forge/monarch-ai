@@ -1,7 +1,7 @@
 /**
- * Shared HUD primitives. OWNED BY THE ORCHESTRATOR — builders may ADD components, not change existing props.
- * Visual language: dark surfaces, 1px #323236 lines, mono uppercase labels, red (#D71921) used sparingly
- * for "active / attention" only. No glows, no gradients beyond the faint grid.
+ * Shared primitives. Builders may ADD components, not change existing props.
+ * Visual language ("calm study", see docs/DESIGN.md): soft surface cards, space instead of lines,
+ * sentence-case sans titles, red (#D71921) only for "act" or "attention".
  */
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
@@ -9,7 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 type Tone = 'default' | 'red' | 'ok' | 'warn' | 'plain';
 
 export function Panel(props: {
-  code?: string; // "ENV.01"
+  code?: string; // accepted for compatibility, no longer rendered
   title: string; // "Local conditions"
   right?: ComponentChildren; // usually <Tag/>
   active?: boolean;
@@ -19,9 +19,8 @@ export function Panel(props: {
   children?: ComponentChildren;
 }) {
   return (
-    <section class={`hud-panel ${props.class ?? ''}`} data-active={props.active ? 'true' : 'false'}>
+    <section class={`hud-panel ${props.active ? 'ring-1 ring-red/25' : ''} ${props.class ?? ''}`} data-active={props.active ? 'true' : 'false'}>
       <header class="hud-head">
-        {props.code && <span class="hud-code">{props.code}</span>}
         <h2 class="hud-title">{props.title}</h2>
         <div class="ml-auto flex items-center gap-2">{props.right}</div>
       </header>
@@ -56,8 +55,8 @@ export function Stat(props: { label: string; value: ComponentChildren; sub?: Com
   return (
     <div class={props.class}>
       <div class="hud-label">{props.label}</div>
-      <div class="hud-value text-sm mt-1">{props.value}</div>
-      {props.sub && <div class="text-[11px] text-fg-3 mt-0.5 font-mono">{props.sub}</div>}
+      <div class="hud-value text-[15px] font-medium mt-0.5">{props.value}</div>
+      {props.sub && <div class="text-[11px] text-fg-3 mt-0.5">{props.sub}</div>}
     </div>
   );
 }
@@ -85,13 +84,13 @@ export function Sparkline(props: {
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" class={`w-full ${props.class ?? ''}`} style={{ height: `${h}px` }}>
       <path d={area} fill={props.fill ?? 'rgb(244 244 246 / 0.05)'} />
-      <path d={line} fill="none" stroke={props.stroke ?? '#9E9EA4'} stroke-width="1.25" vector-effect="non-scaling-stroke" />
+      <path d={line} fill="none" stroke={props.stroke ?? '#A3A3A9'} stroke-width="1.5" vector-effect="non-scaling-stroke" />
     </svg>
   );
 }
 
 export function Empty(props: { children: ComponentChildren; class?: string }) {
-  return <div class={`text-fg-3 text-xs font-mono uppercase tracking-widest py-6 text-center ${props.class ?? ''}`}>{props.children}</div>;
+  return <div class={`text-fg-2 text-[13px] py-8 px-4 text-center ${props.class ?? ''}`}>{props.children}</div>;
 }
 
 export function Spinner(props: { class?: string }) {
@@ -100,13 +99,13 @@ export function Spinner(props: { class?: string }) {
 
 export function ErrorLine(props: { error?: string }) {
   if (!props.error) return null;
-  return <div class="text-xs font-mono text-red px-1 py-2">{props.error}</div>;
+  return <div class="text-[12.5px] text-[#f0686d] bg-red/10 rounded-md px-3 py-2 my-1">{props.error}</div>;
 }
 
 /** red status dot (pulsing when live) */
 export function Dot(props: { tone?: 'red' | 'ok' | 'warn' | 'muted'; pulse?: boolean }) {
   const c = { red: 'bg-red', ok: 'bg-success', warn: 'bg-warning', muted: 'bg-fg-3' }[props.tone ?? 'muted'];
-  return <span class={`inline-block w-1.5 h-1.5 ${c} ${props.pulse ? 'hud-blink' : ''}`} />;
+  return <span class={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${c} ${props.pulse ? 'hud-blink' : ''}`} />;
 }
 
 /** generic button styles (daisyUI btn, tuned) */
@@ -116,19 +115,45 @@ export function Btn(
   const { variant = 'outline', size = 'sm', loading, class: cls, children, ...rest } = props as any;
   const v =
     variant === 'primary'
-      ? 'btn-primary'
+      ? 'btn-primary border-transparent hover:bg-red-hover'
       : variant === 'ghost'
         ? 'btn-ghost text-fg-2 hover:text-fg'
-        : 'btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg';
+        : 'btn-ghost bg-raised border-transparent text-fg-2 hover:bg-subtle hover:text-fg';
   return (
     <button
       {...rest}
-      class={`btn btn-${size} ${v} font-mono uppercase tracking-wider text-[11px] font-normal rounded-[2px] ${cls ?? ''}`}
+      class={`btn btn-${size} ${v} text-[12.5px] font-medium rounded-md shadow-none transition-colors duration-150 ${cls ?? ''}`}
       disabled={rest.disabled || loading}
     >
       {loading && <span class="loading loading-spinner loading-xs" />}
       {children}
     </button>
+  );
+}
+
+/** page title + muted description, with optional actions on the right */
+export function PageHeader(props: { title: ComponentChildren; description?: ComponentChildren; right?: ComponentChildren; class?: string }) {
+  return (
+    <header class={`flex items-start gap-4 ${props.class ?? ''}`}>
+      <div class="min-w-0 flex-1">
+        <h1 class="text-[20px] font-semibold tracking-[-0.01em] text-fg leading-tight">{props.title}</h1>
+        {props.description && <p class="mt-1 text-[13px] text-fg-3 leading-relaxed">{props.description}</p>}
+      </div>
+      {props.right && <div class="flex items-center gap-2 shrink-0">{props.right}</div>}
+    </header>
+  );
+}
+
+/** progressive disclosure ("Advanced", "Details", "More"): native <details>, calm chevron */
+export function Disclosure(props: { label?: ComponentChildren; open?: boolean; class?: string; bodyClass?: string; children: ComponentChildren }) {
+  return (
+    <details class={`group ${props.class ?? 'mt-2'}`} open={props.open}>
+      <summary class="list-none cursor-pointer select-none inline-flex items-center gap-1.5 text-[12.5px] text-fg-3 hover:text-fg-2 py-1 transition-colors [&::-webkit-details-marker]:hidden">
+        <span class="inline-block transition-transform duration-150 group-open:rotate-90">›</span>
+        {props.label ?? 'Advanced'}
+      </summary>
+      <div class={props.bodyClass ?? 'flex flex-col gap-4 pt-3'}>{props.children}</div>
+    </details>
   );
 }
 

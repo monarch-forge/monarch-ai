@@ -22,7 +22,6 @@ export function SkillsTab(props: { id?: string }) {
   return (
     <div class="h-full min-h-0 grid gap-3 grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)]">
       <Panel
-        code="EVO.21"
         title="Skills"
         noPad
         bodyClass="flex flex-col"
@@ -56,7 +55,7 @@ export function SkillsTab(props: { id?: string }) {
                         <span class="flex-1 min-w-0">
                           <span class="block text-[13px] text-fg truncate">{s.name}</span>
                           <span class="block text-[11.5px] text-fg-3 truncate mt-0.5">{s.description}</span>
-                          <span class="flex items-center gap-3 mt-1.5 font-mono text-[10px] tracking-[0.08em] uppercase text-fg-3">
+                          <span class="flex items-center gap-3 mt-1.5 text-[12px] text-fg-3">
                             <span>{s.origin}</span>
                             <span>{s.uses} use{s.uses === 1 ? '' : 's'}</span>
                             <span class="ml-auto normal-case">{ago(s.updatedAt)}</span>
@@ -91,7 +90,7 @@ export function SkillsTab(props: { id?: string }) {
         ) : selected ? (
           <SkillDetail key={selected} id={selected} />
         ) : (
-          <Panel code="EVO.22" title="Skill" class="flex-1">
+          <Panel title="Skill" class="flex-1">
             <EvoNote label="Select a skill" sub="Read or refine the procedure. Monarch sees the name and description of every skill and reads the body on demand." />
           </Panel>
         )}
@@ -126,7 +125,6 @@ function SkillDetail(props: { id: string }) {
 
   return (
     <Panel
-      code="EVO.22"
       title={s?.name ?? props.id}
       class="flex-1"
       noPad
@@ -210,7 +208,6 @@ function SkillEditorPanel(props: { skill?: Skill; onDone?: () => void }) {
 
   return (
     <Panel
-      code="EVO.23"
       title={isNew ? 'New skill' : `Edit · ${props.skill!.name}`}
       class="flex-1"
       noPad
@@ -277,7 +274,7 @@ function SkillEditorPanel(props: { skill?: Skill; onDone?: () => void }) {
         </div>
       </div>
       <div class="flex items-center gap-2 px-4 py-2.5 border-t border-line">
-        <span class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 flex-1">{isNew ? 'saved as skills/' + (effId || '…') + '.md' : 'Ctrl+S saves'}</span>
+        <span class=" text-[12px] text-fg-3 flex-1">{isNew ? 'saved as skills/' + (effId || '…') + '.md' : 'Ctrl+S saves'}</span>
         <Btn size="sm" variant="ghost" onClick={cancel}>
           <X size={11} /> Cancel
         </Btn>

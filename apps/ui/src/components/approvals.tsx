@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
 import type { ApprovalRequest } from '@monarch/shared';
-import { ChevronDown, ChevronRight, ShieldAlert } from 'lucide-preact';
+import { ChevronDown, ChevronRight } from 'lucide-preact';
 import { approvals, conn, navigate } from '../lib/store.ts';
 import { socket } from '../lib/api.ts';
 import { fmt } from './ui.tsx';
@@ -81,15 +81,15 @@ export function ApprovalDock() {
       id="approval-dock"
       role="region"
       aria-label="Pending approvals"
-      class={`fixed left-1/2 -translate-x-1/2 bottom-[124px] z-40 w-[min(560px,calc(100vw-2rem))] flex flex-col gap-2 max-h-[60vh] overflow-y-auto ${flashing ? 'outline outline-1 outline-red outline-offset-4' : ''}`}
+      class={`fixed left-1/2 -translate-x-1/2 bottom-[124px] z-40 w-[min(560px,calc(100vw-2rem))] flex flex-col gap-2 max-h-[60vh] overflow-y-auto ${flashing ? 'outline outline-1 outline-red/60 outline-offset-4 rounded-[14px]' : ''}`}
     >
-      <div class="flex items-center gap-2 px-2 py-1 bg-surface/95 border border-line font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3">
-        <ShieldAlert size={12} strokeWidth={1.5} class="text-warning" />
+      <div class="flex items-center gap-2 px-3 py-1.5 bg-surface/95 backdrop-blur rounded-full text-[12px] text-fg-2 shadow-[0_12px_32px_rgb(0_0_0/0.45)]">
+        <span class="inline-block w-1.5 h-1.5 rounded-full bg-red hud-blink" />
         <span>
-          {list.length} approval{list.length === 1 ? '' : 's'} pending
+          {list.length === 1 ? 'One thing needs your OK' : `${list.length} things need your OK`}
         </span>
-        {conn.value !== 'open' && <span class="text-warning">· core offline</span>}
-        <span class="ml-auto hidden sm:inline">
+        {conn.value !== 'open' && <span class="text-warning">· Monarch is offline</span>}
+        <span class="ml-auto hidden sm:inline text-[11px] text-fg-3">
           <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3">A</kbd> allow <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3 ml-1">S</kbd> always{' '}
           <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3 ml-1">D</kbd> deny
         </span>
@@ -98,7 +98,7 @@ export function ApprovalDock() {
         <ApprovalCard key={a.id} req={a} />
       ))}
       {hidden > 0 && (
-        <button class="self-center font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2 hover:text-fg border border-line bg-surface px-3 py-1" onClick={() => setShowAll(true)}>
+        <button class="self-center text-[12px] text-fg-2 hover:text-fg bg-surface rounded-full px-3 py-1" onClick={() => setShowAll(true)}>
           +{hidden} more
         </button>
       )}
@@ -140,45 +140,45 @@ function ApprovalCard(props: { req: ApprovalRequest }) {
       tabIndex={0}
       data-approval-card
       onKeyDown={onKey}
-      class={`hud-panel shadow-[0_8px_32px_rgb(0_0_0/0.45)] outline-none border-l-2 ${dangerous ? 'border-l-red' : 'border-l-warning'}`}
+      class={`hud-panel !rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none border focus-visible:border-line ${dangerous ? 'border-red/40' : 'border-transparent'}`}
     >
-      <div class="flex items-start gap-3 px-3 py-2.5">
+      <div class="flex items-start gap-3 px-4 pt-3.5 pb-2">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="hud-tag" data-tone={dangerous ? 'red' : 'warn'}>
               {a.risk}
             </span>
-            <span class="font-mono text-[12px] text-fg truncate">{displayToolName(a.tool)}</span>
-            <span class="font-mono text-[10px] text-fg-3 ml-auto shrink-0">{fmt.time(a.ts)}</span>
+            <span class="text-[13.5px] font-medium text-fg truncate">{displayToolName(a.tool)}</span>
+            <span class="text-[11px] text-fg-3 ml-auto shrink-0 tabular-nums">{fmt.time(a.ts)}</span>
           </div>
           <div class="text-[13px] text-fg-2 mt-1.5 break-words">{a.summary || 'Tool call requires approval'}</div>
           <div class="flex items-center gap-3 mt-1.5">
-            <button class="flex items-center gap-1 font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 hover:text-fg-2" onClick={() => setOpen(!open)}>
-              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />} input
+            <button class="flex items-center gap-1 text-[12px] text-fg-3 hover:text-fg-2" onClick={() => setOpen(!open)}>
+              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Details
             </button>
             <button
-              class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 hover:text-fg-2"
+              class="text-[12px] text-fg-3 hover:text-fg-2"
               onClick={() => navigate(`comms/${encodeURIComponent(a.sessionId)}`)}
               title="Open the session that requested this"
             >
-              session ↗
+              Open session ↗
             </button>
           </div>
-          {open && <pre class="mt-2 max-h-56 overflow-auto bg-[#121213] border border-line p-2 font-mono text-[11px] text-fg-2 whitespace-pre-wrap break-all">{inputJson}</pre>}
+          {open && <pre class="mt-2 max-h-56 overflow-auto bg-[#121213] rounded-md p-2.5 font-mono text-[11px] text-fg-2 whitespace-pre-wrap break-all">{inputJson}</pre>}
         </div>
       </div>
-      <div class="flex items-center gap-1.5 px-3 pb-2.5 justify-end">
-        <button class="btn btn-xs btn-ghost rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] text-fg-2 hover:text-fg" onClick={() => respondApproval(a.id, false)}>
+      <div class="flex items-center gap-1.5 px-4 pb-3.5 justify-end">
+        <button class="btn btn-sm btn-ghost rounded-md font-medium text-[12.5px] text-fg-2 hover:text-fg" onClick={() => respondApproval(a.id, false)}>
           Deny
         </button>
         <button
-          class="btn btn-xs btn-outline rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg"
+          class="btn btn-sm btn-ghost rounded-md font-medium text-[12.5px] bg-raised text-fg-2 hover:bg-subtle hover:text-fg"
           onClick={() => respondApproval(a.id, true, true)}
           title="Allow this tool for the rest of this session"
         >
-          Always · session
+          Always this session
         </button>
-        <button class="btn btn-xs btn-primary rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px]" onClick={() => respondApproval(a.id, true)}>
+        <button class="btn btn-sm btn-primary rounded-md font-medium text-[12.5px] border-transparent" onClick={() => respondApproval(a.id, true)}>
           Allow once
         </button>
       </div>

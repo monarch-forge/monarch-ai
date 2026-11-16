@@ -4,7 +4,7 @@ import type { CalendarEvent, GoogleAccount } from '@monarch/shared';
 import { ChevronLeft, ChevronRight, MapPin, Plus, Trash, Video, X, CalendarDays } from 'lucide-preact';
 import { api, openExternal, qs } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Btn, Panel, useNow } from '../ui.tsx';
+import { Btn, useNow } from '../ui.tsx';
 import { AccountMark, accountColor, Button, LoadError, Modal, sameDay, toDateInput, useConfirm } from '../mail/kit.tsx';
 
 const H0 = 6;
@@ -137,143 +137,186 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
     setPop({ ev, x: e.clientX, y: e.clientY });
   };
 
+  const todayIdx = days.findIndex((d) => sameDay(d, now));
+  const todayList = useMemo(
+    () =>
+      todayIdx < 0
+        ? []
+        : [...allDayByDay[todayIdx].map((ev) => ({ ev, s: evStart(ev), e: evEnd(ev), all: true })), ...timedByDay[todayIdx].map((p) => ({ ev: p.ev, s: p.start, e: p.end, all: false }))].sort(
+            (a, b) => Number(b.all) - Number(a.all) || a.s.getTime() - b.s.getTime(),
+          ),
+    [events, todayIdx],
+  );
+  const chip = (color: string) => ({ background: `color-mix(in srgb, ${color} 16%, transparent)`, color: `color-mix(in srgb, ${color} 55%, #f4f4f6)` });
+  const navBtn = 'p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors';
+
   return (
-    <Panel
-      code="CAL.01"
-      title="Calendar"
-      class="flex-1 min-w-0"
-      noPad
-      bodyClass="flex flex-col min-h-0"
-      right={
-        <>
-          {res.loading && <span class="loading loading-spinner loading-xs text-fg-3" />}
-          <span class="font-mono text-[11px] text-fg-2 tracking-wider hidden md:inline">{rangeLabel}</span>
-          <div class="flex items-center border border-line">
-            <button class="p-1 text-fg-2 hover:text-fg hover:bg-subtle" title="Previous week ([)" aria-label="Previous week" onClick={() => setAnchor(addDays(anchor, -7))}>
-              <ChevronLeft size={13} />
-            </button>
-            <button class="px-2 font-mono text-[10px] tracking-widest uppercase text-fg-2 hover:text-fg border-x border-line h-full py-1" title="This week (.)" onClick={() => setAnchor(startOfWeek(new Date()))}>
-              Today
-            </button>
-            <button class="p-1 text-fg-2 hover:text-fg hover:bg-subtle" title="Next week (])" aria-label="Next week" onClick={() => setAnchor(addDays(anchor, 7))}>
-              <ChevronRight size={13} />
-            </button>
-          </div>
-          <Btn size="xs" variant="primary" onClick={() => setCreate({ start: defaultStart(now) })}>
-            <Plus size={12} /> Event
-          </Btn>
-        </>
-      }
-    >
-      <KeyNav onPrev={() => setAnchor(addDays(anchor, -7))} onNext={() => setAnchor(addDays(anchor, 7))} onToday={() => setAnchor(startOfWeek(new Date()))} />
-      {res.error && !res.data && (
-        <div class="border-b border-line">
-          <LoadError error={res.error} onRetry={res.reload} class="py-3!" />
+    <section class="flex-1 min-w-0 flex flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden">
+      <header class="flex items-center gap-2 px-4 sm:px-5 pt-4 pb-3">
+        <div class="min-w-0">
+          <h1 class="text-[17px] font-semibold text-fg truncate">{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
+          <div class="text-[12.5px] text-fg-3 truncate">{thisWeek ? 'This week' : rangeLabel}</div>
         </div>
-      )}
-      {/* day headers */}
-      <div class="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-line">
-        <div />
-        {days.map((d) => {
-          const today = sameDay(d, now);
-          return (
-            <div key={d.toISOString()} class="px-2 py-2 border-l border-line flex items-baseline gap-2">
-              <span class={`hud-label ${today ? 'text-fg!' : ''}`}>{d.toLocaleDateString([], { weekday: 'short' })}</span>
-              <span class={`font-mono text-[15px] tabular-nums ${today ? 'text-red' : 'text-fg-2'}`}>{pad(d.getDate())}</span>
-            </div>
-          );
-        })}
-      </div>
-      {/* all-day row */}
-      <div class="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-line min-h-7">
-        <div class="hud-label text-[9px]! px-2 py-1.5 text-right">All day</div>
-        {allDayByDay.map((list, i) => (
-          <div key={i} class="border-l border-line p-0.5 flex flex-col gap-0.5 min-w-0">
-            {list.map((ev) => (
-              <button
-                key={ev.id}
-                data-ev
-                class="text-left text-[11px] truncate px-1.5 py-0.5 bg-subtle hover:bg-[#2e2e32] text-fg-2 border-l-2"
-                style={{ borderLeftColor: ev.source === 'google' ? accountColor(ev.accountId) : '#9E9EA4' }}
-                onClick={(e) => openPop(ev, e)}
-                title={ev.title}
-              >
-                {ev.title || '(untitled)'}
+        {res.loading && <span class="loading loading-spinner loading-xs text-fg-3 ml-1" />}
+        <div class="ml-auto flex items-center gap-0.5">
+          <button class={navBtn} title="Previous week ([)" aria-label="Previous week" onClick={() => setAnchor(addDays(anchor, -7))}>
+            <ChevronLeft size={15} />
+          </button>
+          <button class="px-2.5 py-1 rounded-md text-[12.5px] text-fg-2 hover:text-fg hover:bg-subtle transition-colors" title="This week (.)" onClick={() => setAnchor(startOfWeek(new Date()))}>
+            Today
+          </button>
+          <button class={navBtn} title="Next week (])" aria-label="Next week" onClick={() => setAnchor(addDays(anchor, 7))}>
+            <ChevronRight size={15} />
+          </button>
+        </div>
+        <Btn size="sm" variant="primary" onClick={() => setCreate({ start: defaultStart(now) })} title="New event">
+          <Plus size={13} /> <span class="hidden sm:inline">Event</span>
+        </Btn>
+      </header>
+      <KeyNav onPrev={() => setAnchor(addDays(anchor, -7))} onNext={() => setAnchor(addDays(anchor, 7))} onToday={() => setAnchor(startOfWeek(new Date()))} />
+      {res.error && !res.data && <LoadError error={res.error} onRetry={res.reload} class="py-3!" />}
+
+      {/* today, first: the whole view on narrow screens */}
+      <div class="md:hidden flex-1 min-h-0 overflow-y-auto px-3 pb-4">
+        {!thisWeek ? (
+          <div class="px-2 py-6 text-[13px] text-fg-3">
+            Viewing {rangeLabel}.{' '}
+            <button class="text-fg-2 underline underline-offset-2" onClick={() => setAnchor(startOfWeek(new Date()))}>
+              Back to today
+            </button>
+          </div>
+        ) : !todayList.length ? (
+          <div class="px-2 py-6 text-[13.5px] text-fg-3">Nothing on the calendar today. A clear day.</div>
+        ) : (
+          todayList.map((x) => {
+            const color = x.ev.source === 'google' ? accountColor(x.ev.accountId) : '#9E9EA4';
+            return (
+              <button key={x.ev.id} class={`w-full text-left flex gap-3 px-2 py-2.5 rounded-md hover:bg-white/[0.03] ${x.e < now ? 'opacity-55' : ''}`} onClick={(e) => openPop(x.ev, e as unknown as MouseEvent)}>
+                <span class="w-12 shrink-0 font-mono text-[11.5px] text-fg-3 pt-0.5">{x.all ? 'all day' : hm(x.s)}</span>
+                <span class="w-[3px] self-stretch rounded-full shrink-0" style={{ background: color }} />
+                <span class="min-w-0">
+                  <span class="block text-[14px] text-fg truncate">{x.ev.title || '(untitled)'}</span>
+                  {x.ev.location && <span class="block text-[12px] text-fg-3 truncate">{x.ev.location}</span>}
+                </span>
               </button>
-            ))}
-          </div>
-        ))}
+            );
+          })
+        )}
       </div>
-      {/* timed grid */}
-      <div ref={scroller} class="flex-1 min-h-0 overflow-y-auto relative">
-        <div class="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] relative" style={{ height: `${(H1 - H0) * ROW}px` }}>
-          <div class="relative">
-            {Array.from({ length: H1 - H0 }, (_, i) => (
-              <div key={i} class="absolute right-2 font-mono text-[10px] text-fg-3 tabular-nums" style={{ top: `${i * ROW - 6}px` }}>
-                {i === 0 ? '' : `${pad(H0 + i)}:00`}
-              </div>
-            ))}
-          </div>
-          {days.map((d, di) => {
+
+      {/* week grid */}
+      <div class="hidden md:flex flex-col flex-1 min-h-0">
+        <div class="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] px-2">
+          <div />
+          {days.map((d) => {
             const today = sameDay(d, now);
             return (
-              <div
-                key={d.toISOString()}
-                class={`relative border-l border-line cursor-cell ${today ? 'bg-white/[0.012]' : ''}`}
-                onClick={(e) => onGridClick(d, e as unknown as MouseEvent)}
-                style={{
-                  backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${ROW - 1}px, rgb(50 50 54 / 0.7) ${ROW - 1}px, rgb(50 50 54 / 0.7) ${ROW}px)`,
-                }}
-              >
-                {timedByDay[di].map((p) => {
-                  const past = p.end.getTime() < now.getTime();
-                  const color = p.ev.source === 'google' ? accountColor(p.ev.accountId) : '#9E9EA4';
-                  const small = p.height < 34;
-                  return (
-                    <button
-                      key={p.ev.id + di}
-                      data-ev
-                      class={`absolute text-left overflow-hidden bg-subtle hover:bg-[#2e2e32] border-l-2 px-1.5 py-0.5 ${past ? 'opacity-55' : ''}`}
-                      style={{
-                        top: `${p.top + 1}px`,
-                        height: `${p.height}px`,
-                        left: `calc(${(p.col / p.cols) * 100}% + 2px)`,
-                        width: `calc(${100 / p.cols}% - 4px)`,
-                        borderLeftColor: color,
-                      }}
-                      onClick={(e) => openPop(p.ev, e as unknown as MouseEvent)}
-                      title={`${p.ev.title} · ${hm(p.start)}–${hm(p.end)}`}
-                    >
-                      <div class={`text-[11.5px] leading-tight text-fg truncate ${small ? 'inline' : ''}`}>{p.ev.title || '(untitled)'}</div>
-                      {!small && (
-                        <div class="font-mono text-[10px] text-fg-3 truncate mt-0.5">
-                          {hm(p.start)}–{hm(p.end)}
-                          {p.ev.location ? ` · ${p.ev.location}` : ''}
-                        </div>
-                      )}
-                      {small && <span class="font-mono text-[10px] text-fg-3 ml-1.5">{hm(p.start)}</span>}
-                    </button>
-                  );
-                })}
-                {today && thisWeek && nowTop >= 0 && nowTop <= (H1 - H0) * ROW && (
-                  <div class="absolute left-0 right-0 pointer-events-none z-10" style={{ top: `${nowTop}px` }}>
-                    <div class="h-px bg-red" />
-                    <div class="absolute -left-[3px] -top-[3px] w-[7px] h-[7px] bg-red" />
-                  </div>
-                )}
+              <div key={d.toISOString()} class="px-1.5 pb-2 flex items-baseline gap-1.5">
+                <span class={`text-[12px] ${today ? 'text-fg font-medium' : 'text-fg-3'}`}>{d.toLocaleDateString([], { weekday: 'short' })}</span>
+                <span
+                  class={`text-[13px] tabular-nums ${today ? 'text-fg font-semibold bg-red/90 rounded-full w-6 h-6 grid place-items-center -my-1' : 'text-fg-2'}`}
+                >
+                  {d.getDate()}
+                </span>
               </div>
             );
           })}
         </div>
-        {!events.length && res.data !== undefined && (
-          <div class="absolute top-4 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-widest uppercase text-fg-3 bg-surface border border-line px-2 py-1 pointer-events-none">
-            No events this week · click the grid to add one
+        {/* all-day row (only when something is all-day) */}
+        {allDayByDay.some((l) => l.length) && (
+          <div class="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] px-2 pb-1.5">
+            <div class="text-[10.5px] text-fg-3 pr-2 pt-1 text-right">all day</div>
+            {allDayByDay.map((list, i) => (
+              <div key={i} class="px-0.5 flex flex-col gap-0.5 min-w-0">
+                {list.map((ev) => (
+                  <button
+                    key={ev.id}
+                    data-ev
+                    class="text-left text-[11.5px] truncate px-2 py-0.5 rounded-md hover:brightness-125 transition"
+                    style={chip(ev.source === 'google' ? accountColor(ev.accountId) : '#9E9EA4')}
+                    onClick={(e) => openPop(ev, e)}
+                    title={ev.title}
+                  >
+                    {ev.title || '(untitled)'}
+                  </button>
+                ))}
+              </div>
+            ))}
           </div>
         )}
+        {/* timed grid */}
+        <div ref={scroller} class="flex-1 min-h-0 overflow-y-auto relative px-2 pb-2">
+          <div class="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] relative" style={{ height: `${(H1 - H0) * ROW}px` }}>
+            <div class="relative">
+              {Array.from({ length: H1 - H0 }, (_, i) =>
+                i === 0 || i % 2 ? null : (
+                  <div key={i} class="absolute right-2.5 font-mono text-[10.5px] text-fg-3/80 tabular-nums" style={{ top: `${i * ROW - 7}px` }}>
+                    {pad(H0 + i)}:00
+                  </div>
+                ),
+              )}
+            </div>
+            {days.map((d, di) => {
+              const today = sameDay(d, now);
+              return (
+                <div
+                  key={d.toISOString()}
+                  class={`relative cursor-cell rounded-md ${today ? 'bg-white/[0.025]' : ''}`}
+                  onClick={(e) => onGridClick(d, e as unknown as MouseEvent)}
+                  style={{
+                    backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${2 * ROW - 1}px, rgb(255 255 255 / 0.035) ${2 * ROW - 1}px, rgb(255 255 255 / 0.035) ${2 * ROW}px)`,
+                  }}
+                >
+                  {timedByDay[di].map((p) => {
+                    const past = p.end.getTime() < now.getTime();
+                    const color = p.ev.source === 'google' ? accountColor(p.ev.accountId) : '#9E9EA4';
+                    const small = p.height < 34;
+                    return (
+                      <button
+                        key={p.ev.id + di}
+                        data-ev
+                        class={`absolute text-left overflow-hidden rounded-md px-2 py-1 hover:brightness-125 transition ${past ? 'opacity-50' : ''}`}
+                        style={{
+                          top: `${p.top + 1}px`,
+                          height: `${p.height}px`,
+                          left: `calc(${(p.col / p.cols) * 100}% + 2px)`,
+                          width: `calc(${100 / p.cols}% - 4px)`,
+                          ...chip(color),
+                        }}
+                        onClick={(e) => openPop(p.ev, e as unknown as MouseEvent)}
+                        title={`${p.ev.title} · ${hm(p.start)}–${hm(p.end)}`}
+                      >
+                        <div class={`text-[12px] leading-tight font-medium truncate ${small ? 'inline' : ''}`}>{p.ev.title || '(untitled)'}</div>
+                        {!small && (
+                          <div class="text-[10.5px] opacity-75 truncate mt-0.5">
+                            {hm(p.start)}–{hm(p.end)}
+                            {p.ev.location ? ` · ${p.ev.location}` : ''}
+                          </div>
+                        )}
+                        {small && <span class="text-[10.5px] opacity-75 ml-1.5">{hm(p.start)}</span>}
+                      </button>
+                    );
+                  })}
+                  {today && thisWeek && nowTop >= 0 && nowTop <= (H1 - H0) * ROW && (
+                    <div class="absolute left-0 right-0 pointer-events-none z-10" style={{ top: `${nowTop}px` }}>
+                      <div class="h-px bg-red/80" />
+                      <div class="absolute -left-[3px] -top-[3px] w-[7px] h-[7px] rounded-full bg-red" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {!events.length && res.data !== undefined && (
+            <div class="absolute top-4 left-1/2 -translate-x-1/2 text-[12.5px] text-fg-3 bg-subtle rounded-full px-3 py-1 pointer-events-none">
+              A quiet week. Click anywhere on the grid to add something.
+            </div>
+          )}
+        </div>
       </div>
       {pop && <EventPopover ev={pop.ev} x={pop.x} y={pop.y} accounts={props.accounts} onClose={() => setPop(null)} onDeleted={() => void res.reload()} />}
       <NewEventModal open={!!create} start={create?.start ?? null} accounts={props.accounts} onClose={() => setCreate(null)} onCreated={() => void res.reload()} />
-    </Panel>
+    </section>
   );
 }
 
@@ -350,23 +393,23 @@ function EventPopover(props: { ev: CalendarEvent; x: number; y: number; accounts
 
   return (
     <>
-      <div ref={ref} tabIndex={-1} role="dialog" aria-label={ev.title} class="hud-panel fixed z-30 w-80 shadow-2xl outline-none" style={{ left: `${pos.left}px`, top: `${pos.top}px` }}>
-        <header class="hud-head">
-          {ev.source === 'google' ? <AccountMark id={ev.accountId} /> : <span class="w-1.5 h-1.5 bg-fg-2" />}
-          <h2 class="text-[13px] text-fg truncate">{ev.title || '(untitled)'}</h2>
-          <button class="ml-auto text-fg-3 hover:text-fg" onClick={props.onClose} aria-label="Close">
-            <X size={13} />
+      <div ref={ref} tabIndex={-1} role="dialog" aria-label={ev.title} class="fixed z-30 w-80 bg-surface rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none" style={{ left: `${pos.left}px`, top: `${pos.top}px` }}>
+        <header class="flex items-center gap-2.5 px-4 pt-4">
+          {ev.source === 'google' ? <AccountMark id={ev.accountId} size={8} /> : <span class="w-2 h-2 rounded-full bg-fg-2 shrink-0" />}
+          <h2 class="text-[14.5px] font-semibold text-fg truncate">{ev.title || '(untitled)'}</h2>
+          <button class="ml-auto -mr-1 p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" onClick={props.onClose} aria-label="Close">
+            <X size={14} />
           </button>
         </header>
-        <div class="p-3.5 flex flex-col gap-2 text-xs">
-          <div class="font-mono text-[11px] text-fg-2">{when}</div>
-          <div class="hud-label">{ev.source === 'google' ? `Google · ${acct?.email ?? ev.accountId ?? ''}` : 'Local calendar'}</div>
+        <div class="px-4 pt-1.5 pb-4 flex flex-col gap-2 text-[13px]">
+          <div class="text-fg-2">{when}</div>
+          <div class="text-[12px] text-fg-3">{ev.source === 'google' ? `Google · ${acct?.email ?? ev.accountId ?? ''}` : 'Local calendar'}</div>
           {ev.location && (
             <div class="flex items-start gap-1.5 text-fg-2">
               <MapPin size={12} class="mt-0.5 shrink-0 text-fg-3" /> <span class="break-words">{ev.location}</span>
             </div>
           )}
-          {ev.notes && <div class="text-fg-2 whitespace-pre-wrap break-words max-h-40 overflow-y-auto border-l border-line pl-2">{ev.notes}</div>}
+          {ev.notes && <div class="text-fg-2 whitespace-pre-wrap break-words max-h-40 overflow-y-auto border-l-2 border-subtle pl-2.5">{ev.notes}</div>}
           <div class="flex items-center gap-2 mt-1">
             {ev.link && (
               <Btn size="xs" variant="primary" onClick={() => void openExternal(ev.link!)}>
@@ -430,12 +473,11 @@ function NewEventModal(props: { open: boolean; start: Date | null; accounts: Goo
     }
   };
 
-  const lab = 'hud-label';
+  const lab = 'text-[12.5px] text-fg-2';
   return (
     <Modal
       open={props.open}
       onClose={props.onClose}
-      code="CAL.N"
       title="New event"
       footer={
         <>
@@ -464,8 +506,8 @@ function NewEventModal(props: { open: boolean; start: Date | null; accounts: Goo
           <input type="date" class="hud-input font-mono text-[13px]!" value={f.date} onInput={set('date')} />
         </label>
         <label class="flex items-end gap-2 pb-2.5">
-          <input type="checkbox" class="checkbox checkbox-xs rounded-none" checked={f.allDay} onChange={set('allDay')} />
-          <span class="text-xs text-fg-2">All day</span>
+          <input type="checkbox" class="checkbox checkbox-xs rounded" checked={f.allDay} onChange={set('allDay')} />
+          <span class="text-[13px] text-fg-2">All day</span>
         </label>
         {!f.allDay && (
           <>
@@ -489,7 +531,7 @@ function NewEventModal(props: { open: boolean; start: Date | null; accounts: Goo
         </label>
         <label class="col-span-2 flex flex-col gap-1.5">
           <span class={lab}>Calendar</span>
-          <select class="select select-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px]" value={f.cal} onChange={set('cal')}>
+          <select class="select select-sm w-full bg-white/[0.04] border-line text-[13px] rounded-md" value={f.cal} onChange={set('cal')}>
             <option value="local">Local (Monarch)</option>
             {props.accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -498,7 +540,7 @@ function NewEventModal(props: { open: boolean; start: Date | null; accounts: Goo
             ))}
           </select>
         </label>
-        {!invalid ? null : f.title.trim() && <div class="col-span-2 text-[11px] font-mono text-warning">End must be after start.</div>}
+        {!invalid ? null : f.title.trim() && <div class="col-span-2 text-[12px] text-warning">End must be after start.</div>}
         <button type="submit" class="hidden" />
       </form>
     </Modal>

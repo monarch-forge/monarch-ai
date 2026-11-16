@@ -34,10 +34,10 @@ export default function EvolvePage(props: { params: string[] }) {
 
   return (
     <div class="h-full overflow-y-auto lg:overflow-hidden">
-      <div class="flex flex-col gap-3 p-3 lg:h-full min-h-full">
+      <div class="flex flex-col gap-4 px-4 lg:px-6 pt-4 lg:pt-6 pb-4 lg:h-full min-h-full">
         <EvolveHeader stats={stats} />
 
-        <nav class="flex items-stretch border-b border-line overflow-x-auto [scrollbar-width:none] shrink-0 -mt-1" role="tablist" aria-label="Evolve sections">
+        <nav class="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] shrink-0" role="tablist" aria-label="Evolve sections">
           {TABS.map((t, i) => {
             const Icon = t.icon;
             const on = t.id === tab.id;
@@ -50,7 +50,7 @@ export default function EvolvePage(props: { params: string[] }) {
                 role="tab"
                 aria-selected={on}
                 aria-current={on ? 'page' : undefined}
-                class="hud-nav !h-10 shrink-0"
+                class={`flex items-center gap-2 shrink-0 h-8 px-3 rounded-full text-[13px] transition-colors duration-150 ${on ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2 hover:bg-raised/50'}`}
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
                     e.preventDefault();
@@ -62,7 +62,7 @@ export default function EvolvePage(props: { params: string[] }) {
               >
                 <Icon size={13} strokeWidth={1.5} />
                 <span>{t.label}</span>
-                {count !== undefined && <span class={`text-[10px] tabular-nums ${attn ? 'text-red' : 'text-fg-3'}`}>{count}</span>}
+                {count !== undefined && <span class={`text-[11.5px] tabular-nums ${attn ? 'text-red' : 'text-fg-3'}`}>{count}</span>}
               </a>
             );
           })}

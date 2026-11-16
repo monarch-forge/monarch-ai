@@ -1,18 +1,19 @@
 /**
- * WORKSHOP — coding sessions per workspace (route #/workshop/:id?, "new" or no id = new session). UI-B.
+ * Workshop — coding sessions per workspace (route #/workshop/:id?, "new" or no id = new session). UI-B.
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { EngineId } from '@monarch/shared';
-import { Plus, FolderOpen, X, GitBranch, ChevronRight, RefreshCw, FolderGit2 } from 'lucide-preact';
-import { Panel, Tag, Empty, Spinner, ErrorLine, fmt } from '../components/ui.tsx';
+import { Plus, FolderOpen, X, GitBranch, ChevronDown, RefreshCw, FolderGit2, SquarePen } from 'lucide-preact';
+import { Spinner, ErrorLine, Btn, fmt } from '../components/ui.tsx';
+import { ChatLayout, SideLabel, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
 import { SessionRow } from '../components/chat/session-list.tsx';
-import { SessionStats, engineLabel, ContextMeter, compactCommand } from '../components/chat/meta.tsx';
+import { SessionStats, ContextMeter, compactCommand } from '../components/chat/meta.tsx';
 import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { DirBrowser } from '../components/config/dir-browser.tsx';
 import { saveSettings } from '../components/config/fields.tsx';
-import { useChatSession, useSessions, totalTokens } from '../lib/chat-store.ts';
+import { useChatSession, useSessions } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast, useResource } from '../lib/store.ts';
 
 interface GitInfo {
@@ -60,6 +61,8 @@ export default function WorkshopPage(props: { params: string[] }) {
 
   const [selected, setSelected] = useState<string>(() => readLS(WS_KEY) ?? '');
   const [browse, setBrowse] = useState(false);
+  const [wsOpen, setWsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useStoredFlag('monarch.workshop.details', false);
   // model chosen in the composer (null = default for new sessions / keep current for an open one)
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   useEffect(() => setChoice(null), [sessionId]);
@@ -140,129 +143,152 @@ export default function WorkshopPage(props: { params: string[] }) {
 
   const isNewMode = !session?.id;
 
-  return (
-    <div class="h-full p-3 grid gap-3 grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_260px]">
-      {/* ── workspaces + sessions ── */}
-      <div class="min-h-0 flex flex-col gap-3">
-        <Panel
-          code="WRK.01"
-          title="Workspaces"
-          noPad
-          class="max-h-[45%]"
-          bodyClass="overflow-y-auto py-1"
-          right={
-            <button class="btn btn-xs btn-ghost rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] text-fg-2 hover:text-fg px-1.5" onClick={() => setBrowse(true)} disabled={conn.value !== 'open'}>
-              <Plus size={12} /> Add
-            </button>
-          }
+  const sidebar = (
+    <>
+      <div class="px-3 pt-3 relative">
+        <button
+          class="w-full flex items-center gap-2.5 rounded-[8px] px-3 h-11 bg-[var(--bg-primary)]/60 hover:bg-[var(--bg-raised,#202023)] text-left transition-colors duration-150"
+          onClick={() => setWsOpen(!wsOpen)}
+          aria-expanded={wsOpen}
+          title={selected || 'Choose a workspace'}
         >
-          {!s ? (
-            <div class="flex justify-center py-4">{conn.value === 'open' ? <Spinner /> : <ErrorLine error="Core offline" />}</div>
-          ) : allWs.length === 0 ? (
-            <div class="px-3 py-4 text-center">
-              <div class="text-[12px] text-fg-3 mb-3">No workspaces yet. Add a project folder to start coding with Monarch.</div>
-              <button class="btn btn-xs btn-primary rounded-[2px] font-mono font-normal uppercase text-[10px]" onClick={() => setBrowse(true)}>
-                <FolderOpen size={12} /> Add workspace
-              </button>
-            </div>
-          ) : (
-            allWs.map((w) => {
-              const saved = workspaces.map(norm).includes(w);
-              return (
-                <div key={w} class="hud-row group cursor-pointer" data-active={norm(selected) === w ? 'true' : 'false'} onClick={() => pickWorkspace(w)} title={w}>
-                  <FolderGit2 size={13} strokeWidth={1.5} class={norm(selected) === w ? 'text-fg-2 shrink-0' : 'text-fg-3 shrink-0'} />
-                  <div class="flex-1 min-w-0">
-                    <div class={`truncate text-[13px] ${norm(selected) === w ? 'text-fg' : 'text-fg-2'}`}>
+          <FolderGit2 size={16} strokeWidth={1.75} class="text-fg-3 shrink-0" />
+          <span class="flex-1 min-w-0">
+            <span class="block text-[11px] text-fg-3 leading-tight">Workspace</span>
+            <span class="block truncate text-[13.5px] text-fg leading-tight">{selected ? base(selected) : 'Choose one…'}</span>
+          </span>
+          <ChevronDown size={15} strokeWidth={1.75} class={`text-fg-3 shrink-0 transition-transform duration-150 ${wsOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {wsOpen && (
+          <div class="mt-1.5 rounded-[10px] bg-[var(--bg-primary)]/60 p-1">
+            {!s ? (
+              <div class="flex justify-center py-3">{conn.value === 'open' ? <Spinner /> : <ErrorLine error="Core offline" />}</div>
+            ) : (
+              allWs.map((w) => {
+                const saved = workspaces.map(norm).includes(w);
+                const on = norm(selected) === w;
+                return (
+                  <div
+                    key={w}
+                    class={`group flex items-center gap-2 rounded-[6px] px-2.5 py-2 cursor-pointer transition-colors duration-150 ${on ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'}`}
+                    onClick={() => {
+                      pickWorkspace(w);
+                      setWsOpen(false);
+                    }}
+                    title={w}
+                  >
+                    <span class={`flex-1 min-w-0 truncate text-[13px] ${on ? 'text-fg' : 'text-fg-2'}`}>
                       {base(w)}
-                      {norm(s.coding.defaultWorkspace) === w && <span class="font-mono text-[9px] text-fg-3 ml-1.5 tracking-widest">DEFAULT</span>}
-                    </div>
-                    <div class="font-mono text-[10px] text-fg-3 truncate">{w}</div>
+                      {norm(s.coding.defaultWorkspace) === w && <span class="text-[11px] text-fg-3 ml-1.5">default</span>}
+                    </span>
+                    <span class="text-[11px] text-fg-3 tabular-nums group-hover:hidden">{byWs.get(w) ?? 0}</span>
+                    {saved ? (
+                      <button
+                        class="text-fg-3 hover:text-red hidden group-hover:block"
+                        title="Remove from list (files are untouched)"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeWorkspace(w);
+                        }}
+                      >
+                        <X size={13} />
+                      </button>
+                    ) : (
+                      <button
+                        class="text-[11.5px] text-fg-3 hover:text-fg hidden group-hover:block"
+                        title="Save to workspace list"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void addWorkspace(w);
+                        }}
+                      >
+                        Save
+                      </button>
+                    )}
                   </div>
-                  <span class="font-mono text-[10px] text-fg-3 tabular-nums">{byWs.get(w) ?? 0}</span>
-                  {saved ? (
-                    <button
-                      class="text-fg-3 hover:text-red hidden group-hover:block"
-                      title="Remove from list (files are untouched)"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void removeWorkspace(w);
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
-                  ) : (
-                    <button
-                      class="font-mono text-[9px] tracking-widest text-fg-3 hover:text-fg hidden group-hover:block"
-                      title="Save to workspace list"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void addWorkspace(w);
-                      }}
-                    >
-                      SAVE
-                    </button>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </Panel>
-
-        <Panel
-          code="WRK.02"
-          title={selected ? `Sessions · ${base(selected)}` : 'Sessions'}
-          noPad
-          class="flex-1"
-          bodyClass="overflow-y-auto py-1"
-          right={
-            <button class="btn btn-xs btn-ghost rounded-[2px] font-mono font-normal uppercase tracking-wider text-[10px] text-fg-2 hover:text-fg px-1.5" onClick={newSession} disabled={!selected}>
-              <Plus size={12} /> New
+                );
+              })
+            )}
+            <button
+              class="w-full flex items-center gap-2 rounded-[6px] px-2.5 py-2 text-[13px] text-fg-3 hover:text-fg hover:bg-[var(--bg-raised,#202023)] disabled:opacity-40"
+              onClick={() => {
+                setWsOpen(false);
+                setBrowse(true);
+              }}
+              disabled={conn.value !== 'open'}
+            >
+              <Plus size={14} strokeWidth={1.75} /> Add a folder…
             </button>
-          }
-        >
-          {coding.loading && !coding.sessions ? (
-            <div class="flex justify-center py-6">
-              <Spinner />
-            </div>
-          ) : coding.error && !coding.sessions ? (
-            <div class="px-3">
-              <ErrorLine error={conn.value === 'open' ? coding.error : 'Core offline'} />
-            </div>
-          ) : !selected ? (
-            <Empty>Select a workspace</Empty>
-          ) : wsSessions.length === 0 ? (
-            <Empty>No sessions in this workspace</Empty>
-          ) : (
-            wsSessions.map((x) => (
-              <SessionRow
-                key={x.id}
-                s={x}
-                active={x.id === chat.sessionId}
-                href={`#/workshop/${encodeURIComponent(x.id)}`}
-                onDeleted={(id) => id === chat.sessionId && location.replace('#/workshop/new')}
-                sub={`${x.engine === 'claude-sdk' ? 'claude code' : 'pi'} · ${x.itemCount} items${totalTokens(x.usage) ? ` · ${fmt.num(totalTokens(x.usage))} tok` : ''}`}
-              />
-            ))
-          )}
-          {otherCount > 0 && <div class="px-3 pt-2 font-mono text-[10px] text-fg-3">{otherCount} session(s) in unlisted folders</div>}
-        </Panel>
+          </div>
+        )}
       </div>
-
-      {/* ── main ── */}
-      <Panel
-        code="WRK.03"
-        title={session?.title || 'New coding session'}
-        active={chat.running}
-        noPad
-        bodyClass="flex flex-col"
-        right={chat.running ? <Tag tone="red">live</Tag> : session?.id ? <Tag>idle</Tag> : <Tag tone="plain">draft</Tag>}
+      <SideLabel
+        right={
+          <button class={`${ICON_BTN} w-7 h-7 -my-1`} onClick={newSession} disabled={!selected} title="New session" aria-label="New session">
+            <SquarePen size={15} strokeWidth={1.75} />
+          </button>
+        }
       >
-        <GitBar cwd={cwd} refreshKey={chat.running ? 1 : 0} />
+        Sessions
+      </SideLabel>
+      <div class="flex-1 min-h-0 overflow-y-auto pb-2">
+        {coding.loading && !coding.sessions ? (
+          <div class="flex justify-center py-6">
+            <Spinner />
+          </div>
+        ) : coding.error && !coding.sessions ? (
+          <div class="px-4">
+            <ErrorLine error={conn.value === 'open' ? coding.error : 'Core offline'} />
+          </div>
+        ) : !selected ? (
+          <p class="px-5 py-4 text-[13px] text-fg-3">Pick a workspace to see its sessions.</p>
+        ) : wsSessions.length === 0 ? (
+          <p class="px-5 py-4 text-[13px] text-fg-3 leading-relaxed">No sessions here yet. Describe a task to start one.</p>
+        ) : (
+          wsSessions.map((x) => (
+            <SessionRow
+              key={x.id}
+              s={x}
+              active={x.id === chat.sessionId}
+              href={`#/workshop/${encodeURIComponent(x.id)}`}
+              onDeleted={(id) => id === chat.sessionId && location.replace('#/workshop/new')}
+            />
+          ))
+        )}
+        {otherCount > 0 && <p class="px-5 pt-3 text-[11.5px] text-fg-3">{otherCount === 1 ? '1 session lives' : `${otherCount} sessions live`} in folders not on your list.</p>}
+      </div>
+    </>
+  );
+
+  const details = (
+    <>
+      {session?.id ? <SessionStats session={session} lastTurn={chat.lastTurn} /> : null}
+      <EngineNote engine={session?.id ? session.engine : effEngine} />
+      {cwd && <GitLog cwd={cwd} refreshKey={chat.running ? 1 : 0} />}
+    </>
+  );
+
+  return (
+    <>
+      <ChatLayout
+        sidebar={sidebar}
+        routeKey={routeId}
+        detailsOpen={detailsOpen}
+        onDetails={setDetailsOpen}
+        details={details}
+        title={
+          <>
+            <h1 class="truncate text-[15px] font-semibold text-fg">{session?.title || 'New coding session'}</h1>
+            <LiveBadge running={chat.running} />
+          </>
+        }
+        actions={<GitChip cwd={cwd} refreshKey={chat.running ? 1 : 0} />}
+      >
         {session?.parentSessionId && (
-          <div class="px-3 py-1 border-b border-line font-mono text-[10.5px] text-fg-3">
-            delegated from{' '}
-            <a href={`#/comms/${encodeURIComponent(session.parentSessionId)}`} class="text-fg-2 underline decoration-red underline-offset-2 hover:text-fg">
-              chat
+          <div class="max-w-[760px] w-full mx-auto px-4 md:px-6 pb-2 -mt-1 text-[12.5px] text-fg-3">
+            Delegated from{' '}
+            <a href={`#/comms/${encodeURIComponent(session.parentSessionId)}`} class="text-fg-2 underline decoration-fg-3 underline-offset-[3px] hover:text-fg">
+              a chat
             </a>
           </div>
         )}
@@ -271,11 +297,12 @@ export default function WorkshopPage(props: { params: string[] }) {
             <Spinner />
           </div>
         ) : chat.error && !session ? (
-          <div class="flex-1 flex flex-col items-center justify-center gap-3">
+          <div class="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+            <p class="text-[14px] text-fg-2">Couldn’t open this session.</p>
             <ErrorLine error={chat.error} />
-            <button class="btn btn-xs btn-primary rounded-[2px] font-mono font-normal uppercase text-[10px]" onClick={newSession}>
+            <Btn variant="primary" onClick={newSession}>
               New session
-            </button>
+            </Btn>
           </div>
         ) : (
           <Transcript
@@ -293,14 +320,8 @@ export default function WorkshopPage(props: { params: string[] }) {
           commands={commands}
           autoFocus
           disabled={(isNewMode && !cwd) || (!!chat.error && !session)}
-          placeholder={isNewMode ? (cwd ? `Describe a task in ${base(cwd)}…` : 'Add or select a workspace first') : 'Follow up…'}
-          meta={
-            <>
-              <span class="inline-block w-1.5 h-1.5 bg-fg-3" />
-              <span class="truncate">{session?.id ? engineLabel(s, session.engine, session.model) : engineLabel(s, effEngine, choice?.model)}</span>
-              {session?.id && <ContextMeter context={session.context} autoCompactPercent={s?.agent?.autoCompactPercent} />}
-            </>
-          }
+          placeholder={isNewMode ? (cwd ? `What should we work on in ${base(cwd)}?` : 'Add or pick a workspace first') : 'Follow up…'}
+          meta={session?.id ? <ContextMeter context={session.context} autoCompactPercent={s?.agent?.autoCompactPercent} /> : null}
           tools={
             <ModelPicker
               value={choice}
@@ -311,36 +332,24 @@ export default function WorkshopPage(props: { params: string[] }) {
             />
           }
         />
-      </Panel>
-
-      {/* ── context ── */}
-      <Panel code="WRK.04" title="Session" class="hidden xl:flex" bodyClass="overflow-y-auto flex flex-col gap-5">
-        {session?.id ? (
-          <SessionStats session={session} lastTurn={chat.lastTurn} />
-        ) : (
-          <div class="flex flex-col gap-3 text-[12px] text-fg-3 leading-relaxed">
-            <EngineNote engine={effEngine} />
-          </div>
-        )}
-      </Panel>
-
+      </ChatLayout>
       <DirBrowser open={browse} initialPath={selected || s?.coding.defaultWorkspace || ''} title="Add workspace" confirmLabel="Use this folder" onPick={(p) => void addWorkspace(p)} onClose={() => setBrowse(false)} />
-    </div>
+    </>
   );
 }
 
 function EngineNote(props: { engine: EngineId }) {
   return props.engine === 'claude-sdk' ? (
-    <div>
-      <div class="hud-label mb-1.5">Claude Code</div>
+    <div class="text-[12.5px] text-fg-2 leading-relaxed">
+      <div class="text-[12px] text-fg-3 mb-1">Engine · Claude Code</div>
       Runs the Claude Agent SDK with Claude Code's own tools (Bash, Read, Edit, Write, Grep…) on your Claude subscription. Risky tools are gated by your
       permission mode.
     </div>
   ) : (
-    <div>
-      <div class="hud-label mb-1.5">Pi</div>
+    <div class="text-[12.5px] text-fg-2 leading-relaxed">
+      <div class="text-[12px] text-fg-3 mb-1">Engine · Pi</div>
       Runs the pi agent loop on the provider configured in{' '}
-      <a href="#/config/models" class="text-fg-2 underline decoration-red underline-offset-2">
+      <a href="#/config/models" class="text-fg underline decoration-fg-3 underline-offset-[3px]">
         Config → Models
       </a>{' '}
       with Monarch's coding tools (shell, read, edit, write).
@@ -349,101 +358,104 @@ function EngineNote(props: { engine: EngineId }) {
 }
 
 function WorkshopEmpty(props: { cwd: string; engine: EngineId; onBrowse: () => void; onPick: (t: string) => void }) {
-  const prompts = ['Give me a tour of this codebase', 'Find and fix the failing tests', 'Review uncommitted changes', 'Add a README section for setup'];
+  const prompts = ['Give me a tour of this codebase', 'Find and fix failing tests', 'Review my uncommitted changes', 'Add setup steps to the README'];
   if (!props.cwd)
     return (
-      <div class="h-full flex flex-col items-center justify-center gap-3 px-6">
-        <FolderOpen size={22} strokeWidth={1} class="text-fg-3" />
-        <div class="text-[13px] text-fg-3">Pick a workspace folder to start a coding session.</div>
-        <button class="btn btn-sm btn-primary rounded-[2px] font-mono font-normal uppercase text-[11px]" onClick={props.onBrowse}>
-          Add workspace
-        </button>
+      <div class="min-h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <FolderOpen size={26} strokeWidth={1.25} class="text-fg-3" />
+        <h2 class="text-[18px] font-semibold text-fg">Pick a project to work on</h2>
+        <p class="text-[13.5px] text-fg-3 max-w-[340px]">Add a folder and Monarch can read, edit and run code in it with you.</p>
+        <Btn variant="primary" class="mt-2" onClick={props.onBrowse}>
+          Add a workspace
+        </Btn>
       </div>
     );
   return (
-    <div class="h-full flex flex-col items-center justify-center px-6 py-10">
-      <div class="font-mono text-[10px] tracking-[0.16em] uppercase text-fg-3">workspace</div>
-      <div class="font-mono text-[15px] text-fg mt-1 break-all text-center">{props.cwd}</div>
-      <div class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-3 mt-2">engine · {props.engine === 'pi' ? 'pi' : 'claude code'}</div>
-      <div class="flex flex-col gap-1 mt-6 w-full max-w-[420px]">
-        {prompts.map((p, i) => (
-          <button
-            key={p}
-            class="text-left flex items-center gap-3 border border-line bg-[#18181a] hover:border-fg-3 px-3 py-2 text-[13px] text-fg-2 hover:text-fg disabled:opacity-50"
-            onClick={() => props.onPick(p)}
-            disabled={conn.value !== 'open'}
-          >
-            <span class="font-mono text-[10px] text-fg-3">T.{String(i + 1).padStart(2, '0')}</span>
-            {p}
-          </button>
-        ))}
+    <div class="min-h-full flex flex-col items-center justify-center px-6 py-10 text-center">
+      <FolderGit2 size={26} strokeWidth={1.25} class="text-fg-3 mb-4" />
+      <h2 class="text-[20px] font-semibold text-fg tracking-tight">What are we building in {base(props.cwd)}?</h2>
+      <p class="text-[12px] text-fg-3 mt-2 font-mono break-all max-w-[520px]">{props.cwd}</p>
+      <p class="text-[12.5px] text-fg-3 mt-1">with {props.engine === 'pi' ? 'Pi' : 'Claude Code'}</p>
+      <div class="mt-7">
+        <Suggestions items={prompts} onPick={props.onPick} disabled={conn.value !== 'open'} />
       </div>
     </div>
   );
 }
 
-function GitBar(props: { cwd: string; refreshKey: number }) {
-  const git = useResource<GitResult>(props.cwd ? `/coding/git?cwd=${encodeURIComponent(props.cwd)}` : null, []);
-  const [open, setOpen] = useState(false);
-  const prev = useRef(props.refreshKey);
+function useGit(cwd: string, refreshKey: number) {
+  const git = useResource<GitResult>(cwd ? `/coding/git?cwd=${encodeURIComponent(cwd)}` : null, []);
+  const prev = useRef(refreshKey);
   // refresh after an agent turn finishes
   useEffect(() => {
-    if (prev.current && !props.refreshKey) void git.reload();
-    prev.current = props.refreshKey;
-  }, [props.refreshKey]);
-
-  if (!props.cwd) return null;
+    if (prev.current && !refreshKey) void git.reload();
+    prev.current = refreshKey;
+  }, [refreshKey]);
   const d = git.data;
   const info = d && !('error' in d) ? d : null;
   const err = d && 'error' in d ? d.error : git.error;
+  return { git, info, err };
+}
 
+/** compact branch + changes chip for the header; click to refresh */
+function GitChip(props: { cwd: string; refreshKey: number }) {
+  const { git, info, err } = useGit(props.cwd, props.refreshKey);
+  if (!props.cwd) return null;
+  const tip = info
+    ? `${props.cwd}\nBranch ${info.branch ?? 'detached'} · ${info.dirty ? `${info.dirty} uncommitted change${info.dirty === 1 ? '' : 's'}` : 'clean'}${
+        info.ahead || info.behind ? ` · ↑${info.ahead} ↓${info.behind}` : ''
+      }\nClick to refresh`
+    : (err ?? props.cwd);
   return (
-    <div class="border-b border-line bg-[#18181a]">
-      <div class="flex items-center gap-3 px-4 h-8 font-mono text-[11px] min-w-0">
-        <FolderOpen size={12} strokeWidth={1.5} class="text-fg-3 shrink-0" />
-        <span class="text-fg-2 truncate min-w-0" title={props.cwd}>
-          {props.cwd}
-        </span>
-        <span class="ml-auto flex items-center gap-3 shrink-0">
-          {git.loading && !d ? (
-            <Spinner />
-          ) : info ? (
-            <>
-              <span class="flex items-center gap-1 text-fg">
-                <GitBranch size={12} strokeWidth={1.5} class="text-fg-3" />
-                {info.branch ?? 'detached'}
-              </span>
-              <span class={info.dirty ? 'text-warning' : 'text-fg-3'} title="Uncommitted changes">
-                {info.dirty ? `±${info.dirty}` : 'clean'}
-              </span>
-              {(info.ahead > 0 || info.behind > 0) && (
-                <span class="text-fg-2" title="Ahead / behind upstream">
-                  ↑{info.ahead} ↓{info.behind}
-                </span>
-              )}
-              {info.recent?.length > 0 && (
-                <button class="flex items-center gap-1 text-fg-3 hover:text-fg-2 uppercase tracking-[0.12em] text-[10px]" onClick={() => setOpen(!open)} aria-expanded={open}>
-                  <ChevronRight size={11} class={`transition-transform ${open ? 'rotate-90' : ''}`} /> log
-                </button>
-              )}
-            </>
-          ) : (
-            <span class="text-fg-3" title={err}>
-              {err && /not a git|no git/i.test(err) ? 'not a git repo' : err ? 'git unavailable' : ''}
+    <button
+      class="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-raised,#202023)] text-[12px] text-fg-2 shrink-0 max-w-[240px] transition-colors duration-150"
+      title={tip}
+      onClick={() => void git.reload()}
+    >
+      {git.loading && !git.data ? (
+        <Spinner />
+      ) : info ? (
+        <>
+          <GitBranch size={13} strokeWidth={1.75} class="text-fg-3 shrink-0" />
+          <span class="truncate">{info.branch ?? 'detached'}</span>
+          {info.dirty > 0 && <span class="text-warning tabular-nums">±{info.dirty}</span>}
+          {(info.ahead > 0 || info.behind > 0) && (
+            <span class="text-fg-3 tabular-nums">
+              ↑{info.ahead} ↓{info.behind}
             </span>
           )}
-          <button class="text-fg-3 hover:text-fg-2" title="Refresh git status" onClick={() => void git.reload()}>
-            <RefreshCw size={11} strokeWidth={1.5} />
-          </button>
+        </>
+      ) : (
+        <span class="text-fg-3">{err && /not a git|no git/i.test(err) ? 'Not a git repo' : err ? 'Git unavailable' : base(props.cwd)}</span>
+      )}
+    </button>
+  );
+}
+
+/** recent commits, shown in the details column */
+function GitLog(props: { cwd: string; refreshKey: number }) {
+  const { git, info } = useGit(props.cwd, props.refreshKey);
+  if (!info) return null;
+  return (
+    <div>
+      <div class="flex items-center gap-2 mb-1.5">
+        <span class="text-[12px] text-fg-3">
+          <GitBranch size={12} strokeWidth={1.75} class="inline -mt-0.5 mr-1" />
+          {info.branch ?? 'detached'} · {info.dirty ? `${info.dirty} uncommitted` : 'clean'}
         </span>
+        <button class="ml-auto text-fg-3 hover:text-fg-2" title="Refresh" onClick={() => void git.reload()}>
+          <RefreshCw size={12} strokeWidth={1.75} />
+        </button>
       </div>
-      {open && info && (
-        <div class="px-4 pb-2 max-h-40 overflow-y-auto">
-          {info.recent.map((c) => (
-            <div key={c.hash} class="flex items-center gap-3 font-mono text-[11px] py-0.5">
-              <span class="text-fg-3 w-16 shrink-0">{c.hash.slice(0, 7)}</span>
-              <span class="text-fg-2 truncate flex-1">{c.subject}</span>
-              <span class="text-fg-3 shrink-0">{c.date ? fmt.ago(c.date) : ''}</span>
+      {info.recent?.length > 0 && (
+        <div class="flex flex-col">
+          {info.recent.slice(0, 8).map((c) => (
+            <div key={c.hash} class="py-1" title={c.hash}>
+              <div class="text-[12.5px] text-fg-2 truncate">{c.subject}</div>
+              <div class="text-[11px] text-fg-3">
+                <span class="font-mono">{c.hash.slice(0, 7)}</span>
+                {c.date ? ` · ${fmt.ago(c.date)}` : ''}
+              </div>
             </div>
           ))}
         </div>

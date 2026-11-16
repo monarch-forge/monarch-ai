@@ -31,7 +31,7 @@ export function EnvPanel(props: { class?: string }) {
           label="No location set"
           sub="Set your location so Monarch can track local conditions."
           action={
-            <button type="button" class="mt-1 font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2 hover:text-fg underline decoration-line underline-offset-4" onClick={() => navigate('config')}>
+            <button type="button" class="mt-1 text-[12.5px] text-fg-2 hover:text-fg underline decoration-fg-3/50 underline-offset-4" onClick={() => navigate('config')}>
               Set location in Config →
             </button>
           }
@@ -58,20 +58,20 @@ function WeatherBody(props: { wx: Weather }) {
           <span class="font-mono text-[12px] text-fg-3 mt-1 ml-1">{tempUnit()}</span>
         </div>
         <div class="text-right min-w-0">
-          <div class="font-mono text-[12px] tracking-[0.12em] uppercase text-fg truncate">{loc?.name ?? '—'}</div>
+          <div class="font-mono text-[12px] text-fg truncate">{loc?.name ?? '—'}</div>
           {loc && (
-            <div class="font-mono text-[10px] tracking-[0.08em] text-fg-3 mt-1 tabular-nums">
+            <div class="font-mono text-[10px] text-fg-3 mt-1 tabular-nums">
               {Math.abs(loc.lat).toFixed(4)} {loc.lat >= 0 ? 'N' : 'S'} / {Math.abs(loc.lon).toFixed(4)} {loc.lon >= 0 ? 'E' : 'W'}
             </div>
           )}
           {today && (
-            <div class="font-mono text-[10px] tracking-[0.12em] uppercase text-fg-2 mt-1 tabular-nums">
+            <div class="font-mono text-[10px] text-fg-2 mt-1 tabular-nums">
               H {Math.round(temp(today.maxC))}° · L {Math.round(temp(today.minC))}°
             </div>
           )}
         </div>
       </div>
-      <div class="grid grid-cols-4 gap-2 border-t border-line pt-2.5">
+      <div class="grid grid-cols-4 gap-2 pt-1">
         <KV k="Wind" v={`${speed(cur.windKph)} ${cur.windDir ?? ''}`.trim()} />
         <KV k="Humidity" v={`${Math.round(cur.humidity)}%`} />
         <KV k="Feels" v={`${Math.round(temp(cur.feelsLikeC))}°`} />
@@ -80,7 +80,7 @@ function WeatherBody(props: { wx: Weather }) {
       {hours.length > 0 && (
         <div class="grid grid-cols-6 gap-1">
           {hours.map((h) => (
-            <div key={h.time} class="bg-[#121213] border border-line/60 py-1.5 text-center">
+            <div key={h.time} class="bg-raised rounded-md py-1.5 text-center">
               <div class="font-mono text-[10px] text-fg-3 tabular-nums">{fmt.time(h.time)}</div>
               <div class="font-mono text-[13px] text-fg tabular-nums mt-0.5">{Math.round(temp(h.tempC))}°</div>
             </div>
@@ -119,28 +119,22 @@ export function SchedulePanel(props: { class?: string }) {
   if (next) {
     const soon = Date.parse(next.start) - t < 10 * 60_000;
     right = (
-      <Tag tone={soon ? 'red' : 'plain'} title={`Next: ${next.title}`}>
-        <span class="tabular-nums">{fmt.countdown(next.start, now)}</span>
+      <Tag tone={soon ? 'red' : 'default'} title={`Next: ${next.title}`}>
+        <span class="tabular-nums">{inMinutes(next.start, now)}</span>
       </Tag>
     );
-  } else if (current) right = <Tag tone="red">In progress</Tag>;
-  else if (res.data) right = <Tag tone="plain">Clear</Tag>;
+  } else if (current) right = <Tag>Happening now</Tag>;
+  
 
   return (
-    <Panel code="CAL.02" title="Today / Schedule" class={props.class} right={right} noPad bodyClass="flex flex-col">
+    <Panel code="CAL.02" title="Today" class={props.class} right={right} noPad bodyClass="flex flex-col">
       <Gate res={res}>
         {() =>
           events.length === 0 ? (
-            <PanelNote label="Nothing scheduled" sub="Your day is open." />
+            <PanelNote label="Nothing on the calendar" sub="Your day is wide open." />
           ) : (
             <div class="flex flex-col min-h-0 flex-1">
-              {next && (
-                <div class="flex items-center justify-between px-3.5 pt-2.5 pb-1.5">
-                  <span class="hud-label text-[10px]">Next event</span>
-                  <span class="font-mono text-[11px] text-fg-2 truncate max-w-[60%]">{next.title}</span>
-                </div>
-              )}
-              <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto px-2 pb-2 pt-1">
+              <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto px-2.5 pb-3 pt-1">
                 {events.map((e) => {
                   const past = !e.allDay && (e.end ? Date.parse(e.end) <= t : Date.parse(e.start) + 30 * 60_000 <= t);
                   const active = e.id === current?.id;
@@ -155,9 +149,9 @@ export function SchedulePanel(props: { class?: string }) {
                       onClick={() => navigate('agenda')}
                       title={e.location ? `${e.title} — ${e.location}` : e.title}
                     >
-                      <span class={`font-mono text-[11px] tabular-nums w-11 shrink-0 ${past ? 'text-fg-3' : 'text-fg-2'}`}>{e.allDay ? 'ALL' : fmt.time(e.start)}</span>
+                      <span class={`font-mono text-[11px] tabular-nums w-12 shrink-0 ${past ? 'text-fg-3' : 'text-fg-2'}`}>{e.allDay ? 'All day' : fmt.time(e.start)}</span>
                       <span class={`flex-1 min-w-0 truncate ${past ? 'text-fg-3' : focus ? 'text-fg' : 'text-fg-2'}`}>{e.title}</span>
-                      {e.location && <span class="font-mono text-[10px] tracking-[0.1em] uppercase text-fg-3 truncate max-w-[34%]">{shortLoc(e.location)}</span>}
+                      {e.location && <span class="text-[11.5px] text-fg-3 truncate max-w-[34%]">{shortLoc(e.location)}</span>}
                     </button>
                   );
                 })}
@@ -170,9 +164,17 @@ export function SchedulePanel(props: { class?: string }) {
   );
 }
 
+function inMinutes(d: string, now: Date): string {
+  const m = Math.max(0, Math.round((Date.parse(d) - now.getTime()) / 60_000));
+  if (m < 1) return 'starting now';
+  if (m < 60) return `in ${m} min`;
+  const h = Math.floor(m / 60);
+  return `in ${h}h${m % 60 ? ` ${m % 60}m` : ''}`;
+}
+
 function shortLoc(s: string): string {
-  if (/^https?:\/\//.test(s)) return 'LINK';
-  if (/meet\.google|zoom\.us|teams\.microsoft/i.test(s)) return 'CALL';
+  if (/^https?:\/\//.test(s)) return 'Link';
+  if (/meet\.google|zoom\.us|teams\.microsoft/i.test(s)) return 'Call';
   return s.split(',')[0].slice(0, 18);
 }
 
@@ -231,7 +233,7 @@ export function VitalsPanel(props: { class?: string }) {
 function VitalRow(props: { label: string; pct: number; value: ComponentChildren; sub?: string; plain?: boolean; wide?: boolean }) {
   return (
     <div class="grid grid-cols-[36px_1fr_auto] items-center gap-3">
-      <span class="hud-label text-[10px]">{props.label}</span>
+      <span class="hud-label text-[11px]">{props.label}</span>
       <SegBar value={props.pct} segments={20} tone={props.plain ? 'default' : tone85(props.pct)} />
       <span class={`hud-value text-[11px] text-right ${props.wide ? 'min-w-[128px]' : 'min-w-[44px]'} ${!props.plain && props.pct >= 85 ? 'text-red' : ''}`} title={props.sub}>
         {props.value}

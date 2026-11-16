@@ -334,14 +334,14 @@ export function CommandPalette() {
 
   let lastGroup = '';
   return (
-    <div class="fixed inset-0 z-[60] flex justify-center items-start pt-[14vh] px-4 bg-black/55" onMouseDown={(e) => e.target === e.currentTarget && (paletteOpen.value = false)}>
-      <div class="hud-panel w-full max-w-[600px] shadow-[0_24px_64px_rgb(0_0_0/0.55)]" role="dialog" aria-modal="true" aria-label="Command palette">
-        <div class="flex items-center gap-2.5 px-3.5 border-b border-line">
+    <div class="fixed inset-0 z-[60] flex justify-center items-start pt-[14vh] px-4 bg-black/45" onMouseDown={(e) => e.target === e.currentTarget && (paletteOpen.value = false)}>
+      <div class="hud-panel !rounded-[14px] w-full max-w-[600px] shadow-[0_12px_32px_rgb(0_0_0/0.45)]" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="flex items-center gap-2.5 px-4">
           <Search size={15} strokeWidth={1.5} class="text-fg-3 shrink-0" />
           <input
             ref={inputRef}
             type="text"
-            class="flex-1 min-w-0 bg-transparent py-3.5 text-[14px] text-fg placeholder:text-fg-3 outline-none"
+            class="flex-1 min-w-0 bg-transparent py-4 text-[15px] text-fg placeholder:text-fg-3 outline-none"
             placeholder="Search pages and actions, or ask Monarch…"
             value={q}
             onInput={(e) => {
@@ -356,10 +356,10 @@ export function CommandPalette() {
             autocomplete="off"
             spellcheck={false}
           />
-          <kbd class="kbd kbd-xs bg-transparent border-line text-fg-3 font-mono">Esc</kbd>
+          <kbd class="kbd kbd-xs bg-raised border-0 text-fg-3">Esc</kbd>
         </div>
-        <div ref={listRef} id="palette-list" role="listbox" class="max-h-[min(420px,56vh)] overflow-y-auto py-1.5">
-          {items.length === 0 && <div class="px-4 py-6 text-center font-mono text-[10px] tracking-[0.16em] uppercase text-fg-3">No matches</div>}
+        <div ref={listRef} id="palette-list" role="listbox" class="max-h-[min(420px,56vh)] overflow-y-auto px-2 pb-2">
+          {items.length === 0 && <div class="px-4 py-8 text-center text-[13px] text-fg-3">Nothing matches that</div>}
           {items.map((it, i) => {
             const Icon = it.icon;
             const header = it.group !== lastGroup ? it.group : null;
@@ -367,13 +367,13 @@ export function CommandPalette() {
             const active = i === sel;
             return (
               <div key={it.id}>
-                {header && <div class="px-4 pt-2 pb-1 hud-label text-[9.5px]">{header}</div>}
+                {header && <div class="px-3 pt-3 pb-1 hud-label text-[11.5px]">{header}</div>}
                 <div
                   id={`pal-${it.id}`}
                   data-idx={i}
                   role="option"
                   aria-selected={active}
-                  class={`mx-1.5 flex items-center gap-3 px-2.5 py-2 cursor-pointer border-l-2 ${active ? 'bg-subtle border-red' : 'border-transparent hover:bg-white/[0.02]'}`}
+                  class={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors duration-100 ${active ? 'bg-raised' : ''}`}
                   onMouseMove={() => sel !== i && setSel(i)}
                   onClick={() => void it.run()}
                 >
@@ -386,17 +386,17 @@ export function CommandPalette() {
                   ) : (
                     <span class={`flex-1 min-w-0 truncate text-[13px] ${active ? 'text-fg' : 'text-fg-2'}`}>{it.label}</span>
                   )}
-                  {it.hint && it.group !== 'Ask' && <span class="font-mono text-[9.5px] tracking-[0.14em] uppercase text-fg-3">{it.hint}</span>}
+                  {it.hint && it.group !== 'Ask' && <span class="text-[11.5px] text-fg-3">{it.hint}</span>}
                   {active && <CornerDownLeft size={12} strokeWidth={1.5} class="text-fg-3" />}
                 </div>
               </div>
             );
           })}
         </div>
-        <div class="flex items-center gap-4 px-3.5 py-2 border-t border-line font-mono text-[9.5px] tracking-[0.14em] uppercase text-fg-3">
+        <div class="flex items-center gap-4 px-4 py-2.5 bg-[#161618] rounded-b-[14px] text-[11.5px] text-fg-3">
           <span>↑↓ select</span>
           <span>↵ run</span>
-          <span class="ml-auto">{conn.value === 'open' ? 'Core linked' : 'Core offline'}</span>
+          <span class="ml-auto">{conn.value === 'open' ? '' : 'Monarch is offline'}</span>
         </div>
       </div>
     </div>

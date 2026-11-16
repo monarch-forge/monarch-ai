@@ -14,13 +14,24 @@ export default function SystemsPage(_props: { params: string[] }) {
   const hist = metricsHistory.value;
   return (
     <div class="h-full overflow-y-auto">
-      <div class="grid grid-cols-1 lg:grid-cols-6 xl:grid-cols-12 gap-3 p-3 xl:p-4">
-        <Panel code="SYS.01" title="Host" class="lg:col-span-3 xl:col-span-4" right={info.data ? <Tag tone="plain">{info.data.arch}</Tag> : undefined}>
+      <div class="px-4 lg:px-6 pt-4 lg:pt-6">
+        <h1 class="text-[20px] font-semibold text-fg">Systems</h1>
+        <p class="text-[13.5px] text-fg-2 mt-1">{m ? calmSummary(m) : 'Waiting for the first reading from your machine…'}</p>
+        {m && (
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+            <BigNum label="Processor" value={fmt.pct(m.cpu.load)} hot={m.cpu.load >= 85} />
+            <BigNum label="Memory" value={fmt.pct(m.mem.percent)} hot={m.mem.percent >= 85} />
+            <BigNum label="Busiest disk" value={m.disk.length ? fmt.pct(Math.max(...m.disk.map((d) => d.percent))) : '—'} hot={m.disk.some((d) => d.percent >= 90)} />
+            <BigNum label="Power" value={m.battery ? fmt.pct(m.battery.percent) : 'AC'} hot={false} />
+          </div>
+        )}
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-6 xl:grid-cols-12 gap-4 px-4 lg:px-6 py-5">
+        <Panel title="Host" class="lg:col-span-3 xl:col-span-4" right={info.data ? <Tag tone="plain">{info.data.arch}</Tag> : undefined}>
           <Gate res={info}>{(i) => <HostBody info={i} m={m} />}</Gate>
         </Panel>
 
         <Panel
-          code="SYS.02"
           title="Processor"
           class="lg:col-span-3 xl:col-span-5"
           active={!!m && m.cpu.load >= 85}
@@ -29,12 +40,11 @@ export default function SystemsPage(_props: { params: string[] }) {
           {m ? <CpuBody m={m} hist={hist} /> : <NoMetrics />}
         </Panel>
 
-        <Panel code="SYS.03" title="Core" class="lg:col-span-6 xl:col-span-3" active={conn.value === 'open' && phase.value !== 'idle'} right={<ConnTag />}>
+        <Panel title="Core" class="lg:col-span-6 xl:col-span-3" active={conn.value === 'open' && phase.value !== 'idle'} right={<ConnTag />}>
           <CoreBody />
         </Panel>
 
         <Panel
-          code="SYS.04"
           title="Memory"
           class="lg:col-span-3 xl:col-span-4"
           active={!!m && m.mem.percent >= 85}
@@ -43,20 +53,34 @@ export default function SystemsPage(_props: { params: string[] }) {
           {m ? <MemBody m={m} hist={hist} /> : <NoMetrics />}
         </Panel>
 
-        <Panel code="SYS.05" title="Network" class="lg:col-span-3 xl:col-span-4" right={m?.net.iface ? <Tag tone="plain">{m.net.iface}</Tag> : undefined}>
+        <Panel title="Network" class="lg:col-span-3 xl:col-span-4" right={m?.net.iface ? <Tag tone="plain">{m.net.iface}</Tag> : undefined}>
           {m ? <NetBody m={m} hist={hist} /> : <NoMetrics />}
         </Panel>
 
-        <Panel code="SYS.06" title="Power" class="lg:col-span-6 xl:col-span-4" right={m ? <Tag tone="plain">{m.battery ? (m.battery.charging ? 'Charging' : 'Battery') : 'AC'}</Tag> : undefined}>
+        <Panel title="Power" class="lg:col-span-6 xl:col-span-4" right={m ? <Tag tone="plain">{m.battery ? (m.battery.charging ? 'Charging' : 'Battery') : 'AC'}</Tag> : undefined}>
           {m ? <PowerBody m={m} /> : <NoMetrics />}
         </Panel>
 
-        <Panel code="SYS.07" title="Storage" class="lg:col-span-6 xl:col-span-5" noPad right={m ? <Tag tone="plain">{`${m.disk.length} vol`}</Tag> : undefined}>
+        <Panel title="Storage" class="lg:col-span-6 xl:col-span-5" noPad right={m ? <Tag tone="plain">{`${m.disk.length} vol`}</Tag> : undefined}>
           {m ? <DisksBody m={m} /> : <NoMetrics />}
         </Panel>
 
         <ProcessesPanel class="lg:col-span-6 xl:col-span-7" />
       </div>
+    </div>
+  );
+}
+
+function calmSummary(m: SystemMetrics): string {
+  const hot = m.cpu.load >= 85 || m.mem.percent >= 85;
+  return hot ? 'Your machine is working hard right now.' : 'Everything is running comfortably.';
+}
+
+function BigNum(props: { label: string; value: string; hot: boolean }) {
+  return (
+    <div class="rounded-[10px] bg-surface px-5 py-4">
+      <div class="text-[12.5px] text-fg-3">{props.label}</div>
+      <div class={`text-[28px] font-light tabular-nums leading-tight mt-1 ${props.hot ? 'text-red' : 'text-fg'}`}>{props.value}</div>
     </div>
   );
 }
@@ -223,12 +247,12 @@ function PowerBody(props: { m: SystemMetrics }) {
           <div class="flex items-baseline gap-1">
             <span class="font-mono font-light text-[34px] leading-none tabular-nums text-fg">{Math.round(b.percent)}</span>
             <span class="font-mono text-[12px] text-fg-3">%</span>
-            <span class="ml-auto font-mono text-[10px] tracking-[0.14em] uppercase text-fg-2">{b.charging ? 'On AC · charging' : 'Discharging'}</span>
+            <span class="ml-auto text-[12px] text-fg-2">{b.charging ? 'On AC · charging' : 'Discharging'}</span>
           </div>
           <SegBar value={b.percent} segments={24} tone={b.percent <= 15 && !b.charging ? 'red' : 'default'} />
         </>
       ) : (
-        <div class="font-mono text-[11px] tracking-[0.12em] uppercase text-fg-3">No battery · mains power</div>
+        <div class=" text-[12px] text-fg-3">No battery · mains power</div>
       )}
       <div class="grid grid-cols-2 gap-3 border-t border-line pt-3">
         <Stat label="Uptime" value={fmt.uptime(m.uptimeSec)} />
@@ -297,7 +321,7 @@ function CoreBody() {
         <Stat label="Engine" value={s?.engine ?? h?.engine ?? '—'} />
         <Stat label="Model" value={<span class="truncate block" title={model}>{model ?? '—'}</span>} />
       </div>
-      {c !== 'open' && <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-red">Link lost · showing last known</div>}
+      {c !== 'open' && <div class=" text-[12px] text-red">Link lost · showing last known</div>}
     </div>
   );
 }
@@ -335,7 +359,7 @@ function ProcessesPanel(props: { class?: string }) {
   );
 
   return (
-    <Panel code="SYS.08" title="Top processes" class={props.class} noPad right={<Tag tone="plain">5s refresh</Tag>}>
+    <Panel title="Top processes" class={props.class} noPad right={<Tag tone="plain">5s refresh</Tag>}>
       <Gate res={res}>
         {() =>
           rows.length === 0 ? (

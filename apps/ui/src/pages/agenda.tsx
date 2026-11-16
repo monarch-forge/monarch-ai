@@ -13,11 +13,13 @@ export default function AgendaPage(_props: { params: string[] }) {
   const acc = useResource<GoogleAccount[]>('/google/accounts', ['google']);
   const accounts = useMemo(() => (Array.isArray(acc.data) ? acc.data.filter((a) => a && typeof a.id === 'string') : []), [acc.data]);
   return (
-    <div class="h-full p-3 flex gap-3 min-h-0">
-      <WeekCalendar accounts={accounts} />
-      <div class="w-[360px] xl:w-[400px] shrink-0 flex flex-col gap-3 min-h-0">
-        <TasksPanel class="flex-[3] min-h-0" />
-        <AutomationsPanel class="flex-[2] min-h-0" />
+    <div class="h-full overflow-y-auto lg:overflow-hidden p-3 sm:p-4 lg:p-5 flex flex-col lg:flex-row gap-4 min-h-0">
+      <div class="flex min-h-[420px] lg:min-h-0 lg:flex-1 min-w-0">
+        <WeekCalendar accounts={accounts} />
+      </div>
+      <div class="lg:w-[340px] xl:w-[380px] shrink-0 flex flex-col gap-4 min-h-0">
+        <TasksPanel class="lg:flex-[3] min-h-[280px] lg:min-h-0" />
+        <AutomationsPanel class="lg:flex-[2] min-h-[200px] lg:min-h-0" />
       </div>
     </div>
   );

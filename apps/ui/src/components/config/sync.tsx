@@ -134,8 +134,8 @@ export function SyncSection() {
 
   if (status.missing) {
     return (
-      <Panel code="SYN.00" title="Sync">
-        <div class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-3 py-8 text-center">Sync service unavailable</div>
+      <Panel title="Sync">
+        <div class=" text-[12px] text-fg-3 py-8 text-center">Sync service unavailable</div>
       </Panel>
     );
   }
@@ -241,7 +241,7 @@ export function SyncSection() {
 
   return (
     <>
-      <Panel code="SYN.01" title="Encrypted sync" right={statusTag(st)}>
+      <Panel title="Encrypted sync" right={statusTag(st)}>
         <p class="text-[13px] text-fg-2 leading-relaxed">
           Backs up all Monarch data — settings, secrets and tokens, sessions, memory vault, extensions, skills and stores — to a private git repo you own. Everything is
           encrypted on this device with your passphrase before it leaves; GitHub or GitLab only ever see ciphertext.
@@ -250,7 +250,7 @@ export function SyncSection() {
         <ErrorLine error={st?.error ?? status.error} />
       </Panel>
 
-      <Panel code="SYN.02" title="1 · Provider" right={<Link2 size={13} strokeWidth={1.5} class="text-fg-3" />}>
+      <Panel title="1 · Provider" right={<Link2 size={13} strokeWidth={1.5} class="text-fg-3" />}>
         <div class="grid gap-4 grid-cols-1 md:grid-cols-2">
           <Field label="Provider" htmlFor="sync-provider" hint={pv && !pv.git.installed ? 'git is not installed — sync needs git on this machine.' : undefined}>
             <select id="sync-provider" class={SELECT} value={draft.provider} onChange={(e) => set({ provider: (e.target as HTMLSelectElement).value as SyncProvider, account: '', host: '' })}>
@@ -328,7 +328,6 @@ export function SyncSection() {
       </Panel>
 
       <Panel
-        code="SYN.03"
         title="2 · Encryption"
         right={!encrypt ? <Tag tone="warn">Off — readable in the repo</Tag> : st?.passphraseSet ? <Tag tone="ok">Passphrase set on this device</Tag> : <Tag>Not set</Tag>}
       >
@@ -366,7 +365,7 @@ export function SyncSection() {
         )}
       </Panel>
 
-      <Panel code="SYN.04" title="3 · Connect" right={st?.remoteReady ? <Tag tone="ok">connected</Tag> : <Tag>not connected</Tag>}>
+      <Panel title="3 · Connect" right={st?.remoteReady ? <Tag tone="ok">connected</Tag> : <Tag>not connected</Tag>}>
         <div class="flex flex-wrap items-center gap-3">
           <span class="text-[13px] text-fg-2 flex-1 min-w-[200px] break-all">
             {st?.remoteUrl ? <span class="font-mono text-[12px] text-fg">{st.remoteUrl}</span> : 'Creates the private repo if missing and verifies access.'}
@@ -383,7 +382,7 @@ export function SyncSection() {
       </Panel>
 
       {ready && (
-        <Panel code="SYN.05" title="Sync" right={st!.localChanged ? <Tag tone="warn">local changes</Tag> : <Tag tone="ok">up to date</Tag>}>
+        <Panel title="Sync" right={st!.localChanged ? <Tag tone="warn">local changes</Tag> : <Tag tone="ok">up to date</Tag>}>
           <div class="grid gap-3 grid-cols-2 md:grid-cols-4 font-mono text-[11px]">
             <Info label="Last upload" value={relTime(st!.lastPushAt)} />
             <Info label="Last restore" value={relTime(st!.lastPullAt)} />
@@ -402,7 +401,7 @@ export function SyncSection() {
       )}
 
       {ready && (
-        <Panel code="SYN.06" title="History" right={<History size={13} strokeWidth={1.5} class="text-fg-3" />} noPad>
+        <Panel title="History" right={<History size={13} strokeWidth={1.5} class="text-fg-3" />} noPad>
           {history.error && <div class="px-3.5"><ErrorLine error={history.error} /></div>}
           {!history.data?.length ? (
             <div class="text-[12px] text-fg-3 px-3.5 py-4">{history.loading ? 'Loading…' : 'No snapshots yet.'}</div>
@@ -450,8 +449,8 @@ export function SyncSection() {
         createPortal(
           <div class="fixed inset-0 z-[1000] bg-[#121213]/95 flex flex-col items-center justify-center gap-4" role="alertdialog" aria-live="assertive">
             <span class="loading loading-spinner loading-md text-red" />
-            <div class="font-mono text-[12px] tracking-[0.2em] uppercase text-fg">Restoring…</div>
-            <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-fg-3">{conn.value === 'open' ? 'waiting for core restart' : 'reconnecting'}</div>
+            <div class=" text-[12px] text-fg">Restoring…</div>
+            <div class=" text-[12px] text-fg-3">{conn.value === 'open' ? 'waiting for core restart' : 'reconnecting'}</div>
           </div>,
           document.body,
         )}
