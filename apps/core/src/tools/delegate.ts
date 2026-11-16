@@ -20,6 +20,43 @@ const orch = () => import('../agent/orchestrator.ts');
 const sess = () => import('../agent/sessions.ts');
 const appr = () => import('../agent/approvals.ts');
 
+/* ─────────────── model selection ─────────────── */
+
+const CLAUDE_ALIASES = ['opus', 'sonnet', 'haiku'];
+
+/** every model of every configured provider, as the specs coding_agent_start accepts */
+async function availableModels(): Promise<{ engine: EngineId; spec: string; name: string; provider: string; context?: number; reasoning?: boolean }[]> {
+  const { listAvailableModels } = await import('../agent/providers.ts');
+  const list = await listAvailableModels();
+  return list.map((m) => ({
+    engine: m.engine,
+    spec: m.engine === 'pi' ? `${m.provider}/${m.id}` : m.id,
+    name: m.name,
+    provider: m.provider,
+    context: m.contextWindow,
+    reasoning: m.reasoning,
+  }));
+}
+
+/** check an engine/model choice before starting a session; returns the normalized pair or throws with suggestions */
+async function validateModel(engine: EngineId | undefined, model: string | undefined): Promise<{ engine?: EngineId; model?: string }> {
+  const want = model?.trim();
+  if (!want) return { engine };
+  const eff: EngineId = engine ?? (want.includes('/') ? 'pi' : getSettings().engine);
+  if (eff === 'claude-sdk' && CLAUDE_ALIASES.includes(want.toLowerCase())) return { engine: eff, model: want.toLowerCase() };
+  const all = await availableModels();
+  const mine = all.filter((m) => m.engine === eff);
+  const lw = want.toLowerCase();
+  const hit = mine.find((m) => m.spec.toLowerCase() === lw) ?? (eff === 'pi' ? mine.find((m) => m.spec.toLowerCase().endsWith(`/${lw}`)) : undefined);
+  if (hit) return { engine: eff, model: hit.spec };
+  const close = mine.filter((m) => m.spec.toLowerCase().includes(lw) || m.name.toLowerCase().includes(lw)).slice(0, 8).map((m) => m.spec);
+  throw new Error(
+    `Model "${want}" is not available on ${eff === 'pi' ? 'pi' : 'Claude'}.` +
+      (close.length ? ` Close matches: ${close.join(', ')}.` : ` Call coding_agent_models to see the models you can use.`) +
+      (eff === 'claude-sdk' ? ' Claude also accepts the aliases opus, sonnet, haiku.' : ''),
+  );
+}
+
 const link = (id: string) => `#/workshop/${encodeURIComponent(id)}`;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -132,15 +169,23 @@ export const tools: ToolDef[] = [
     description:
       'Delegate a coding task to a new coding agent (a Workshop session with file/shell tools in a workspace). Use this for any request to write, change, fix, refactor or inspect code instead of doing it inline. ' +
       'Returns sessionId and a Workshop link immediately (wait=false), or blocks until the agent finishes (wait=true). Give a complete, self-contained task description. ' +
-      'cwd: absolute path or remembered workspace name; defaults to the default workspace.',
+      'cwd: absolute path or remembered workspace name; defaults to the default workspace. ' +
+      'Runtime/model: omit both to use the user\'s default. Only pick a model when the user asks for one (e.g. "use opus") or the task clearly needs a stronger/cheaper model; ' +
+      'call coding_agent_models to see what is available. The choice is validated before the session starts.',
     risk: 'sensitive',
     loading: 'always',
     schema: z.object({
       task: z.string().min(1).describe('full instructions for the coding agent'),
       cwd: z.string().optional().describe('workspace: absolute path, ~/path, or remembered workspace name'),
       title: z.string().optional(),
-      engine: z.enum(['claude-sdk', 'pi']).optional(),
-      model: z.string().optional(),
+      engine: z
+        .enum(['claude-sdk', 'pi'])
+        .optional()
+        .describe("runtime: 'claude-sdk' = Claude Code on the user's Claude subscription; 'pi' = any pi provider (OpenAI, Gemini, OpenRouter, custom…). Default: the user's default engine."),
+      model: z
+        .string()
+        .optional()
+        .describe("claude-sdk: an alias (opus, sonnet, haiku) or a full Claude model id. pi: '<provider>/<model-id>' as listed by coding_agent_models. A '/' implies engine pi."),
       wait: z.boolean().optional().describe('block until the agent finishes its turn (default false)'),
       timeoutSec: z.number().int().min(5).max(1800).optional().describe('when wait=true (default 300)'),
     }),
@@ -150,12 +195,13 @@ export const tools: ToolDef[] = [
       const cwd = resolveWorkspace(i.cwd);
       const o = await orch();
       const title = i.title?.trim() || clip(i.task.replace(/\s+/g, ' '), 60);
+      const choice = await validateModel(i.engine as EngineId | undefined, i.model);
       const { sessionId } = o.startPrompt({
         text: i.task,
         kind: 'coding',
         title,
-        engine: i.engine as EngineId | undefined,
-        model: i.model,
+        engine: choice.engine,
+        model: choice.model,
         cwd,
         parentSessionId: ctx.sessionId,
       });
@@ -166,14 +212,26 @@ export const tools: ToolDef[] = [
   defineTool({
     ...common,
     name: 'coding_agent_send',
-    description: 'Send a follow-up instruction to an existing coding agent session. Starts a new turn if idle; queued after the current turn if it is busy.',
+    description:
+      'Send a follow-up instruction to an existing coding agent session. Starts a new turn if idle; queued after the current turn if it is busy. ' +
+      'Optional model switches that agent to another model of the SAME runtime from this message on (e.g. escalate to opus for a hard bug); a different runtime needs a new agent.',
     risk: 'sensitive',
-    schema: z.object({ sessionId: z.string(), message: z.string().min(1) }),
+    schema: z.object({
+      sessionId: z.string(),
+      message: z.string().min(1),
+      model: z.string().optional().describe('switch to this model (same runtime) before sending; see coding_agent_models'),
+    }),
     summarize: (i) => `Tell coding agent ${i.sessionId.slice(0, 8)}: ${clip(i.message, 120)}`,
     async run(i) {
-      await codingSession(i.sessionId);
+      const rec = await codingSession(i.sessionId);
+      let switched: string | undefined;
+      if (i.model?.trim()) {
+        const choice = await validateModel(rec.engine, i.model);
+        const now = (await orch()).setSessionModel(i.sessionId, rec.engine, choice.model!);
+        switched = `model now ${now}`;
+      }
       const r = (await orch()).sendToSession(i.sessionId, i.message);
-      return { sessionId: i.sessionId, link: link(i.sessionId), result: r, note: r === 'queued' ? 'Agent is busy; message queued and will run after the current turn.' : 'Turn started.' };
+      return { sessionId: i.sessionId, link: link(i.sessionId), result: r, ...(switched ? { switched } : {}), note: r === 'queued' ? 'Agent is busy; message queued and will run after the current turn.' : 'Turn started.' };
     },
   }),
   defineTool({
@@ -230,6 +288,31 @@ export const tools: ToolDef[] = [
       await codingSession(i.sessionId);
       const stopped = (await orch()).abortSession(i.sessionId);
       return { sessionId: i.sessionId, stopped, note: stopped ? 'Stopped.' : 'Was not running.' };
+    },
+  }),
+  defineTool({
+    ...common,
+    name: 'coding_agent_models',
+    description:
+      'List the runtimes and models a coding agent can use (every model of every provider the user has configured). Use the spec values as coding_agent_start/coding_agent_send `model`.',
+    risk: 'safe',
+    schema: z.object({ query: z.string().optional().describe('optional filter, e.g. "opus", "gpt", "gemini"') }),
+    summarize: (i) => `List coding agent models${i.query ? ` matching ${i.query}` : ''}`,
+    async run(i) {
+      const s = getSettings();
+      const q = i.query?.trim().toLowerCase();
+      const all = (await availableModels()).filter((m) => !q || `${m.spec} ${m.name}`.toLowerCase().includes(q));
+      const def = s.engine === 'pi' ? `pi ${s.pi.provider}/${s.pi.model}` : `claude-sdk ${s.claudeSdk.model}`;
+      const lines = [`Default (used when engine/model are omitted): ${def}`];
+      for (const eng of ['claude-sdk', 'pi'] as EngineId[]) {
+        const ms = all.filter((m) => m.engine === eng);
+        if (!ms.length) continue;
+        lines.push('', eng === 'claude-sdk' ? 'claude-sdk (Claude subscription) — aliases: opus, sonnet, haiku' : 'pi');
+        for (const m of ms.slice(0, 80)) lines.push(`- ${m.spec} — ${m.name}${m.context ? ` · ${Math.round(m.context / 1000)}k ctx` : ''}${m.reasoning ? ' · reasoning' : ''}`);
+        if (ms.length > 80) lines.push(`… ${ms.length - 80} more (use query to filter)`);
+      }
+      if (all.length === 0) lines.push(q ? `No models match "${i.query}".` : 'No configured providers found.');
+      return lines.join('\n');
     },
   }),
 ];

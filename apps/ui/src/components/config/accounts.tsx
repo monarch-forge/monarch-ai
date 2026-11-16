@@ -23,6 +23,13 @@ const SLACK_SCOPES = [
   'users:read',
   'search:read',
   'chat:write',
+  'channels:write',
+  'groups:write',
+  'im:write',
+  'mpim:write',
+  'reactions:read',
+  'reactions:write',
+  'users:read.email',
 ];
 
 function ConfirmRemove(props: { label: string; onConfirm: () => Promise<void> }) {

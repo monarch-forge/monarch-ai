@@ -419,6 +419,159 @@ export async function postMessage(workspaceId: string | undefined, channelId: st
   return toMessage(ws, r.channel, { ts: r.ts, text, thread_ts: threadTs, ...r.message }, users);
 }
 
+/* ─────────────── more actions (read state, reactions, edit/delete, schedule, people, DMs) ─────────────── */
+
+async function latestTs(ws: SlackWorkspace, channelId: string): Promise<string | undefined> {
+  const r = await wsCall<{ messages: SMsg[] }>(ws, 'conversations.history', { channel: channelId, limit: 1 });
+  return r.messages?.[0]?.ts;
+}
+
+/** mark a conversation read up to `ts` (default: its newest message). Needs channels/groups/im/mpim:write. */
+export async function markRead(workspaceId: string | undefined, channelId: string, ts?: string): Promise<{ ts: string | null }> {
+  const ws = resolveWorkspace(workspaceId);
+  const upTo = ts?.trim() || (await latestTs(ws, channelId));
+  if (!upTo) return { ts: null };
+  await wsCall(ws, 'conversations.mark', { channel: channelId, ts: upTo });
+  activity('SLK', `Marked ${ws.name}/${channelId} read`);
+  changed('slack');
+  return { ts: upTo };
+}
+
+export interface SlackUnread {
+  channelId: string;
+  name: string;
+  kind: SlackChannel['kind'];
+  unread: number;
+  /** newest unread messages, oldest → newest */
+  preview: SlackMessage[];
+}
+
+/** conversations with messages newer than the user's read marker (user tokens only; bounded) */
+export async function unreadOverview(workspaceId: string | undefined, opts: { maxChannels?: number; preview?: number } = {}): Promise<SlackUnread[]> {
+  const ws = resolveWorkspace(workspaceId);
+  if (ws.tokenType === 'bot') throw new HttpError(400, `Unread state needs a user token (xoxp-…); ${ws.name} uses a bot token`);
+  const chans = (await listChannels(ws.id)).slice(0, Math.max(1, Math.min(200, opts.maxChannels ?? 80)));
+  const out: SlackUnread[] = [];
+  let i = 0;
+  const worker = async () => {
+    while (i < chans.length) {
+      const c = chans[i++];
+      try {
+        const info = await wsCall<{ channel: { last_read?: string; unread_count_display?: number } }>(ws, 'conversations.info', { channel: c.id });
+        const lastRead = info.channel?.last_read;
+        if (!lastRead || lastRead === '0000000000.000000') continue;
+        const h = await wsCall<{ messages: SMsg[] }>(ws, 'conversations.history', { channel: c.id, oldest: lastRead, limit: 100 });
+        const msgs = (h.messages ?? []).filter((m) => m.ts !== lastRead && (!m.subtype || !['channel_join', 'channel_leave'].includes(m.subtype)));
+        if (!msgs.length) continue;
+        const shown = msgs.slice(0, Math.max(0, opts.preview ?? 3));
+        const users = await resolveUsers(ws, shown.flatMap((m) => [m.user ?? '', ...mentionIds(m.text ?? '')]));
+        out.push({ channelId: c.id, name: c.name, kind: c.kind, unread: info.channel?.unread_count_display ?? msgs.length, preview: shown.map((m) => toMessage(ws, c.id, m, users)).reverse() });
+      } catch {
+        /* skip conversations we can't inspect */
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, chans.length) }, worker));
+  return out.sort((a, b) => b.unread - a.unread);
+}
+
+export async function react(workspaceId: string | undefined, channelId: string, ts: string, emoji: string, remove = false): Promise<void> {
+  const ws = resolveWorkspace(workspaceId);
+  const name = emoji.trim().replace(/^:|:$/g, '');
+  if (!name) throw new HttpError(400, 'emoji is required');
+  await wsCall(ws, remove ? 'reactions.remove' : 'reactions.add', { channel: channelId, timestamp: ts, name });
+  changed('slack');
+}
+
+export async function updateMessage(workspaceId: string | undefined, channelId: string, ts: string, text: string): Promise<void> {
+  const ws = resolveWorkspace(workspaceId);
+  if (!text?.trim()) throw new HttpError(400, 'text is required');
+  await wsCall(ws, 'chat.update', { channel: channelId, ts, text });
+  activity('SLK', `Edited message in ${ws.name}/${channelId}`);
+  changed('slack');
+}
+
+export async function deleteMessage(workspaceId: string | undefined, channelId: string, ts: string): Promise<void> {
+  const ws = resolveWorkspace(workspaceId);
+  await wsCall(ws, 'chat.delete', { channel: channelId, ts });
+  activity('SLK', `Deleted message in ${ws.name}/${channelId}`);
+  changed('slack');
+}
+
+export async function scheduleMessage(workspaceId: string | undefined, channelId: string, text: string, postAt: Date, threadTs?: string): Promise<{ id: string; postAt: string }> {
+  const ws = resolveWorkspace(workspaceId);
+  const at = Math.floor(postAt.getTime() / 1000);
+  if (!Number.isFinite(at) || at <= Date.now() / 1000 + 10) throw new HttpError(400, 'postAt must be in the future');
+  const r = await wsCall<{ scheduled_message_id: string; post_at: number }>(ws, 'chat.scheduleMessage', { channel: channelId, text, post_at: at, thread_ts: threadTs });
+  activity('SLK', `Scheduled a message in ${ws.name}/${channelId} for ${new Date(at * 1000).toISOString()}`);
+  return { id: r.scheduled_message_id, postAt: new Date(r.post_at * 1000).toISOString() };
+}
+
+export interface SlackPerson {
+  id: string;
+  name: string;
+  realName?: string;
+  title?: string;
+  email?: string;
+  tz?: string;
+  isBot: boolean;
+}
+
+const peopleCache = new Map<string, { at: number; list: SlackPerson[] }>();
+/** workspace members (cached 10 min); email needs users:read.email */
+export async function listPeople(workspaceId: string | undefined): Promise<SlackPerson[]> {
+  const ws = resolveWorkspace(workspaceId);
+  const hit = peopleCache.get(ws.id);
+  if (hit && Date.now() - hit.at < 600_000) return hit.list;
+  const list: SlackPerson[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const r = await wsCall<{ members: any[]; response_metadata?: { next_cursor?: string } }>(ws, 'users.list', { limit: 200, cursor });
+    for (const u of r.members ?? []) {
+      if (u.deleted) continue;
+      list.push({
+        id: u.id,
+        name: u.profile?.display_name || u.name || u.id,
+        realName: u.profile?.real_name || u.real_name || undefined,
+        title: u.profile?.title || undefined,
+        email: u.profile?.email || undefined,
+        tz: u.tz || undefined,
+        isBot: !!u.is_bot || u.id === 'USLACKBOT',
+      });
+      metaOf(ws.id).users.set(u.id, u.profile?.display_name || u.profile?.real_name || u.real_name || u.name || u.id);
+    }
+    cursor = r.response_metadata?.next_cursor || undefined;
+    if (!cursor) break;
+  }
+  peopleCache.set(ws.id, { at: Date.now(), list });
+  return list;
+}
+
+export async function findPeople(workspaceId: string | undefined, query: string): Promise<SlackPerson[]> {
+  const q = query.trim().replace(/^@/, '').toLowerCase();
+  const people = (await listPeople(workspaceId)).filter((p) => !p.isBot);
+  if (/^[UW][A-Z0-9]{6,}$/i.test(query.trim())) return people.filter((p) => p.id === query.trim().toUpperCase());
+  return people.filter((p) => [p.name, p.realName, p.email, p.title].some((v) => v?.toLowerCase().includes(q)));
+}
+
+/** channel id for a conversation ref; for a person's name/email/id with no existing DM, opens one (im:write) */
+export async function resolveOrOpenConversation(workspaceId: string | undefined, ref: string): Promise<{ id: string; name: string }> {
+  try {
+    return await resolveChannel(workspaceId, ref);
+  } catch (e) {
+    if (ref.trim().startsWith('#')) throw e;
+    const matches = await findPeople(workspaceId, ref);
+    if (matches.length !== 1) {
+      if (!matches.length) throw e;
+      throw new HttpError(409, `"${ref}" matches several people: ${matches.slice(0, 6).map((p) => `${p.realName || p.name} (${p.id})`).join(', ')} — use the user id`);
+    }
+    const ws = resolveWorkspace(workspaceId);
+    const r = await wsCall<{ channel: { id: string } }>(ws, 'conversations.open', { users: matches[0].id });
+    metaOf(ws.id).channels = null; // refresh the conversation list next time
+    return { id: r.channel.id, name: `@${matches[0].realName || matches[0].name}` };
+  }
+}
+
 /** called once at startup */
 export function initSlack(): void {
   const n = listWorkspaces().length;

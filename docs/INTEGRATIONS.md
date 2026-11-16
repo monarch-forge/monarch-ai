@@ -85,7 +85,10 @@ Monarch uses a Slack app that you install into your own workspace, then talks to
 | `channels:history`, `groups:history`, `im:history`, `mpim:history` | Read messages and threads in them |
 | `users:read` | Show names instead of user IDs |
 | `search:read` | Search messages (user tokens only) |
-| `chat:write` | Post messages and replies as you (every post needs your approval) |
+| `chat:write` | Post, reply in threads, edit, delete and schedule messages as you (each needs your approval) |
+| `channels:write`, `groups:write`, `im:write`, `mpim:write` | Mark conversations as read, and open a DM with someone new |
+| `reactions:read`, `reactions:write` | Add and remove emoji reactions |
+| `users:read.email` | Find people by email (optional) |
 
 ### 1. Create the Slack app
 
@@ -101,7 +104,11 @@ Monarch uses a Slack app that you install into your own workspace, then talks to
    channels:history  channels:read  groups:history  groups:read
    im:history  im:read  mpim:history  mpim:read
    users:read  search:read  chat:write
+   channels:write  groups:write  im:write  mpim:write
+   reactions:read  reactions:write  users:read.email
    ```
+
+   Already connected before these were added? Add the new scopes, **Reinstall to Workspace** and paste the new token; until then Monarch tells you which scope a refused action needs.
 
    The same list is shown in Monarch under **Config → Accounts → Slack → show scopes**.
 

@@ -688,6 +688,14 @@ export function sendToSession(sessionId: string, text: string): 'started' | 'que
   return 'started';
 }
 
+/** switch an existing session's model (same engine only); returns the model now in use */
+export function setSessionModel(sessionId: string, engine: EngineId | undefined, spec: string): string {
+  const rec = getSession(sessionId);
+  if (!rec) throw new Error(`Session not found: ${sessionId}`);
+  switchModel(rec, engine, spec);
+  return rec.model;
+}
+
 export function queuedCount(sessionId: string): number {
   return queued.get(sessionId)?.length ?? 0;
 }
