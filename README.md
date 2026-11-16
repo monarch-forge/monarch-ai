@@ -24,8 +24,8 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Sync across devices.** In **Config → Sync**, Monarch encrypts all its data (settings, keys and tokens, sessions, vault, extensions and skills) with your passphrase and keeps it in a private repo. It signs in with your existing `gh` account (or `glab`, or any git remote). On a new device, pick the same repo, enter the passphrase and press **Restore**.
 - **MCP servers.** In **Evolve → MCP**, add Model Context Protocol servers: local commands (stdio) or remote URLs (HTTP/SSE). You can also paste a `{"mcpServers": …}` block from Claude Desktop, Claude Code or Cursor. Their tools become available to the agent in both engines, are found through tool search, and go through your approval rules; env values and headers are stored as secrets.
 - **Context meter and auto-compaction.** Every Comms and Workshop session shows how much of the model's context it uses. Long sessions compact automatically at 75% (adjustable in Config → Models), and `/compact` compacts on demand.
-- **Chief of staff.** One long-running Monarch session can handle office work, personal errands and side projects. It runs your inbox, calendar (move events, find shared free time, answer invites, add Meet links), Slack and tasks itself, and leads your Workshop coding agents: it starts them, sends them follow-ups, picks their model and reviews their work. It never sends you off to another tab.
-- **Works on small models.** Small-model mode (automatic for Flash/Lite/mini-class models, or set in Config → Models) loads the common tools up front, uses a compact prompt, fixes common argument slips and catches cut-off replies. Combined with auto-compaction and the memory vault, a single manager session stays usable over time.
+- **Chief of staff.** One long-running Monarch session can handle office work, personal errands and side projects. It runs your inbox, calendar (move events, find shared free time, answer invites, add Meet links), Slack and tasks itself, and leads your Workshop worker agents. It does quick things itself and hands heavy work (code, full inbox triage, research, planning, long drafts) to workers: it starts them, sends follow-ups, picks their model (default in Config → Models → Worker agents) and reviews their work. It never sends you off to another tab.
+- **Works on small models.** Small-model mode (automatic for Flash/Lite/mini-class models, or set in Config → Models) loads the common tools up front, uses a compact prompt, fixes common argument slips and catches cut-off replies. Models that write tool calls as text instead of making real calls still work: Monarch runs those calls for real and feeds the results back. Combined with auto-compaction and the memory vault, a single manager session stays usable over time.
 - **Command palette.** Press `Ctrl/⌘+K` for everything.
 
 ## Architecture
@@ -71,8 +71,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.6.0/monarch-ai-bin-0.6.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.6.0-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.7.0/monarch-ai-bin-0.7.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.7.0-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -97,30 +97,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.6.0_amd64.deb
+sudo apt install ./Monarch_0.7.0_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.6.0-1.x86_64.rpm
+sudo dnf install ./Monarch-0.7.0-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.6.0_amd64.AppImage && ./Monarch_0.6.0_amd64.AppImage
+chmod +x Monarch_0.7.0_amd64.AppImage && ./Monarch_0.7.0_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.6.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.6.0_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.7.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.7.0_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.6.0_x64-setup.exe`, or `Monarch_0.6.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.7.0_x64-setup.exe`, or `Monarch_0.7.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 

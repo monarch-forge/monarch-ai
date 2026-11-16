@@ -92,7 +92,7 @@ export const SMALL_MODE_UPFRONT = new Set([
   'mail_search', 'mail_read_thread', 'mail_draft',
   'slack_unread', 'slack_read', 'slack_search', 'slack_post',
   'memory_search', 'memory_read', 'memory_write',
-  'coding_agent_start', 'coding_agent_send', 'coding_agent_status', 'coding_agent_wait', 'coding_agent_list',
+  'agent_start', 'agent_send', 'agent_status', 'agent_wait', 'agent_list',
 ]);
 
 /** small mode loads mail/Slack tools up front only when such an account is connected (window space is precious) */

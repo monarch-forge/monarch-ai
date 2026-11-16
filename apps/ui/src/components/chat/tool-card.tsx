@@ -289,9 +289,9 @@ function Details(props: { item: ToolItem }) {
   );
 }
 
-/** coding_agent_* tools: the delegated Workshop session id (from input, else from the JSON output) */
+/** agent_* (and legacy coding_agent_*) tools: the delegated Workshop session id (from input, else from the JSON output) */
 function codingAgentSession(item: ToolItem): string | undefined {
-  if (!/coding_agent_/.test(item.name)) return undefined;
+  if (!/^(coding_)?agent_/.test(item.name)) return undefined;
   const fromInput = str(rec(item.input).sessionId);
   if (fromInput) return fromInput;
   const m = /"sessionId"\s*:\s*"([A-Za-z0-9_-]{1,80})"/.exec(item.output ?? '');
@@ -339,7 +339,7 @@ export function ToolCard(props: { item: ToolItem; sessionId?: string | null; def
       {agentSession && (
         <div class="px-2.5 pb-1.5 -mt-0.5">
           <a href={`#/workshop/${encodeURIComponent(agentSession)}`} class="font-mono text-[10.5px] tracking-wider text-fg-2 underline decoration-red underline-offset-2 hover:text-fg">
-            Open coding agent in Workshop →
+            Open worker agent in Workshop →
           </a>
         </div>
       )}

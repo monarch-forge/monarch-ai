@@ -279,6 +279,8 @@ export interface Settings {
      * 'auto' (default) = on for models whose id/name looks small (flash, lite, mini, haiku, nano, 7b…) or with a context window under 64k.
      */
     smallModelMode?: 'auto' | 'on' | 'off';
+    /** default runtime/model for worker agents (agent_start without engine/model); unset = the default engine/model */
+    workerModel?: { engine: EngineId; model: string } | null;
   };
   user: {
     name: string; // "Tony"

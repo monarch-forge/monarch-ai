@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-preact';
 import { qs } from '../../lib/api.ts';
 import { settings, useResource } from '../../lib/store.ts';
 import { Panel, Tag, Spinner, ErrorLine } from '../ui.tsx';
+import { ModelPicker, type ModelChoice } from '../chat/model-picker.tsx';
 import { Field, INPUT, SELECT, RADIO, ToggleRow, SaveBar, saveSettings, useDraft, Kbd } from './fields.tsx';
 
 type Slice = Pick<Settings, 'engine' | 'claudeSdk' | 'pi'>;
@@ -228,6 +229,7 @@ export function ModelsSection() {
       </Panel>
 
       <ContextPanel />
+      <WorkerModelPanel />
       <SmallModelPanel />
     </div>
   );
@@ -304,6 +306,29 @@ function SmallModelPanel() {
         </Field>
       </div>
       <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
+    </Panel>
+  );
+}
+
+/** Settings.agent.workerModel — default runtime/model for worker agents started by Monarch */
+function WorkerModelPanel() {
+  const s = settings.value!;
+  const w = s.agent?.workerModel ?? null;
+  const save = async (c: ModelChoice | null) => {
+    await saveSettings({ agent: { ...(s.agent ?? {}), workerModel: c ? { engine: c.engine, model: c.model } : null } }, c ? `Worker agents: ${c.model}` : 'Worker agents use the default model');
+  };
+  return (
+    <Panel code="CFG.26" title="Worker agents" right={<Tag tone={w ? 'ok' : undefined}>{w ? w.model : 'same as default'}</Tag>}>
+      <div class="flex flex-col gap-2 max-w-[560px]">
+        <div class="text-[12.5px] text-fg-2 leading-relaxed">
+          Monarch does quick things itself and hands heavy work (code, full inbox triage, research, planning, long drafts) to worker agents in the Workshop. Give them a stronger model here so
+          your manager can stay on a fast one. Monarch still uses another model when you ask for one.
+        </div>
+        <div class="flex items-center gap-3">
+          <ModelPicker value={w} onChange={(c) => void save(c)} placement="down" title="Default model for worker agents" />
+          <span class="text-[11px] text-fg-3">“Default” = the same engine and model as Monarch.</span>
+        </div>
+      </div>
     </Panel>
   );
 }

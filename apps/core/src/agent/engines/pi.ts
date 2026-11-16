@@ -16,6 +16,7 @@ import { defineTool, truncate, type ToolDef } from '../../kernel.ts';
 import { getSettings } from '../../settings.ts';
 import { emptyUsage, addUsage, autoCompactPercent, type SessionRecord } from '../sessions.ts';
 import { deferToolsEnabled, errorText, loadsUpFront, piToolDefs, runToolDef, smallModeFor, toolJsonSchema, toolSearchReport, toolSummary } from '../toolset.ts';
+import { parseLooseObject, parseTextToolCalls, textToolResultsMessage, type TextToolCall } from '../text-tools.ts';
 import { codingAgentsBrief } from '../../tools/delegate.ts';
 import { piModels, resolvePiModel } from '../pi-models.ts';
 import type { Engine, TurnContext, TurnResult } from './types.ts';
@@ -26,10 +27,16 @@ interface TurnState {
   byModel: Record<string, Usage>;
   model?: string;
   error?: string;
-  /** text of the current assistant message held back while it may be a stray tool-call fragment */
-  held: string;
-  /** the current assistant message's text has been released to the UI */
-  released: boolean;
+  /** full text of the current assistant message */
+  msg: string;
+  /** how much of `msg` has been streamed to the UI (the rest is held back: may be a fragment / text tool call) */
+  out: number;
+  /** the current message turned into tool-call text: stream nothing more of it */
+  suppress: boolean;
+  /** tool calls the last assistant message wrote as text (no native calls): run by the text-tool fallback */
+  textCalls?: TextToolCall[];
+  /** raw streamed argument text of native tool calls in the current message, by content index */
+  rawArgs: Record<number, string>;
   /** the last assistant message was suppressed as a fragment */
   fragment?: string;
   /** the last reply was cut off for lack of room in the context window */
@@ -167,17 +174,24 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
     case 'message_update': {
       const a = ev.assistantMessageEvent;
       if (a.type === 'text_delta' && a.delta) {
-        if (turn.released) emit({ type: 'text', delta: a.delta });
-        else {
-          turn.held += a.delta;
-          if (!mayBeFragment(turn.held)) {
-            turn.released = true;
-            emit({ type: 'text', delta: turn.held });
-            turn.held = '';
-          }
-        }
+        turn.msg += a.delta;
+        pump(entry, turn);
       }
       else if (a.type === 'thinking_delta' && a.delta) emit({ type: 'thinking', delta: a.delta });
+      else if (a.type === 'toolcall_delta' && a.delta) turn.rawArgs[a.contentIndex] = (turn.rawArgs[a.contentIndex] ?? '') + a.delta;
+      else if (a.type === 'toolcall_end') {
+        // native call whose arguments were not JSON (e.g. `{path:<|"|>x<|"|>}`): pi-ai parsed them as {} — re-read them leniently
+        const raw = turn.rawArgs[a.contentIndex]?.trim();
+        delete turn.rawArgs[a.contentIndex];
+        const tc = a.toolCall as { name: string; arguments?: Record<string, unknown> };
+        if (raw && raw !== "{}" && (!tc.arguments || !Object.keys(tc.arguments).length) && raw.includes("{")) {
+          const p = parseLooseObject(raw, raw.indexOf('{'));
+          if (p && Object.keys(p.value).length) {
+            tc.arguments = p.value;
+            console.info(`[pi] recovered non-JSON arguments of native ${tc.name} call (${raw.length} chars)`);
+          } else console.warn(`[pi] ${tc.name} call arguments unreadable: ${JSON.stringify(raw.slice(0, 120))}`);
+        }
+      }
       break;
     }
     case 'message_end': {
@@ -208,12 +222,24 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
       // out of room: the provider cut the reply after a few tokens (max_tokens clamped to what is left of the window)
       const starved = am.stopReason === 'length' && !hasToolCall && (am.usage?.output ?? 0) < 16;
       if (starved) turn.starved = true;
-      if (turn.held) {
-        if (!hasToolCall && (starved || isFragment(turn.held))) turn.fragment = turn.held;
-        else emit({ type: 'text', delta: turn.held });
-      } else if (starved && !turn.released) turn.fragment = turn.fragment ?? '';
-      turn.held = '';
-      turn.released = false;
+      const rest = turn.msg.slice(turn.out);
+      const parsed = !hasToolCall && turn.msg.trim() ? parseTextToolCalls(turn.msg, entry.defs.keys()) : undefined;
+      if (parsed?.calls.length) {
+        // tool calls written as text: keep them out of the UI, the fallback executes them
+        const first = turn.msg.indexOf(parsed.calls[0].raw);
+        if (first > turn.out) {
+          const before = turn.msg.slice(turn.out, first).trimEnd();
+          if (before.trim()) emit({ type: 'text', delta: before });
+        }
+        turn.textCalls = parsed.calls;
+      } else if (rest) {
+        if (!hasToolCall && (starved || isFragment(rest))) turn.fragment = rest;
+        else emit({ type: 'text', delta: rest });
+      } else if (starved && turn.out === 0) turn.fragment = turn.fragment ?? '';
+      turn.msg = '';
+      turn.out = 0;
+      turn.suppress = false;
+      turn.rawArgs = {};
       emit({ type: 'assistant-end' });
       break;
     }
@@ -247,6 +273,88 @@ function mayBeFragment(text: string): boolean {
   return t.length < 400;
 }
 
+/** stream what is safe of the current message; hold back anything that may become a (text) tool call */
+export function pump(entry: Entry, turn: TurnState): void {
+  if (turn.suppress) return;
+  if (turn.out === 0 && mayBeFragment(turn.msg)) return;
+  const names = entry.defs;
+  const send = (chunk: string) => {
+    if (!chunk) return;
+    turn.out += chunk.length;
+    turn.ctx.emit({ type: 'text', delta: chunk });
+  };
+  for (;;) {
+    const tail = turn.msg.slice(turn.out);
+    if (!tail) return;
+    const atLineStart = turn.out === 0 || turn.msg[turn.out - 1] === '\n';
+    const nl = tail.indexOf('\n');
+    // Gemma-style thinking channel leaked into the text: route it to the thinking stream
+    const ch = /^\s*<\|channel>/.exec(tail);
+    if (ch || (atLineStart && '<|channel>'.startsWith(tail.trimStart()) && tail.trim())) {
+      if (!ch) return;
+      const close = tail.indexOf('<channel|>');
+      if (close < 0) return;
+      const inner = tail.slice(ch[0].length, close).replace(/^thought\s*/, '');
+      turn.out += close + '<channel|>'.length;
+      if (inner.trim()) turn.ctx.emit({ type: 'thinking', delta: inner });
+      continue;
+    }
+    const line = nl < 0 ? tail : tail.slice(0, nl);
+    const hit = findCall(line, names);
+    if (hit >= 0) {
+      send(line.slice(0, hit).replace(/[`\s]+$/, ''));
+      turn.suppress = true;
+      return;
+    }
+    if (atLineStart && /^\s*(?:```|\{)/.test(line) && (nl < 0 || /^\s*(?:```[\w-]*|[{\[])\s*$/.test(line))) {
+      // a fence / JSON opener: decide together with the next line(s)
+      const rest = nl < 0 ? '' : tail.slice(nl + 1);
+      const nl2 = rest.indexOf('\n');
+      const next = nl2 < 0 ? rest : rest.slice(0, nl2);
+      if (nl >= 0 && (findCall(next, names) >= 0 || /"(?:name|tool|function)"\s*:/.test(next))) {
+        turn.suppress = true;
+        return;
+      }
+      if ((nl < 0 || nl2 < 0) && tail.length < 300) return;
+    }
+    if (nl < 0) {
+      send(line.slice(0, safeLength(line, names)));
+      return;
+    }
+    send(tail.slice(0, nl + 1));
+  }
+}
+
+const CALL_AT = /(?:^|[^\w.])((?:\w*call\w*\s*:\s*)?`*([A-Za-z_][\w.]*)`?\s*[{(])/g;
+
+/** index in `line` where a tool call written as text starts (`fs_write{…`, `tool_call:fs_read(…`, `{"name": …`), or -1 */
+function findCall(line: string, names: Map<string, unknown>): number {
+  let best = -1;
+  for (const m of line.matchAll(CALL_AT)) {
+    if (!names.has(m[2].split('.').pop()!)) continue;
+    best = m.index! + (m[0].length - m[1].length);
+    break;
+  }
+  const j = /\{\s*"(?:name|tool|function)"\s*:/.exec(line);
+  if (j && (best < 0 || j.index < best)) best = j.index;
+  return best;
+}
+
+/** how much of an unfinished line is safe to stream: stop before a trailing word that may still become a call */
+function safeLength(line: string, names: Map<string, unknown>): number {
+  const m = /((?:\w*call\w*\s*:\s*)?`*([A-Za-z_][\w.]*)?(\s*))$/.exec(line);
+  if (!m || !m[1]) return line.length;
+  const start = line.length - m[1].length;
+  if (start > 0 && /[\w.]/.test(line[start - 1])) return line.length;
+  const word = m[2];
+  if (!word) return /call\w*\s*:/.test(m[1]) || m[1].includes('`') ? start : line.length;
+  const seg = word.split('.').pop()!;
+  if (m[3]) return names.has(seg) ? start : line.length;
+  if (!seg) return line.length; // "word." ends a sentence
+  for (const n of names.keys()) if (n.startsWith(seg)) return start;
+  return /call\w*\s*:/.test(m[1]) ? start : line.length;
+}
+
 /** a reply that is only a piece of JSON / tool-call syntax (not a real answer) */
 export function isFragment(text: string): boolean {
   const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
@@ -262,7 +370,9 @@ export function isFragment(text: string): boolean {
   }
 }
 
-const NUDGE = 'Your last reply was cut off. If you meant to call a tool, call it properly with a tool call; otherwise answer in plain text.';
+const NUDGE =
+  'Your last reply was cut off. If you meant to call a tool, call it properly with a tool call ' +
+  '(if you cannot, write it on its own line as tool_name{"arg": "value"} and it will be run); otherwise answer in plain text.';
 
 function fragmentToolName(text: string): string | undefined {
   return /"(?:name|tool|function)"\s*:\s*"([a-z0-9_]+)"/i.exec(text)?.[1];
@@ -559,7 +669,7 @@ export const piEngine: Engine = {
       return { usage: emptyUsage(), model: model.id, error: 'This session is still busy.' };
     }
 
-    const turn: TurnState = { ctx, usage: preUsage, byModel: preUsage.inputTokens ? { [model.id]: preUsage } : {}, model: model.id, held: '', released: false };
+    const turn: TurnState = { ctx, usage: preUsage, byModel: preUsage.inputTokens ? { [model.id]: preUsage } : {}, model: model.id, msg: '', out: 0, suppress: false, rawArgs: {} };
     entry.turn = turn;
     ctx.emit({ type: 'model', model: model.id });
 
@@ -569,6 +679,7 @@ export const piEngine: Engine = {
     else ctx.signal.addEventListener('abort', onAbort, { once: true });
     try {
       await agent.prompt(await withAgentsNote(rec, ctx.text));
+      await drainTextCalls(entry, rec, turn, model);
       // stray-output guard: the turn ended with a bare tool-call fragment as text → retry once
       if (turn.fragment !== undefined && !turn.error && !ctx.signal.aborted) {
         const first = turn.fragment;
@@ -589,6 +700,7 @@ export const piEngine: Engine = {
         const nudge = { role: 'user', content: `[Monarch system note] ${NUDGE}`, timestamp: Date.now() } as AgentMessage;
         agent.state.messages = [...agent.state.messages, nudge];
         await agent.continue();
+        await drainTextCalls(entry, rec, turn, model);
         // keep the transcript clean: drop the nudge (and a second fragment)
         if (turn.fragment !== undefined) dropTrailingFragment(agent);
         agent.state.messages = agent.state.messages.filter((m) => m !== nudge);
@@ -635,6 +747,80 @@ export const piEngine: Engine = {
   },
 };
 
+/* ─────────────── text tool-call fallback ─────────────── */
+
+const MAX_TEXT_ROUNDS = 8;
+const textToolSessions = new Set<string>();
+let textCallSeq = 0;
+
+/**
+ * Some models (OpenAI-compatible proxies, Gemma-style chat templates) never emit native tool calls and
+ * write them as text instead (`fs_write{path: …}`). When an assistant message had no native calls but
+ * parseable calls to known tools, run them through the same path as native calls (approval, arg repair,
+ * runToolDef, tool cards), hand the results back as a user message and let the model continue.
+ */
+async function drainTextCalls(entry: Entry, rec: SessionRecord, turn: TurnState, model: Model<Api>): Promise<void> {
+  const ctx = turn.ctx;
+  let rounds = 0;
+  while (turn.textCalls?.length && !turn.error && !ctx.signal.aborted) {
+    if (rounds >= MAX_TEXT_ROUNDS) {
+      turn.textCalls = undefined;
+      const msg = `I stopped after ${MAX_TEXT_ROUNDS} rounds of tool calls in this turn. Tell me if I should keep going.`;
+      ctx.emit({ type: 'text', delta: msg });
+      ctx.emit({ type: 'assistant-end' });
+      entry.agent.state.messages = [...entry.agent.state.messages, syntheticAssistant(model, msg)];
+      return;
+    }
+    rounds++;
+    const calls = turn.textCalls;
+    turn.textCalls = undefined;
+    if (!textToolSessions.has(rec.id)) {
+      textToolSessions.add(rec.id);
+      console.warn(`[pi] model ${model.id} writes tool calls as text (no native tool calls); session ${rec.id} uses the text tool-call fallback`);
+    }
+    const results: { name: string; ok: boolean; output: string }[] = [];
+    for (const call of calls) {
+      if (ctx.signal.aborted) break;
+      results.push(await runTextCall(entry, rec, turn, call));
+    }
+    if (ctx.signal.aborted) return;
+    if (entry.toolsDirty) {
+      entry.toolsDirty = false;
+      entry.agent.state.tools = toolsFor(entry, rec);
+    }
+    const note = { role: 'user', content: textToolResultsMessage(results), timestamp: Date.now() } as AgentMessage;
+    entry.agent.state.messages = [...entry.agent.state.messages, note];
+    await entry.agent.continue();
+  }
+}
+
+async function runTextCall(entry: Entry, rec: SessionRecord, turn: TurnState, call: TextToolCall): Promise<{ name: string; ok: boolean; output: string }> {
+  const ctx = turn.ctx;
+  const def = entry.defs.get(call.name);
+  const callId = `textcall_${Date.now().toString(36)}_${++textCallSeq}`;
+  ctx.emit({ type: 'tool-start', callId, name: call.name, input: call.args, risk: def?.risk });
+  const t0 = Date.now();
+  const end = (ok: boolean, output: string) => {
+    ctx.emit({ type: 'tool-end', callId, ok, output: truncate(output, 8000), durationMs: Date.now() - t0 });
+    return { name: call.name, ok, output: truncate(output, 12000) };
+  };
+  if (!def) return end(false, `Unknown tool ${call.name}.`);
+  try {
+    const ok = await ctx.approve({ callId, name: def.name, input: call.args, risk: def.risk, summary: toolSummary(def, call.args) });
+    if (!ok) return end(false, 'The user declined this action. Do not retry it; ask how to proceed instead.');
+    const text = await runToolDef(def, call.args, {
+      sessionId: rec.id,
+      cwd: ctx.cwd,
+      signal: ctx.signal,
+      progress: (t) => ctx.progress(callId, def.name, t),
+      small: entry.small,
+    });
+    return end(true, text);
+  } catch (e) {
+    return end(false, errorText(e));
+  }
+}
+
 /**
  * Live "your coding agents" note for pi: prefixed to the user turn only when the list changed since the
  * last note in this session, so the (cached) system prompt and transcript prefix stay stable.
@@ -649,7 +835,7 @@ async function withAgentsNote(rec: SessionRecord, text: string): Promise<string>
   }
   if (!brief || brief === stateOf(rec).codingAgentsNote) return text;
   stateOf(rec).codingAgentsNote = brief;
-  return `<context>\nYour coding agents (manage them with coding_agent_send/status/wait; newest first):\n${brief}\n</context>\n\n${text}`;
+  return `<context>\nYour worker agents (manage them with agent_send/status/wait; newest first):\n${brief}\n</context>\n\n${text}`;
 }
 
 /** forget all cached agents (e.g. after provider/model settings changed) */

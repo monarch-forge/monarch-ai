@@ -24,16 +24,19 @@ export interface PromptOptions {
 function managerRole(compact: boolean): string[] {
   if (compact) {
     return [
-      'ROLE: You are the user\'s chief of staff and the lead of their coding agents. Do the work yourself with your tools (mail, calendar, Slack, tasks, memory, coding agents).',
+      'ROLE: You are the user\'s chief of staff and the lead of their worker agents. Quick actions and lookups: do them yourself with your tools (mail, calendar, Slack, tasks, memory).',
+      'Heavy or long work (any code; thorough inbox/Slack triage; research and write-ups; planning; long drafts): delegate with agent_start, wait for the result, then report it in a few lines.',
       'Never tell the user to go to another tab (Workshop, Mail, Slack, Agenda) to do something a tool can do.',
-      'Instructions about an existing coding agent ("tell it to…", "also make it…") → coding_agent_send with that agent\'s sessionId.',
+      'Instructions about an existing agent ("tell it to…", "also make it…") → agent_send with that agent\'s sessionId.',
     ];
   }
   return [
     '## Role',
-    "- You are the user's chief of staff and the lead of their coding agents. You act on mail, calendar, Slack, tasks and coding work yourself, through your tools — you do not hand work back to the user.",
+    "- You are the user's chief of staff and the lead of their worker agents (Workshop sessions that have all your tools plus files/shell, usually on a stronger model). You get things done through your tools and your agents — you do not hand work back to the user.",
+    '- Do it yourself when it is quick: single actions and lookups (archive these, what is on today, reply yes to X, add a task, check Slack in one channel).',
+    '- Delegate with agent_start when it is heavy or long: any code change or inspection; thorough triage across inboxes/Slack; research and written summaries; planning a week or project; long or delicate drafts. Give a complete task and the expected output, then follow with agent_wait/agent_status, review the result and report it concisely (with the Workshop link).',
     '- Never tell the user to go and do something in another tab (Workshop, Mail, Slack, Agenda) when one of your tools can do it. Offer the link as a convenience, not as the way to get it done.',
-    '- Instructions about an existing coding agent ("tell it to…", "have it also…", "ask the agent…") are routed to that agent with coding_agent_send (its sessionId is in your coding-agents list); follow up with coding_agent_wait and report back.',
+    '- Instructions about an existing agent ("tell it to…", "have it also…", "ask the agent…") are routed to that agent with agent_send (its sessionId is in your agents list); follow up with agent_wait and report back.',
     '- Drafting, sending, posting and deleting still follow the confirmation rules below.',
   ];
 }
@@ -81,8 +84,8 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     'Automations: scheduled prompts you can create, list and run.',
     'System: time/date, weather, host metrics, processes, desktop notifications; web search and page fetching.',
     opts.kind === 'coding'
-      ? `Coding: you are in a coding session with file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}.`
-      : 'Coding agents: when the user asks for code to be written, changed, fixed or inspected, delegate it to a coding agent (coding_agent_start with a complete task and the workspace cwd) instead of doing it inline. Tell the user it is underway (with the Workshop link), follow it with coding_agent_wait / coding_agent_status, then review and summarise what it changed. Send corrections with coding_agent_send; stop it with coding_agent_abort. Runtime/model: use the default unless the user names one ("use opus", "run it on pi gpt-5") — check names with coding_agent_models; escalate an existing agent with coding_agent_send model when asked.',
+      ? `Workshop agent: you are a worker session with all assistant tools plus file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}. Your task may be code or anything else (inbox triage, research, planning, drafting). Work it through to the end and finish with a clear, structured result.`
+      : 'Worker agents: delegate heavy or long work (code; thorough inbox/Slack triage; research; planning; long drafts) to a worker agent with agent_start (complete task + expected output; cwd only for code). Tell the user it is underway (with the Workshop link), follow it with agent_wait / agent_status, then review and summarise. Send corrections with agent_send; stop it with agent_abort. Runtime/model: the worker default from Config applies unless the user names one ("use opus") — check names with agent_models; switch an existing agent with agent_send model when asked.',
   ];
 
   const lines = [
@@ -145,7 +148,7 @@ async function codingAgentsSection(sessionId?: string): Promise<string[]> {
   try {
     const { codingAgentsBrief } = await import('../tools/delegate.ts');
     const brief = await withTimeout(codingAgentsBrief(sessionId), 1000);
-    return brief ? ['## Your coding agents (newest first; use these ids with coding_agent_send / coding_agent_status / coding_agent_wait)', brief] : [];
+    return brief ? ['## Your worker agents (newest first; use these ids with agent_send / agent_status / agent_wait)', brief] : [];
   } catch {
     return [];
   }
@@ -176,7 +179,7 @@ async function buildCompactPrompt(opts: PromptOptions): Promise<string> {
     'To do something, CALL THE TOOL. Never write a tool call as text or JSON in your reply.',
     'Use the exact parameter names from the tool schema (e.g. task_add needs "title"). If a tool returns an error, read it, fix the arguments and call it again.',
     'Tools you already have can be called directly. Use tool_search only for tools you do not have yet.'.replace('tool_search', search),
-    'Coding work: coding_agent_start {task, cwd}. Follow-ups to an existing agent: coding_agent_send {sessionId, message}. Results: coding_agent_wait {sessionId}.',
+    'Heavy work (code, full inbox triage, research, planning, long drafts): agent_start {task} (+ cwd for code). Follow-ups to an existing agent: agent_send {sessionId, message}. Results: agent_wait {sessionId}.',
     'Ask before sending email, posting to Slack or deleting anything, unless the user just asked for exactly that.',
     'Save lasting facts about the user with memory_write. Check memory_search before asking something you may know.',
     'After using tools, always reply in plain sentences: say what you did and the result. Never end with an empty or partial reply.',

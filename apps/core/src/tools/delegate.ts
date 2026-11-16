@@ -1,5 +1,5 @@
 /**
- * Coding agents (group 'coding-agents'): lets a chat agent delegate work to a Workshop coding session and
+ * Worker agents (group 'coding-agents'): lets a chat agent delegate work to a Workshop coding session and
  * manage it like a lead engineer — start, follow up, check status, wait for the result, list, abort.
  *
  * The child session is an ordinary 'coding' session (own cwd, file/shell tools, own approvals). Approvals
@@ -13,6 +13,7 @@ import { z } from 'zod';
 import type { ChatItem, EngineId } from '@monarch/shared';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
+import { looksLikeTextToolCall } from '../agent/text-tools.ts';
 
 type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
 
@@ -24,7 +25,7 @@ const appr = () => import('../agent/approvals.ts');
 
 const CLAUDE_ALIASES = ['opus', 'sonnet', 'haiku'];
 
-/** every model of every configured provider, as the specs coding_agent_start accepts */
+/** every model of every configured provider, as the specs agent_start accepts */
 async function availableModels(): Promise<{ engine: EngineId; spec: string; name: string; provider: string; context?: number; reasoning?: boolean }[]> {
   const { listAvailableModels } = await import('../agent/providers.ts');
   const list = await listAvailableModels();
@@ -52,7 +53,7 @@ async function validateModel(engine: EngineId | undefined, model: string | undef
   const close = mine.filter((m) => m.spec.toLowerCase().includes(lw) || m.name.toLowerCase().includes(lw)).slice(0, 8).map((m) => m.spec);
   throw new Error(
     `Model "${want}" is not available on ${eff === 'pi' ? 'pi' : 'Claude'}.` +
-      (close.length ? ` Close matches: ${close.join(', ')}.` : ` Call coding_agent_models to see the models you can use.`) +
+      (close.length ? ` Close matches: ${close.join(', ')}.` : ` Call agent_models to see the models you can use.`) +
       (eff === 'claude-sdk' ? ' Claude also accepts the aliases opus, sonnet, haiku.' : ''),
   );
 }
@@ -84,13 +85,13 @@ function checkDir(p: string): string {
 async function codingSession(id: string) {
   const r = (await sess()).getSession(id);
   if (!r) throw new Error(`No session ${id}`);
-  if (r.kind !== 'coding') throw new Error(`Session ${id} is a ${r.kind} session, not a coding agent`);
+  if (r.kind !== 'coding') throw new Error(`Session ${id} is a ${r.kind} session, not a worker agent`);
   return r;
 }
 
 async function assertNotNested(callerId: string): Promise<void> {
   const caller = (await sess()).getSession(callerId);
-  if (caller?.kind === 'coding' && caller.parentSessionId) throw new Error('A delegated coding agent cannot start further coding agents.');
+  if (caller?.kind === 'coding' && caller.parentSessionId) throw new Error('A delegated worker agent cannot start further worker agents.');
 }
 
 function toolLine(t: ToolItem): string {
@@ -107,6 +108,27 @@ function lastAssistant(items: ChatItem[]): string {
   return '';
 }
 
+export const UNEXECUTED_WARNING =
+  'WARNING: the worker did not actually run any tools — nothing was changed; its reply contains unexecuted tool-call text.';
+export const NO_TOOLS_NOTE =
+  'NOTE: the worker ran no tools in its latest turn, so it did not create, edit or run anything — if the task needed changes, they were NOT made (whatever its reply says).';
+
+/** tool names a worker could have meant (Monarch coding tools + Claude Code built-ins) */
+async function workerToolNames(): Promise<string[]> {
+  const t = await import('../agent/toolset.ts');
+  return [...t.piToolDefs('coding').map((d) => d.name), ...t.SDK_CODING_BUILTINS];
+}
+
+/** the worker's latest turn ran no tools but its reply is tool-call text → nothing really happened */
+async function unexecuted(toolCallsThisTurn: number, reply: string): Promise<boolean> {
+  if (toolCallsThisTurn > 0 || !reply.trim()) return false;
+  try {
+    return looksLikeTextToolCall(reply, await workerToolNames());
+  } catch {
+    return false;
+  }
+}
+
 async function statusOf(id: string, tail = 8) {
   const r = await codingSession(id);
   const o = await orch();
@@ -118,6 +140,11 @@ async function statusOf(id: string, tail = 8) {
   const running = o.isSessionRunning(id);
   const state = pend.length ? 'awaiting-approval' : running ? 'running' : errorThisTurn ? 'error' : 'idle';
   const tools = items.filter((i): i is ToolItem => i.kind === 'tool');
+  const toolCallsThisTurn = items.filter((i, idx): i is ToolItem => i.kind === 'tool' && idx > lastUserIdx && i.status !== 'error').length;
+  const last = lastAssistant(items);
+  const settled = state !== 'running' && lastUserIdx >= 0;
+  const warn = settled && (await unexecuted(toolCallsThisTurn, last));
+  const noTools = settled && !warn && toolCallsThisTurn === 0 && !errorThisTurn && !pend.length;
   return {
     sessionId: id,
     link: link(id),
@@ -130,9 +157,11 @@ async function statusOf(id: string, tail = 8) {
     queuedFollowUps: o.queuedCount(id),
     error: errorThisTurn,
     pendingApprovals: pend.map((p) => ({ id: p.id, tool: p.tool, summary: p.summary })),
+    ...(warn ? { warning: UNEXECUTED_WARNING } : noTools ? { warning: NO_TOOLS_NOTE } : {}),
     toolCalls: tools.length,
+    toolCallsThisTurn,
     recentTools: tools.slice(-Math.max(0, tail)).map(toolLine),
-    lastAssistant: clip(lastAssistant(items), 4000),
+    lastAssistant: clip(last, 4000),
     usage: r.usage,
     updatedAt: r.updatedAt,
   };
@@ -148,9 +177,10 @@ async function waitAndReport(id: string, timeoutSec: number, signal: AbortSignal
   try {
     const out = await o.waitForSessionIdle(id, timeoutSec * 1000, signal);
     const s = await statusOf(id, 12);
+    if (out && s.warning !== UNEXECUTED_WARNING && (await unexecuted(s.toolCallsThisTurn, out.text || ''))) (s as typeof s & { warning?: string }).warning = UNEXECUTED_WARNING;
     return {
       finished: !!out,
-      ...(out ? {} : { note: `Still ${s.state} after ${timeoutSec}s — call coding_agent_wait again or coding_agent_status later.` }),
+      ...(out ? {} : { note: `Still ${s.state} after ${timeoutSec}s — call agent_wait again or agent_status later.` }),
       ...s,
       finalReply: out ? clip(out.text || s.lastAssistant, 6000) : undefined,
     };
@@ -164,7 +194,9 @@ async function waitAndReport(id: string, timeoutSec: number, signal: AbortSignal
 type Status = Awaited<ReturnType<typeof statusOf>>;
 
 function compactStatus(s: Status & { finished?: boolean; note?: string; finalReply?: string }): string {
-  const lines = [`Coding agent ${s.sessionId} "${s.title}" — ${s.state}${s.finished === false ? ' (not finished yet)' : ''}`, `cwd: ${s.cwd ?? '?'} · model: ${s.model || s.engine}`];
+  const lines = [`Worker agent ${s.sessionId} "${s.title}" — ${s.state}${s.finished === false ? ' (not finished yet)' : ''}`, `cwd: ${s.cwd ?? '?'} · model: ${s.model || s.engine}`];
+  if (s.warning) lines.push(s.warning);
+  lines.push(`toolCalls: ${s.toolCallsThisTurn} (executed, latest turn) · ${s.toolCalls} total`);
   if (s.error) lines.push(`error: ${clip(s.error, 300)}`);
   if (s.pendingApprovals.length) lines.push(`waiting for the user to approve: ${s.pendingApprovals.map((p) => p.summary).join('; ')}`);
   if (s.recentTools.length) lines.push(`recent tools: ${s.recentTools.slice(-5).join(', ')}`);
@@ -175,7 +207,7 @@ function compactStatus(s: Status & { finished?: boolean; note?: string; finalRep
 }
 
 /**
- * Short list of recent coding agents for the manager's prompt: this chat's own agents first, then others.
+ * Short list of recent worker agents for the manager's prompt: this chat's own agents first, then others.
  * One line each: id, title, cwd basename, state, model.
  */
 export async function codingAgentsBrief(parentId: string, limit = 8): Promise<string> {
@@ -200,24 +232,30 @@ export async function codingAgentsBrief(parentId: string, limit = 8): Promise<st
   return lines.join('\n');
 }
 
-const KEYWORDS = ['coding', 'code', 'delegate', 'workshop', 'implement', 'fix bug', 'refactor', 'programming', 'sub-agent', 'developer', 'repository', 'project'];
-const common = { group: 'coding-agents', keywords: KEYWORDS, tag: 'CODE' as const };
+const KEYWORDS = ['worker', 'agent', 'delegate', 'workshop', 'coding', 'code', 'implement', 'fix bug', 'refactor', 'research', 'triage', 'inbox', 'plan', 'draft', 'sub-agent', 'project'];
+const common = { group: 'worker-agents', keywords: KEYWORDS, tag: 'CODE' as const };
+
+/** default runtime/model for worker agents (Config → Models → Worker agents); falls back to the user's default */
+function workerDefault(): { engine?: EngineId; model?: string } {
+  const w = (getSettings() as { agent?: { workerModel?: { engine?: EngineId; model?: string } } }).agent?.workerModel;
+  return w?.model ? { engine: w.engine, model: w.model } : {};
+}
 
 export const tools: ToolDef[] = [
   defineTool({
     ...common,
-    name: 'coding_agent_start',
+    name: 'agent_start',
     description:
-      'Delegate a coding task to a new coding agent (a Workshop session with file/shell tools in a workspace). Use this for any request to write, change, fix, refactor or inspect code instead of doing it inline. ' +
-      'Returns sessionId and a Workshop link immediately (wait=false), or blocks until the agent finishes (wait=true). Give a complete, self-contained task description. ' +
-      'cwd: absolute path or remembered workspace name; defaults to the default workspace. ' +
-      'Runtime/model: omit both to use the user\'s default. Only pick a model when the user asks for one (e.g. "use opus") or the task clearly needs a stronger/cheaper model; ' +
-      'call coding_agent_models to see what is available. The choice is validated before the session starts.',
+      'Delegate a task to a new worker agent (a Workshop session with every Monarch tool — mail, calendar, Slack, tasks, memory, web — plus file/shell tools in a folder). ' +
+      'Use it for heavy or long work: any code change or inspection; thorough inbox/Slack triage across accounts; research and write-ups; planning; long drafts. Do quick actions and lookups yourself instead. ' +
+      'Returns sessionId and a Workshop link immediately (wait=false), or blocks until the agent finishes (wait=true). Give a complete, self-contained task and the expected output. ' +
+      'cwd: project folder for code work (absolute path or remembered workspace name; default workspace if omitted); not needed for non-code tasks. ' +
+      'Runtime/model: omit both to use the worker default from Config (usually a stronger model than yours). Only pick one when the user asks; agent_models lists what is available.',
     risk: 'sensitive',
     loading: 'always',
     schema: z.object({
-      task: z.string().min(1).describe('full instructions for the coding agent'),
-      cwd: z.string().optional().describe('workspace: absolute path, ~/path, or remembered workspace name'),
+      task: z.string().min(1).describe('full, self-contained instructions and the expected result'),
+      cwd: z.string().optional().describe('project folder for code work: absolute path, ~/path, or remembered workspace name. Omit for non-code tasks.'),
       title: z.string().optional(),
       engine: z
         .enum(['claude-sdk', 'pi'])
@@ -226,17 +264,25 @@ export const tools: ToolDef[] = [
       model: z
         .string()
         .optional()
-        .describe("claude-sdk: an alias (opus, sonnet, haiku) or a full Claude model id. pi: '<provider>/<model-id>' as listed by coding_agent_models. A '/' implies engine pi."),
+        .describe("claude-sdk: an alias (opus, sonnet, haiku) or a full Claude model id. pi: '<provider>/<model-id>' as listed by agent_models. A '/' implies engine pi."),
       wait: z.boolean().optional().describe('block until the agent finishes its turn (default false; true in small-model mode)'),
       timeoutSec: z.number().int().min(5).max(1800).optional().describe('when wait=true (default 300)'),
     }),
-    summarize: (i) => `Start coding agent in ${i.cwd || 'default workspace'}: ${clip(i.task, 120)}`,
+    summarize: (i) => `Start worker agent${i.cwd ? ` in ${i.cwd}` : ''}: ${clip(i.task, 120)}`,
     async run(i, ctx) {
       await assertNotNested(ctx.sessionId);
-      const cwd = resolveWorkspace(i.cwd);
+      // code work needs a real folder; other tasks fall back to the default workspace or home
+      let cwd: string;
+      try {
+        cwd = resolveWorkspace(i.cwd);
+      } catch (e) {
+        if (i.cwd) throw e;
+        cwd = homedir();
+      }
       const o = await orch();
       const title = i.title?.trim() || clip(i.task.replace(/\s+/g, ' '), 60);
-      const choice = await validateModel(i.engine as EngineId | undefined, i.model);
+      const def = !i.engine && !i.model ? workerDefault() : {};
+      const choice = await validateModel((i.engine ?? def.engine) as EngineId | undefined, i.model ?? def.model);
       const { sessionId } = o.startPrompt({
         text: i.task,
         kind: 'coding',
@@ -248,25 +294,25 @@ export const tools: ToolDef[] = [
       });
       if (i.wait ?? ctx.small) {
         const r = await waitAndReport(sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
-        return ctx.small ? `Started coding agent ${sessionId}.\n${compactStatus(r)}` : r;
+        return ctx.small ? `Started worker agent ${sessionId}.\n${compactStatus(r)}` : r;
       }
-      if (ctx.small) return `Started coding agent ${sessionId} "${title}" in ${cwd}. It is running in the background; follow it with coding_agent_wait {"sessionId": "${sessionId}"}.`;
-      return { sessionId, link: link(sessionId), cwd, title, state: 'running', note: 'Running in the background. Use coding_agent_wait or coding_agent_status to follow it.' };
+      if (ctx.small) return `Started worker agent ${sessionId} "${title}" in ${cwd}. It is running in the background; follow it with agent_wait {"sessionId": "${sessionId}"}.`;
+      return { sessionId, link: link(sessionId), cwd, title, state: 'running', note: 'Running in the background. Use agent_wait or agent_status to follow it.' };
     },
   }),
   defineTool({
     ...common,
-    name: 'coding_agent_send',
+    name: 'agent_send',
     description:
-      'Send a follow-up instruction to an existing coding agent session. Starts a new turn if idle; queued after the current turn if it is busy. ' +
+      'Send a follow-up instruction to an existing worker agent session. Starts a new turn if idle; queued after the current turn if it is busy. ' +
       'Optional model switches that agent to another model of the SAME runtime from this message on (e.g. escalate to opus for a hard bug); a different runtime needs a new agent.',
     risk: 'sensitive',
     schema: z.object({
       sessionId: z.string(),
       message: z.string().min(1),
-      model: z.string().optional().describe('switch to this model (same runtime) before sending; see coding_agent_models'),
+      model: z.string().optional().describe('switch to this model (same runtime) before sending; see agent_models'),
     }),
-    summarize: (i) => `Tell coding agent ${i.sessionId.slice(0, 8)}: ${clip(i.message, 120)}`,
+    summarize: (i) => `Tell worker agent ${i.sessionId.slice(0, 8)}: ${clip(i.message, 120)}`,
     async run(i, ctx) {
       const rec = await codingSession(i.sessionId);
       let switched: string | undefined;
@@ -276,18 +322,18 @@ export const tools: ToolDef[] = [
         switched = `model now ${now}`;
       }
       const r = (await orch()).sendToSession(i.sessionId, i.message);
-      if (ctx.small) return `Sent to coding agent ${i.sessionId}: ${r === 'queued' ? 'it is busy, message queued for after its current turn' : 'turn started'}${switched ? ` (${switched})` : ''}. Use coding_agent_wait {"sessionId": "${i.sessionId}"} to get the result.`;
+      if (ctx.small) return `Sent to worker agent ${i.sessionId}: ${r === 'queued' ? 'it is busy, message queued for after its current turn' : 'turn started'}${switched ? ` (${switched})` : ''}. Use agent_wait {"sessionId": "${i.sessionId}"} to get the result.`;
       return { sessionId: i.sessionId, link: link(i.sessionId), result: r, ...(switched ? { switched } : {}), note: r === 'queued' ? 'Agent is busy; message queued and will run after the current turn.' : 'Turn started.' };
     },
   }),
   defineTool({
     ...common,
-    name: 'coding_agent_status',
-    description: 'State of a coding agent session: running/idle/error/awaiting-approval, last assistant message, recent tool calls, pending approvals, usage.',
+    name: 'agent_status',
+    description: 'State of a worker agent session: running/idle/error/awaiting-approval, last assistant message, recent tool calls, pending approvals, usage.',
     risk: 'safe',
     loading: 'always',
     schema: z.object({ sessionId: z.string(), tail: z.number().int().min(0).max(50).optional().describe('number of recent tool calls (default 8)') }),
-    summarize: (i) => `Coding agent status ${i.sessionId.slice(0, 8)}`,
+    summarize: (i) => `Worker agent status ${i.sessionId.slice(0, 8)}`,
     run: async (i, ctx) => {
       const st = await statusOf(i.sessionId, i.tail ?? 8);
       return ctx.small ? compactStatus(st) : st;
@@ -295,11 +341,12 @@ export const tools: ToolDef[] = [
   }),
   defineTool({
     ...common,
-    name: 'coding_agent_wait',
-    description: "Block until a coding agent finishes its current work (or timeout) and return its final reply plus status — use it to review the agent's result.",
+    name: 'agent_wait',
+    description: "Block until a worker agent finishes its current work (or timeout) and return its final reply plus status — use it to review the agent's result. " +
+      'Verify: only report work as done if the worker actually executed tools / the result shows it.',
     risk: 'safe',
     schema: z.object({ sessionId: z.string(), timeoutSec: z.number().int().min(1).max(1800).optional().describe('default 300') }),
-    summarize: (i) => `Wait for coding agent ${i.sessionId.slice(0, 8)}`,
+    summarize: (i) => `Wait for worker agent ${i.sessionId.slice(0, 8)}`,
     async run(i, ctx) {
       await codingSession(i.sessionId);
       const r = await waitAndReport(i.sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
@@ -308,8 +355,8 @@ export const tools: ToolDef[] = [
   }),
   defineTool({
     ...common,
-    name: 'coding_agent_list',
-    description: 'List recent coding agent (Workshop) sessions with their state, newest first.',
+    name: 'agent_list',
+    description: 'List recent worker agent (Workshop) sessions with their state, newest first.',
     risk: 'safe',
     schema: z.object({ limit: z.number().int().min(1).max(50).optional(), mine: z.boolean().optional().describe('only sessions delegated from this chat') }),
     async run(i, ctx) {
@@ -320,7 +367,7 @@ export const tools: ToolDef[] = [
         const pick = list.slice(0, i.limit ?? 15);
         return pick.length
           ? pick.map((s) => `- ${s.id} "${clip(s.title, 50)}" in ${s.cwd ? basename(s.cwd) : '?'} · ${o.isSessionRunning(s.id) ? 'running' : 'idle'}${s.parentSessionId === ctx.sessionId ? ' · from this chat' : ''}`).join('\n')
-          : 'No coding agents yet.';
+          : 'No worker agents yet.';
       }
       return list.slice(0, i.limit ?? 15).map((s) => ({
         sessionId: s.id,
@@ -335,11 +382,11 @@ export const tools: ToolDef[] = [
   }),
   defineTool({
     ...common,
-    name: 'coding_agent_abort',
-    description: 'Stop a coding agent: abort its running turn and drop queued follow-ups.',
+    name: 'agent_abort',
+    description: 'Stop a worker agent: abort its running turn and drop queued follow-ups.',
     risk: 'sensitive',
     schema: z.object({ sessionId: z.string() }),
-    summarize: (i) => `Stop coding agent ${i.sessionId.slice(0, 8)}`,
+    summarize: (i) => `Stop worker agent ${i.sessionId.slice(0, 8)}`,
     async run(i) {
       await codingSession(i.sessionId);
       const stopped = (await orch()).abortSession(i.sessionId);
@@ -348,12 +395,12 @@ export const tools: ToolDef[] = [
   }),
   defineTool({
     ...common,
-    name: 'coding_agent_models',
+    name: 'agent_models',
     description:
-      'List the runtimes and models a coding agent can use (every model of every provider the user has configured). Use the spec values as coding_agent_start/coding_agent_send `model`.',
+      'List the runtimes and models a worker agent can use (every model of every provider the user has configured). Use the spec values as agent_start/agent_send `model`.',
     risk: 'safe',
     schema: z.object({ query: z.string().optional().describe('optional filter, e.g. "opus", "gpt", "gemini"') }),
-    summarize: (i) => `List coding agent models${i.query ? ` matching ${i.query}` : ''}`,
+    summarize: (i) => `List worker agent models${i.query ? ` matching ${i.query}` : ''}`,
     async run(i) {
       const s = getSettings();
       const q = i.query?.trim().toLowerCase();
@@ -372,3 +419,8 @@ export const tools: ToolDef[] = [
     },
   }),
 ];
+
+/** legacy names (sessions and habits from before 0.7.0): same tools, deferred and hidden from the prompt */
+for (const t of [...tools]) {
+  tools.push({ ...t, name: `coding_${t.name}`, loading: 'deferred', description: `Legacy alias of ${t.name}. ${t.description}` } as ToolDef);
+}
