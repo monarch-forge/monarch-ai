@@ -139,7 +139,7 @@ export function AutomationsPanel(props: { class?: string }) {
                   {a.name}
                 </button>
                 <span class="ml-auto flex items-center gap-1">
-                  <button class="p-1 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100 focus:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
+                  <button class="p-1 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
                     <Pencil size={12} />
                   </button>
                   <button class="p-1 text-fg-3 hover:text-fg disabled:opacity-40" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>
@@ -409,7 +409,7 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
                   <span class={`w-1.5 h-1.5 shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success' : 'border border-fg-3'}`} />
                   <span class="text-[12.5px] text-fg truncate">{a.name}</span>
                   <span class="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                    <button class="p-0.5 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100 focus:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
+                    <button class="p-0.5 text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
                       <Pencil size={11} />
                     </button>
                     <button class="p-0.5 text-fg-3 hover:text-fg disabled:opacity-40" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>

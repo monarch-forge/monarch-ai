@@ -136,7 +136,7 @@ export function errMsg(e: unknown): string {
 
 /** chunky mono textarea used for source / JSON / markdown editing */
 export const CODE_AREA =
-  'w-full bg-[#121213] border border-line rounded-[2px] font-mono text-[12px] leading-[1.6] text-fg p-3 resize-y focus:outline-none focus:border-fg-3 [tab-size:2]';
+  'w-full bg-[#121213] border border-line rounded-[2px] font-mono text-[12px] leading-[1.6] text-fg p-3 resize-y focus:border-fg-3 [tab-size:2]';
 
 /** insert two spaces on Tab inside a textarea instead of moving focus (Esc then Tab still leaves) */
 export function tabIndentHandler(e: KeyboardEvent, onValue: (v: string) => void): void {

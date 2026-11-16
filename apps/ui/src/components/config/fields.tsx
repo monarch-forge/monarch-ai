@@ -5,9 +5,9 @@ import type { Settings } from '@monarch/shared';
 import { api } from '../../lib/api.ts';
 import { settings, toast } from '../../lib/store.ts';
 
-export const INPUT = 'input input-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px] focus:outline-none focus-within:outline-none focus:border-fg-3 focus-within:border-fg-3';
-export const SELECT = 'select select-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px] focus:outline-none focus:border-fg-3';
-export const TEXTAREA = 'textarea textarea-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px] leading-relaxed focus:outline-none focus:border-fg-3';
+export const INPUT = 'input input-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px] focus-within:outline-none focus:border-fg-3 focus-within:border-fg-3';
+export const SELECT = 'select select-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px] focus:border-fg-3';
+export const TEXTAREA = 'textarea textarea-sm w-full bg-[#121213] border-line text-[13px] rounded-[2px] leading-relaxed focus:border-fg-3';
 export const TOGGLE = 'toggle toggle-sm rounded-[2px] border-line checked:bg-red checked:border-red checked:text-fg';
 export const RADIO = 'radio radio-sm border-line checked:bg-red checked:border-red checked:text-fg';
 

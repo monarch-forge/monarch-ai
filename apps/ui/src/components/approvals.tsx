@@ -140,7 +140,7 @@ function ApprovalCard(props: { req: ApprovalRequest }) {
       tabIndex={0}
       data-approval-card
       onKeyDown={onKey}
-      class={`hud-panel shadow-[0_8px_32px_rgb(0_0_0/0.45)] outline-none focus:border-fg-3 border-l-2 ${dangerous ? 'border-l-red' : 'border-l-warning'}`}
+      class={`hud-panel shadow-[0_8px_32px_rgb(0_0_0/0.45)] outline-none border-l-2 ${dangerous ? 'border-l-red' : 'border-l-warning'}`}
     >
       <div class="flex items-start gap-3 px-3 py-2.5">
         <div class="flex-1 min-w-0">
