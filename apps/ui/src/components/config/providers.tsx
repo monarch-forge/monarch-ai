@@ -81,7 +81,7 @@ export function ProvidersSection() {
           <button class={BTN_OUT} onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
             {adding ? <span class="loading loading-spinner loading-xs" /> : <Plus size={11} />} Custom provider
           </button>
-          <button class="text-fg-3 hover:text-fg-2" title="Refresh" onClick={() => void res.reload()}>
+          <button key="refresh-btn" class="text-fg-3 hover:text-fg-2" title="Refresh" onClick={() => void res.reload()}>
             <RefreshCw size={12} strokeWidth={1.5} class={res.loading ? 'animate-spin' : ''} />
           </button>
         </>

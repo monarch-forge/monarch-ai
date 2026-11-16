@@ -208,7 +208,7 @@ export function Transcript(props: {
               }
             })}
             {props.running && lastItem && lastItem.kind !== 'assistant' && (
-              <Row>
+              <Row key="working-row">
                 <Gutter who={agentName} ts="" tone="agent" live />
                 <div class="flex-1 h-5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-fg-3">
                   <span class="inline-block w-[7px] h-[14px] bg-fg-2 hud-blink" />

@@ -123,7 +123,7 @@ function CpuBody(props: { m: SystemMetrics; hist: SystemMetrics[] }) {
           <div class="hud-label text-[10px] mb-2">Per core</div>
           <div class="flex items-end gap-[3px] h-14">
             {cores.map((c, i) => (
-              <div key={i} class="flex-1 h-full bg-subtle relative min-w-[3px]" title={`Core ${i}: ${fmt.pct(c)}`}>
+              <div key={`core-bar-${i}`} class="flex-1 h-full bg-subtle relative min-w-[3px]" title={`Core ${i}: ${fmt.pct(c)}`}>
                 <div class={`absolute bottom-0 inset-x-0 ${c >= 85 ? 'bg-red' : 'bg-fg-2'}`} style={{ height: `${Math.max(1, Math.min(100, c))}%` }} />
               </div>
             ))}
@@ -131,7 +131,7 @@ function CpuBody(props: { m: SystemMetrics; hist: SystemMetrics[] }) {
           {cores.length <= 32 && (
             <div class="flex gap-[3px] mt-1">
               {cores.map((_, i) => (
-                <span key={i} class="flex-1 text-center font-mono text-[8.5px] text-fg-3 tabular-nums min-w-[3px]">
+                <span key={`core-num-${i}`} class="flex-1 text-center font-mono text-[8.5px] text-fg-3 tabular-nums min-w-[3px]">
                   {cores.length <= 16 || i % 2 === 0 ? i : ''}
                 </span>
               ))}
