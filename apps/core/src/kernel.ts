@@ -209,6 +209,8 @@ export interface ToolContext {
   signal: AbortSignal;
   /** report incremental progress text (shown in the tool card) */
   progress(text: string): void;
+  /** small-model mode is active for the calling session: prefer compact plain-text results */
+  small?: boolean;
 }
 
 /**

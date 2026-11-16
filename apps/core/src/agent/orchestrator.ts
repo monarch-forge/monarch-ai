@@ -337,7 +337,7 @@ async function startTurn(rec: SessionRecord, text: string, mode: 'turn' | 'compa
   try {
     const engine = engines[rec.engine] ?? engines['claude-sdk'];
     const cwd = effectiveCwd(rec);
-    const systemPrompt = await buildSystemPrompt({ kind: rec.kind, cwd, engine: engine.id });
+    const systemPrompt = await buildSystemPrompt({ kind: rec.kind, cwd, engine: engine.id, sessionId: rec.id, model: rec.model, piProvider: rec.engineState.piProvider });
     const ctx: TurnContext = {
       session: rec,
       text,

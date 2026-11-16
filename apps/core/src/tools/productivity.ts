@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Automation, CalendarEvent, Task } from '@monarch/shared';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import { createTask, deleteTask, getTask, listTasks, updateTask } from '../services/tasks.ts';
-import { createEvent, deleteEvent, listEventsWithCoverage } from '../services/events.ts';
+import { createEvent, deleteEvent, findFreeSlots, listEventsWithCoverage, respondToEvent, updateEvent, userTimeZone } from '../services/events.ts';
 import { createAutomation, deleteAutomation, listAutomations, parseSchedule } from '../services/automations.ts';
 import { addDays, fmtLocal, localIso, parseWhen, startOfDay } from '../services/dates.ts';
 
@@ -28,9 +28,11 @@ let accountEmails = new Map<string, string>();
 
 const fmtEvent = (e: CalendarEvent) =>
   [
-    `${e.allDay ? `${e.start.slice(0, 10)} (all day)` : `${fmtLocal(e.start)}${e.end ? ` – ${fmtLocal(e.end)}` : ''}`}  ${e.title}`,
+    `${e.allDay ? `${new Date(e.start).toLocaleDateString('sv')} (all day)` : `${fmtLocal(e.start)}${e.end ? ` – ${fmtLocal(e.end)}` : ''}`}  ${e.title}`,
     `id=${e.id}`,
     e.accountId ? `account=${accountEmails.get(e.accountId) ?? e.accountId} (accountId=${e.accountId})` : `source=${e.source}`,
+    e.isOrganizer ? 'role=organizer' : e.myResponse ? `role=guest rsvp=${e.myResponse === 'needsAction' ? 'PENDING' : e.myResponse}` : e.organizer ? `organizer=${e.organizer}` : null,
+    e.attendeeCount ? `guests=${e.attendeeCount}` : null,
     e.location ? `location=${e.location}` : null,
     e.link ? `link=${e.link}` : null,
     e.notes ? `notes=${JSON.stringify(e.notes.slice(0, 200))}` : null,
@@ -175,8 +177,9 @@ const calendarList = defineTool({
     from: z.string().optional().describe(`Range start (default: start of today). ${WHEN}`),
     to: z.string().optional().describe(`Range end, exclusive (default: from + 7 days). ${WHEN}`),
     query: z.string().optional().describe('Case-insensitive filter on title/location/notes.'),
+    pendingOnly: z.boolean().optional().describe('Only Google invitations the user has not answered yet (rsvp=PENDING).'),
   }),
-  run: async ({ from, to, query }) => {
+  run: async ({ from, to, query, pendingOnly }) => {
     const f = parseWhen(from) ?? startOfDay();
     const t = parseWhen(to) ?? addDays(f, 7);
     const res = await listEventsWithCoverage(f, t);
@@ -184,6 +187,7 @@ const calendarList = defineTool({
     let list = res.events;
     const q = query?.toLowerCase();
     if (q) list = list.filter((e) => `${e.title} ${e.location ?? ''} ${e.notes ?? ''}`.toLowerCase().includes(q));
+    if (pendingOnly) list = list.filter((e) => e.myResponse === 'needsAction');
     const count = (pred: (e: CalendarEvent) => boolean) => list.filter(pred).length;
     const parts = res.google.map((a) =>
       a.error ? `${a.email} (error: ${a.error.slice(0, 160)})` : `${a.email} (${count((e) => e.accountId === a.accountId)} event${count((e) => e.accountId === a.accountId) === 1 ? '' : 's'})`,
@@ -196,6 +200,7 @@ const calendarList = defineTool({
           : 'No Google accounts connected.',
       `Local Monarch calendar: ${count((e) => !e.accountId)} event(s).`,
       q ? `Filter: "${query}".` : '',
+      pendingOnly ? 'Filter: pending invitations only.' : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -210,7 +215,8 @@ const calendarAdd = defineTool({
   group: 'productivity',
   keywords: ['create event', 'schedule meeting', 'appointment', 'book', 'google calendar'],
   description:
-    "Add a calendar event. Without accountId it goes to the local Monarch calendar; with accountId (a connected Google account id — see the source field in calendar_list output) it is created on that account's primary Google calendar.",
+    "Add a calendar event. Without accountId it goes to the local Monarch calendar; with accountId (a connected Google account id — see calendar_list output) it is created on that account's primary Google calendar. Google only: attendees (emails) are sent invitations; createMeet attaches a Google Meet link. Use calendar_free_slots first to pick a time.",
+  // risk is static per tool: kept 'sensitive' (approval-gated); invites are named in the approval summary
   risk: 'sensitive',
   tag: 'CAL',
   schema: z.object({
@@ -222,9 +228,12 @@ const calendarAdd = defineTool({
     notes: z.string().optional(),
     link: z.string().optional().describe('Meeting link URL.'),
     accountId: z.string().optional().describe('Google account id to create the event on; omit for the local calendar.'),
+    attendees: z.array(z.string()).optional().describe('Google only: guest emails to invite (they receive an invitation email).'),
+    createMeet: z.boolean().optional().describe('Google only: attach a new Google Meet video link.'),
   }),
-  summarize: (i) => `Add event: ${i.title} at ${i.start}${i.accountId ? ` (Google ${i.accountId})` : ''}`,
-  run: async (i) => `Created: ${fmtEvent(await createEvent(i))}`,
+  summarize: (i) =>
+    `Add event: ${i.title} at ${i.start}${i.accountId ? ` (Google ${i.accountId})` : ''}${i.attendees?.length ? ` — invites ${i.attendees.join(', ')}` : ''}${i.createMeet ? ' + Meet' : ''}`,
+  run: async ({ attendees, createMeet, ...i }) => `Created: ${fmtEvent(await createEvent(i, { attendees, createMeet }))}`,
 });
 
 const calendarDelete = defineTool({
@@ -239,6 +248,90 @@ const calendarDelete = defineTool({
   run: async ({ id }) => {
     await deleteEvent(id);
     return `Deleted event ${id}.`;
+  },
+});
+
+const calendarUpdate = defineTool({
+  name: 'calendar_update',
+  group: 'productivity',
+  keywords: ['reschedule', 'move meeting', 'rename event', 'edit event', 'postpone', 'google calendar'],
+  description:
+    'Edit a calendar event by id (local or Google; ids from calendar_list): move it (start/end), rename, toggle all-day, change location/notes. Only provided fields change; moving start alone keeps the duration only if you also pass end. Google guests are NOT emailed unless notifyGuests=true (set it only when the user asks to notify them).',
+  risk: 'sensitive',
+  tag: 'CAL',
+  schema: z.object({
+    id: z.string().describe('Event id from calendar_list.'),
+    title: z.string().optional(),
+    start: z.string().optional().describe(`New start. ${WHEN}`),
+    end: z.string().nullable().optional().describe(`New end. ${WHEN}`),
+    allDay: z.boolean().optional(),
+    location: z.string().optional(),
+    notes: z.string().optional(),
+    link: z.string().optional().describe('Meeting link URL (local events only; Google keeps its own link).'),
+    notifyGuests: z.boolean().optional().describe('Google: email the change to guests (sendUpdates=all). Default false.'),
+  }),
+  summarize: (i) =>
+    `Update event ${i.id}: ${[i.title && `title "${i.title}"`, i.start && `start ${i.start}`, i.end && `end ${i.end}`, i.allDay !== undefined && `allDay=${i.allDay}`, i.location !== undefined && 'location', i.notes !== undefined && 'notes'].filter(Boolean).join(', ') || 'no changes'}${i.notifyGuests ? ' (notify guests)' : ''}`,
+  run: async ({ id, notifyGuests, ...patch }) => {
+    const p = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<CalendarEvent>;
+    if (!Object.keys(p).length) return 'Nothing to change.';
+    return `Updated: ${fmtEvent(await updateEvent(id, p, { sendUpdates: notifyGuests ? 'all' : 'none' }))}`;
+  },
+});
+
+const calendarRespond = defineTool({
+  name: 'calendar_respond',
+  group: 'productivity',
+  keywords: ['rsvp', 'accept invite', 'decline meeting', 'tentative', 'invitation'],
+  description:
+    'RSVP to a Google calendar invitation (find pending ones with calendar_list pendingOnly=true). The organizer is notified of the response.',
+  risk: 'sensitive',
+  tag: 'CAL',
+  schema: z.object({
+    id: z.string().describe('Google event id from calendar_list.'),
+    response: z.enum(['accepted', 'declined', 'tentative']),
+    comment: z.string().optional().describe('Optional note to the organizer.'),
+  }),
+  summarize: (i) => `RSVP ${i.response} to ${i.id}${i.comment ? ` ("${i.comment.slice(0, 60)}")` : ''}`,
+  run: async ({ id, response, comment }) => `Responded ${response}: ${fmtEvent(await respondToEvent(id, response, { comment }))}`,
+});
+
+const calendarFreeSlots = defineTool({
+  name: 'calendar_free_slots',
+  group: 'productivity',
+  keywords: ['availability', 'free time', 'find a time', 'when am i free', 'schedule meeting', 'free busy'],
+  description:
+    "Find free time windows of at least durationMinutes across the user's local calendar and ALL connected Google calendars, plus attendees' busy time (Google free/busy — works for colleagues in the same Workspace or who share their calendar; others are reported as unavailable). Weekdays within working hours (default 09:00–18:00) in the user's timezone; default range now → +7 days; up to 8 windows.",
+  risk: 'safe',
+  tag: 'CAL',
+  schema: z.object({
+    durationMinutes: z.number().int().min(5).max(24 * 60),
+    from: z.string().optional().describe(`Range start (default now). ${WHEN}`),
+    to: z.string().optional().describe(`Range end (default from + 7 days). ${WHEN}`),
+    attendees: z.array(z.string()).optional().describe('Guest emails whose availability must also be free.'),
+    workingHours: z.object({ start: z.string(), end: z.string() }).optional().describe('Local HH:MM, e.g. {"start":"09:00","end":"18:00"}.'),
+    accounts: z.array(z.string()).optional().describe("Only count these Google accounts (ids or emails) as the user's busy time; default all."),
+    includeWeekends: z.boolean().optional(),
+  }),
+  run: async (i) => {
+    const r = await findFreeSlots({
+      ...i,
+      from: parseWhen(i.from) ?? undefined,
+      to: parseWhen(i.to) ?? undefined,
+    });
+    const tz = r.timeZone || userTimeZone();
+    const fmt = (iso: string, withDay: boolean) =>
+      new Intl.DateTimeFormat('en-GB', { timeZone: tz, hourCycle: 'h23', ...(withDay ? { weekday: 'short', day: '2-digit', month: 'short' } : {}), hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+    const lines = [
+      `Timezone ${tz}. Checked: ${r.checked.join(', ')}.`,
+      r.accountErrors.length ? `NOT checked (errors): ${r.accountErrors.map((a) => `${a.email} (${a.error.slice(0, 120)})`).join('; ')}.` : '',
+      r.attendeesChecked.length ? `Attendees checked: ${r.attendeesChecked.join(', ')}.` : '',
+      r.attendeesUnavailable.length ? `Attendee availability UNKNOWN (not included): ${r.attendeesUnavailable.map((a) => `${a.email} (${a.reason})`).join('; ')}.` : '',
+    ].filter(Boolean);
+    if (!r.slots.length) return `${lines.join('\n')}\nNo free window of ${i.durationMinutes} min found.`;
+    return `${lines.join('\n')}\n${r.slots.length} free window(s) ≥ ${i.durationMinutes} min:\n${r.slots
+      .map((s) => `${fmt(s.start, true)}–${fmt(s.end, false)} (${s.minutes} min) start=${s.start}`)
+      .join('\n')}`;
   },
 });
 
@@ -302,6 +395,9 @@ export const tools: ToolDef[] = [
   taskDelete,
   calendarList,
   calendarAdd,
+  calendarUpdate,
+  calendarRespond,
+  calendarFreeSlots,
   calendarDelete,
   automationsList,
   automationCreate,

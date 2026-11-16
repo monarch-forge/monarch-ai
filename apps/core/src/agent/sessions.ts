@@ -26,6 +26,8 @@ export interface EngineState {
   activatedTools?: string[];
   /** pi: assistant messages before this index predate the last compaction (their usage is stale) */
   piUsageFrom?: number;
+  /** pi: the last "your coding agents" context note injected into a user turn (re-sent only on change) */
+  codingAgentsNote?: string;
 }
 
 export interface SessionRecord extends SessionDetail {

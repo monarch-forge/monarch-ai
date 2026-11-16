@@ -2,8 +2,9 @@
  * Tool plumbing shared by both engines: which ToolDefs a session gets, risk lookup for
  * Claude Code built-ins, and a uniform "run a ToolDef" wrapper (zod parse, activity log, text result).
  */
-import type { SessionKind, ToolRisk } from '@monarch/shared';
-import { activity, isAlwaysLoaded, toolResultText, type ToolContext, type ToolDef } from '../kernel.ts';
+import { z } from 'zod';
+import type { EngineId, SessionKind, ToolRisk } from '@monarch/shared';
+import { activity, isAlwaysLoaded, secrets, toolResultText, type ToolContext, type ToolDef } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { assistantTools, codingTools } from '../tools/index.ts';
 
@@ -42,15 +43,76 @@ export function deferToolsEnabled(): boolean {
   return getSettings().evolution?.deferTools !== false;
 }
 
-/** whether a tool's schema goes into every prompt (everything is, when deferral is off) */
-export function loadsUpFront(def: ToolDef, defer = deferToolsEnabled()): boolean {
-  return !defer || isAlwaysLoaded(def);
+/* ────────────────────────────── small-model mode ────────────────────────────── */
+
+const SMALL_RE = /flash|lite|mini|haiku|nano|small|fast|\b(9|8|7|3)b\b|[-_:](9|8|7|3)b/i;
+const SMALL_WINDOW = 64_000;
+
+/** settings.agent.smallModelMode (default 'auto') */
+export function smallModelSetting(): 'auto' | 'on' | 'off' {
+  const m = getSettings().agent?.smallModelMode;
+  return m === 'on' || m === 'off' ? m : 'auto';
 }
 
-export function splitByLoading(defs: ToolDef[], defer = deferToolsEnabled()): { always: ToolDef[]; deferred: ToolDef[] } {
+/** heuristic: does this model look small (cheap/fast tier or a short context window)? */
+export function looksSmall(id: string, name = '', contextWindow?: number): boolean {
+  if (SMALL_RE.test(id) || (name && SMALL_RE.test(name))) return true;
+  return !!contextWindow && contextWindow > 0 && contextWindow < SMALL_WINDOW;
+}
+
+/** small-model mode for a concrete model (applies the on/off/auto setting) */
+export function smallModeFor(id: string, name = '', contextWindow?: number): boolean {
+  const mode = smallModelSetting();
+  if (mode !== 'auto') return mode === 'on';
+  return looksSmall(id, name, contextWindow);
+}
+
+/** small-model mode for a session's engine/model (resolves pi models for their name/context window) */
+export async function smallModeForSession(engine: EngineId, modelSpec?: string, piProvider?: string): Promise<boolean> {
+  const mode = smallModelSetting();
+  if (mode !== 'auto') return mode === 'on';
+  const s = getSettings();
+  if (engine === 'claude-sdk') return looksSmall(modelSpec || s.claudeSdk.model);
+  const spec = modelSpec || s.pi.model;
+  try {
+    const { resolvePiModel } = await import('./pi-models.ts');
+    const { model } = resolvePiModel(piProvider || s.pi.provider, spec);
+    if (model) return looksSmall(model.id, model.name, model.contextWindow);
+  } catch {
+    /* fall through */
+  }
+  return looksSmall(spec);
+}
+
+/** tools loaded up front in small-model mode (small models struggle with tool search) */
+export const SMALL_MODE_UPFRONT = new Set([
+  'tasks_list', 'task_add', 'task_update', 'task_complete',
+  'calendar_list', 'calendar_add',
+  'automations_list', 'automation_create',
+  'mail_search', 'mail_read_thread', 'mail_draft',
+  'slack_unread', 'slack_read', 'slack_search', 'slack_post',
+  'memory_search', 'memory_read', 'memory_write',
+  'coding_agent_start', 'coding_agent_send', 'coding_agent_status', 'coding_agent_wait', 'coding_agent_list',
+]);
+
+/** small mode loads mail/Slack tools up front only when such an account is connected (window space is precious) */
+function smallUpfront(name: string): boolean {
+  if (!SMALL_MODE_UPFRONT.has(name)) return false;
+  const sec = secrets.get();
+  if (name.startsWith('mail_')) return Object.keys(sec.google?.accounts ?? {}).length > 0;
+  if (name.startsWith('slack_')) return Object.keys(sec.slack ?? {}).length > 0;
+  return true;
+}
+
+/** whether a tool's schema goes into every prompt (everything is, when deferral is off) */
+export function loadsUpFront(def: ToolDef, defer = deferToolsEnabled(), small = false): boolean {
+  return !defer || isAlwaysLoaded(def) || (small && smallUpfront(def.name));
+}
+
+export function splitByLoading(defs: ToolDef[], defer = deferToolsEnabled(), small = false): { always: ToolDef[]; deferred: ToolDef[] } {
   const always: ToolDef[] = [];
   const deferred: ToolDef[] = [];
-  for (const d of defs) (loadsUpFront(d, defer) ? always : deferred).push(d);
+  for (const d of defs) (loadsUpFront(d, defer, small) ? always : deferred).push(d);
   return { always, deferred };
 }
 
@@ -121,8 +183,8 @@ export function searchToolDefs(defs: ToolDef[], query: string, limit = 5): ToolD
 }
 
 /** compact "what else exists" index for the system prompt: one line per group of deferred tools */
-export function deferredToolIndex(defs: ToolDef[], maxChars = 600): string {
-  const { deferred } = splitByLoading(defs);
+export function deferredToolIndex(defs: ToolDef[], maxChars = 600, small = false): string {
+  const { deferred } = splitByLoading(defs, deferToolsEnabled(), small);
   if (!deferred.length) return '';
   const groups = new Map<string, string[]>();
   for (const d of deferred) {
@@ -242,15 +304,296 @@ export function safeJson(v: unknown): string {
   }
 }
 
-/** parse input with the tool's zod schema, run it, stringify the result. Throws on failure. */
-export async function runToolDef(def: ToolDef, rawInput: unknown, ctx: ToolContext): Promise<string> {
-  const parsed = def.schema.safeParse(rawInput ?? {});
-  if (!parsed.success) {
-    throw new Error(`Invalid arguments for ${def.name}: ${parsed.error.message}`);
+/* ────────────────────────────── schemas, search reports, argument repair ────────────────────────────── */
+
+const schemaCache = new WeakMap<ToolDef, Record<string, unknown>>();
+
+/** JSON schema for a ToolDef's zod schema, as plain JSON (cached per def) */
+export function toolJsonSchema(def: ToolDef): Record<string, unknown> {
+  const hit = schemaCache.get(def);
+  if (hit) return hit;
+  let js: Record<string, unknown>;
+  try {
+    js = z.toJSONSchema(def.schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
+  } catch {
+    js = { type: 'object', properties: {} };
   }
-  if (def.tag) activity(def.tag, clip(toolSummary(def, parsed.data), 120), 'info', ctx.sessionId);
-  const result = await def.run(parsed.data, ctx);
+  delete js.$schema;
+  if (js.type !== 'object') js = { type: 'object', properties: {}, ...js };
+  schemaCache.set(def, js);
+  return js;
+}
+
+interface ParamInfo {
+  name: string;
+  type: string;
+  required: boolean;
+  nullable: boolean;
+  description: string;
+}
+
+function typeOf(p: any): { type: string; nullable: boolean } {
+  if (!p || typeof p !== 'object') return { type: 'any', nullable: true };
+  if (Array.isArray(p.anyOf) || Array.isArray(p.oneOf)) {
+    const alts = (p.anyOf ?? p.oneOf) as any[];
+    const parts = alts.map((a) => typeOf(a));
+    const nullable = parts.some((x) => x.nullable || x.type === 'null');
+    const types = [...new Set(parts.map((x) => x.type).filter((t) => t !== 'null'))];
+    return { type: types.join(' | ') || 'any', nullable };
+  }
+  if (Array.isArray(p.enum)) return { type: p.enum.map((e: unknown) => JSON.stringify(e)).join(' | '), nullable: p.enum.includes(null) };
+  if (Array.isArray(p.type)) return { type: p.type.filter((t: string) => t !== 'null').join(' | '), nullable: p.type.includes('null') };
+  if (p.type === 'array') return { type: `${typeOf(p.items).type}[]`, nullable: false };
+  if (p.type === 'null') return { type: 'null', nullable: true };
+  return { type: p.type ?? 'any', nullable: !p.type };
+}
+
+export function toolParams(def: ToolDef): ParamInfo[] {
+  const js = toolJsonSchema(def) as { properties?: Record<string, any>; required?: string[] };
+  const req = new Set(js.required ?? []);
+  return Object.entries(js.properties ?? {}).map(([name, p]) => {
+    const t = typeOf(p);
+    return { name, type: t.type, nullable: t.nullable, required: req.has(name), description: String(p?.description ?? '').replace(/\s+/g, ' ').trim() };
+  });
+}
+
+/** "- title (string, required): Short task title." lines */
+export function paramLines(def: ToolDef): string[] {
+  const ps = toolParams(def);
+  if (!ps.length) return ['(no parameters)'];
+  return ps.map((p) => `- ${p.name} (${p.type}, ${p.required ? 'required' : 'optional'})${p.description ? `: ${clip(p.description, 140)}` : ''}`);
+}
+
+/** common names models use for a parameter → the parameter it most likely means */
+const SYNONYMS: Record<string, string[]> = {
+  title: ['task', 'name', 'summary', 'subject', 'label', 'text', 'content', 'todo', 'item'],
+  text: ['content', 'body', 'message', 'note', 'msg'],
+  notes: ['content', 'body', 'note', 'details', 'description'],
+  body: ['content', 'text', 'message'],
+  message: ['text', 'content', 'body', 'msg', 'instruction', 'instructions'],
+  description: ['details', 'notes', 'body'],
+  due: ['when', 'date', 'time', 'deadline', 'due_date', 'dueDate', 'due_at', 'dueAt'],
+  remindAt: ['remind_at', 'reminder', 'remind', 'reminder_time', 'when'],
+  start: ['when', 'date', 'time', 'start_time', 'startTime', 'datetime', 'start_at', 'startAt'],
+  end: ['end_time', 'endTime', 'end_at', 'endAt', 'until'],
+  query: ['q', 'search', 'keywords', 'term', 'keyword'],
+  prompt: ['instruction', 'instructions', 'task', 'command'],
+  task: ['prompt', 'instructions', 'instruction', 'description', 'message', 'request'],
+  schedule: ['cron', 'every', 'when', 'frequency', 'interval'],
+  sessionId: ['session_id', 'session', 'id', 'agentId', 'agent_id', 'agent'],
+  cwd: ['workspace', 'dir', 'directory', 'path', 'folder', 'repo'],
+  name: ['title', 'label'],
+  id: ['taskId', 'task_id', 'eventId', 'event_id'],
+};
+
+const lc = (s: string) => s.toLowerCase().replace(/[_-]/g, '');
+
+/**
+ * Best-effort repair of model-produced arguments before validation. Only unambiguous fixes:
+ * stringified JSON args, null for optional params, "42"/"true" for number/boolean params, and
+ * unknown keys that clearly mean a missing parameter (task → title when title is missing and
+ * task is not a real parameter). Returns the args and a description of every change.
+ */
+export function repairArgs(def: ToolDef, raw: unknown): { args: unknown; repairs: string[] } {
+  const repairs: string[] = [];
+  let input = raw;
+  if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        input = parsed;
+        repairs.push('parsed stringified JSON arguments');
+      }
+    } catch {
+      /* not JSON */
+    }
+  }
+  const params = toolParams(def);
+  if (typeof input === 'string') {
+    const reqStr = params.filter((p) => p.required && p.type === 'string');
+    if (reqStr.length === 1) {
+      repairs.push(`wrapped bare string as ${reqStr[0].name}`);
+      return { args: { [reqStr[0].name]: input }, repairs };
+    }
+    return { args: input, repairs };
+  }
+  if (input == null) input = {};
+  if (typeof input !== 'object' || Array.isArray(input)) return { args: input, repairs };
+  const obj: Record<string, unknown> = { ...(input as Record<string, unknown>) };
+  const byName = new Map(params.map((p) => [p.name, p]));
+  const byLc = new Map(params.map((p) => [lc(p.name), p.name]));
+
+  // case/underscore variants of real names (due_date → dueDate is handled by synonyms; Title → title here)
+  for (const k of Object.keys(obj)) {
+    if (byName.has(k)) continue;
+    const real = byLc.get(lc(k));
+    if (real && !(real in obj)) {
+      obj[real] = obj[k];
+      delete obj[k];
+      repairs.push(`${k} → ${real}`);
+    }
+  }
+  // value coercions
+  for (const [k, v] of Object.entries(obj)) {
+    const p = byName.get(k);
+    if (!p) continue;
+    if (v === null && !p.nullable && !p.required) {
+      delete obj[k];
+      repairs.push(`dropped null ${k}`);
+    } else if (typeof v === 'string' && /^(number|integer)$/.test(p.type) && v.trim() && !Number.isNaN(Number(v))) {
+      obj[k] = Number(v);
+      repairs.push(`${k} "${v}" → number`);
+    } else if (typeof v === 'string' && p.type === 'boolean' && /^(true|false)$/i.test(v.trim())) {
+      obj[k] = v.trim().toLowerCase() === 'true';
+      repairs.push(`${k} "${v}" → boolean`);
+    } else if (typeof v === 'string' && p.type.endsWith('[]') && !v.trim().startsWith('[')) {
+      obj[k] = v.split(',').map((x) => x.trim()).filter(Boolean);
+      repairs.push(`${k} string → list`);
+    }
+  }
+  // synonyms: unknown key → a missing parameter that it unambiguously names
+  const unknown = () => Object.keys(obj).filter((k) => !byName.has(k));
+  const targets = params.filter((p) => !(p.name in obj)).sort((a, b) => Number(b.required) - Number(a.required));
+  for (const p of targets) {
+    const syn = (SYNONYMS[p.name] ?? []).map(lc);
+    const cands = unknown().filter((k) => syn.includes(lc(k)));
+    if (cands.length !== 1) continue;
+    // ambiguous when the same unknown key could also fill another missing param of equal rank
+    const k = cands[0];
+    const rivals = targets.filter((o) => o !== p && !(o.name in obj) && o.required === p.required && (SYNONYMS[o.name] ?? []).map(lc).includes(lc(k)));
+    if (rivals.length) continue;
+    obj[p.name] = obj[k];
+    delete obj[k];
+    repairs.push(`${k} → ${p.name}`);
+  }
+  // last resort: exactly one missing required string param and exactly one unknown string value
+  const missingReq = params.filter((p) => p.required && !(p.name in obj));
+  const unk = unknown();
+  if (missingReq.length === 1 && missingReq[0].type === 'string' && unk.length === 1 && typeof obj[unk[0]] === 'string') {
+    const k = unk[0];
+    obj[missingReq[0].name] = obj[k];
+    delete obj[k];
+    repairs.push(`${k} → ${missingReq[0].name}`);
+  }
+  return { args: obj, repairs };
+}
+
+/** a validation error that tells the model exactly how to call the tool */
+export function teachingError(def: ToolDef, input: unknown, error: z.ZodError): string {
+  const params = toolParams(def);
+  const known = new Set(params.map((p) => p.name));
+  const problems: string[] = [];
+  const missing: string[] = [];
+  for (const iss of error.issues) {
+    const key = String(iss.path[0] ?? '');
+    const p = params.find((x) => x.name === key);
+    const absent = !!key && (input == null || typeof input !== 'object' || !(key in (input as object)));
+    if (p && absent && p.required) {
+      missing.push(key);
+      problems.push(`missing required "${key}" (${p.type})${p.description ? ` — ${clip(p.description, 100)}` : ''}`);
+    } else {
+      problems.push(`${iss.path.length ? `"${iss.path.join('.')}"` : 'arguments'}: ${iss.message}`);
+    }
+  }
+  if (input && typeof input === 'object' && !Array.isArray(input)) {
+    for (const k of Object.keys(input)) if (!known.has(k)) problems.push(`unknown parameter "${k}" (not accepted by ${def.name})`);
+  }
+  const example: Record<string, string> = {};
+  for (const p of params.filter((x) => x.required)) example[p.name] = '…';
+  const hint = missing.length
+    ? `Call ${def.name} again with {${missing.map((m) => `"${m}": …`).join(', ')}${params.some((p) => p.required && !missing.includes(p.name)) ? ', …' : ''}}.`
+    : `Call ${def.name} again with arguments like ${JSON.stringify(example)}.`;
+  return [`Invalid arguments for ${def.name}:`, ...problems.map((x) => `- ${x}`), `Expected parameters of ${def.name}:`, ...paramLines(def), hint].join('\n');
+}
+
+/** apply repairArgs (logging any change) and validate; returns parsed data or a teaching error */
+export function prepareArgs(def: ToolDef, rawInput: unknown): { ok: true; data: unknown; repairs: string[] } | { ok: false; error: string } {
+  const { args, repairs } = repairArgs(def, rawInput);
+  if (repairs.length) console.info(`[tools] repaired ${def.name} args: ${repairs.join('; ')}`);
+  const parsed = def.schema.safeParse(args ?? {});
+  if (!parsed.success) return { ok: false, error: teachingError(def, args, parsed.error) };
+  return { ok: true, data: parsed.data, repairs };
+}
+
+/** parse input with the tool's zod schema (after repairs), run it, stringify the result. Throws on failure. */
+export async function runToolDef(def: ToolDef, rawInput: unknown, ctx: ToolContext): Promise<string> {
+  const prep = prepareArgs(def, rawInput);
+  if (!prep.ok) throw new Error(prep.error);
+  if (def.tag) activity(def.tag, clip(toolSummary(def, prep.data), 120), 'info', ctx.sessionId);
+  const result = await def.run(prep.data as Record<string, unknown>, ctx);
   return toolResultText(result);
+}
+
+/* tool search report (shared by pi's tool_search) */
+
+function editDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[n];
+}
+
+/** closest tool names to a free-form string (typos, partial names, word overlap) */
+export function closestToolNames(defs: ToolDef[], query: string, n = 6): string[] {
+  const q = query.toLowerCase().replace(/^select:/, '').trim();
+  const qt = new Set(tokens(q));
+  return defs
+    .map((d) => {
+      const name = d.name.toLowerCase();
+      const overlap = tokens(name).filter((t) => qt.has(t) || [...qt].some((x) => x.length > 2 && (t.startsWith(x) || x.startsWith(t)))).length;
+      const dist = editDistance(q.slice(0, 40), name) / Math.max(q.length, name.length, 1);
+      return { name: d.name, score: overlap * 2 - dist };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n)
+    .map((x) => x.name);
+}
+
+/**
+ * Tool search over EVERY tool the session has. Loaded tools come back marked "already loaded";
+ * deferred matches are returned in `activate`. Never dead-ends: no match lists the closest names + groups.
+ */
+export function toolSearchReport(
+  all: ToolDef[],
+  isLoaded: (d: ToolDef) => boolean,
+  query: string,
+  limit = 5,
+): { text: string; activate: string[] } {
+  const q = query.trim();
+  let hits: ToolDef[];
+  const unknownNames: string[] = [];
+  if (/^select:/i.test(q)) {
+    hits = searchToolDefs(all, q);
+    const found = new Set(hits.map((h) => h.name));
+    for (const n of q.slice(7).split(',').map((x) => x.trim().replace(/^mcp__[^_]+__/, '')).filter(Boolean)) if (!found.has(n)) unknownNames.push(n);
+  } else {
+    hits = searchToolDefs(all, q, limit);
+  }
+  const groups = [...new Set(all.map(groupOf))].sort().join(', ');
+  if (!hits.length) {
+    const close = closestToolNames(all, unknownNames.join(' ') || q);
+    return {
+      text: `No tool is named or described by "${q}". Closest tool names: ${close.join(', ')}. Tool groups: ${groups}. Call one of the closest tools directly if it fits, or search with other keywords (e.g. "select:${close[0] ?? 'name'}").`,
+      activate: [],
+    };
+  }
+  const activate = hits.filter((d) => !isLoaded(d)).map((d) => d.name);
+  const lines = hits.map((d) => {
+    const desc = d.description.replace(/\s+/g, ' ').trim().split(/(?<=\.)\s/)[0] ?? '';
+    const tag = isLoaded(d) ? 'already loaded — call it directly' : 'loaded now';
+    return `- ${d.name} [${tag}]: ${desc}\n  parameters:\n${paramLines(d).map((l) => `    ${l}`).join('\n')}`;
+  });
+  const missing = unknownNames.length ? `\nNot found: ${unknownNames.join(', ')} (closest: ${closestToolNames(all, unknownNames.join(' ')).slice(0, 4).join(', ')}).` : '';
+  return { text: `Call these tools directly now (do not search for them again):\n${lines.join('\n')}${missing}`, activate };
 }
 
 export function errorText(e: unknown): string {

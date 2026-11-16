@@ -4,15 +4,43 @@ import { secrets } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { memoryPromptContext } from '../integrations/memory/index.ts';
 import { skillsPromptContext } from '../extensions/index.ts';
-import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs } from './toolset.ts';
+import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs, smallModeForSession } from './toolset.ts';
 
 export interface PromptOptions {
   kind: SessionKind;
   cwd?: string;
   engine: 'claude-sdk' | 'pi';
+  /** the session the prompt is for (live coding-agents list) */
+  sessionId?: string;
+  /** session model spec (small-model mode detection); default = the engine's configured model */
+  model?: string;
+  /** pi: the session's provider */
+  piProvider?: string;
+  /** force the compact small-model variant (otherwise detected from the model + settings) */
+  small?: boolean;
+}
+
+/** manager / chief-of-staff role (both prompt variants) */
+function managerRole(compact: boolean): string[] {
+  if (compact) {
+    return [
+      'ROLE: You are the user\'s chief of staff and the lead of their coding agents. Do the work yourself with your tools (mail, calendar, Slack, tasks, memory, coding agents).',
+      'Never tell the user to go to another tab (Workshop, Mail, Slack, Agenda) to do something a tool can do.',
+      'Instructions about an existing coding agent ("tell it to…", "also make it…") → coding_agent_send with that agent\'s sessionId.',
+    ];
+  }
+  return [
+    '## Role',
+    "- You are the user's chief of staff and the lead of their coding agents. You act on mail, calendar, Slack, tasks and coding work yourself, through your tools — you do not hand work back to the user.",
+    '- Never tell the user to go and do something in another tab (Workshop, Mail, Slack, Agenda) when one of your tools can do it. Offer the link as a convenience, not as the way to get it done.',
+    '- Instructions about an existing coding agent ("tell it to…", "have it also…", "ask the agent…") are routed to that agent with coding_agent_send (its sessionId is in your coding-agents list); follow up with coding_agent_wait and report back.',
+    '- Drafting, sending, posting and deleting still follow the confirmation rules below.',
+  ];
 }
 
 export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
+  const small = opts.small ?? (opts.kind !== 'coding' && (await smallModeForSession(opts.engine, opts.model, opts.piProvider)));
+  if (small) return buildCompactPrompt(opts);
   const s = getSettings();
   const name = s.assistant.name || 'Monarch';
   const honorific = s.user.honorific || 'sir';
@@ -60,6 +88,7 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
   const lines = [
     `You are ${name}, a personal AI operating system for your principal — composed, precise and quietly witty, with the unflappable competence of a seasoned British butler (think JARVIS). Address the user as "${address}" naturally and sparingly, not in every sentence.`,
     '',
+    ...(opts.kind === 'coding' ? [] : [...managerRole(false), '']),
     '## Manner',
     '- Concise by default: lead with the answer, then the essential detail. Expand only when asked or when the task needs it.',
     '- Use markdown sparingly (short lists, code blocks, tables when they truly help). No filler, no flattery.',
@@ -86,6 +115,8 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     ...caps.map((c) => `- ${c}`),
   ];
 
+  const agents = opts.engine === 'claude-sdk' && opts.kind !== 'coding' ? await codingAgentsSection(opts.sessionId) : [];
+  if (agents.length) lines.push('', ...agents);
   lines.push('', ...toolsSection(opts), '', ...evolutionSection(s.evolution?.enabled !== false, opts.engine));
 
   let skills = '';
@@ -103,6 +134,79 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     lines.push('', '## Standing instructions from the user', s.assistant.persona.trim());
   }
   return lines.filter((l, i, a) => !(l === '' && a[i - 1] === '')).join('\n');
+}
+
+/**
+ * Live coding-agents list (claude-sdk builds its system prompt every turn). The pi engine keeps its
+ * system prompt stable for caching and injects the same list as a context note in the user turn instead.
+ */
+async function codingAgentsSection(sessionId?: string): Promise<string[]> {
+  if (!sessionId) return [];
+  try {
+    const { codingAgentsBrief } = await import('../tools/delegate.ts');
+    const brief = await withTimeout(codingAgentsBrief(sessionId), 1000);
+    return brief ? ['## Your coding agents (newest first; use these ids with coding_agent_send / coding_agent_status / coding_agent_wait)', brief] : [];
+  } catch {
+    return [];
+  }
+}
+
+/** compact system prompt for small models: numbered short rules, no long prose */
+async function buildCompactPrompt(opts: PromptOptions): Promise<string> {
+  const s = getSettings();
+  const name = s.assistant.name || 'Monarch';
+  const honorific = s.user.honorific || 'sir';
+  const tz = s.user.location?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  let localNow: string;
+  try {
+    localNow = new Intl.DateTimeFormat('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: tz }).format(new Date());
+  } catch {
+    localNow = new Date().toString();
+  }
+  let memory = '';
+  try {
+    memory = (await withTimeout(memoryPromptContext(), 1500)) || '';
+  } catch {
+    memory = '';
+  }
+  const claude = opts.engine === 'claude-sdk';
+  const search = claude ? 'ToolSearch' : 'tool_search';
+  const rules = [
+    `Address the user as "${honorific}"${s.user.name ? ` (${s.user.name})` : ''}, sparingly. Be brief, warm and precise (a capable butler).`,
+    'To do something, CALL THE TOOL. Never write a tool call as text or JSON in your reply.',
+    'Use the exact parameter names from the tool schema (e.g. task_add needs "title"). If a tool returns an error, read it, fix the arguments and call it again.',
+    'Tools you already have can be called directly. Use tool_search only for tools you do not have yet.'.replace('tool_search', search),
+    'Coding work: coding_agent_start {task, cwd}. Follow-ups to an existing agent: coding_agent_send {sessionId, message}. Results: coding_agent_wait {sessionId}.',
+    'Ask before sending email, posting to Slack or deleting anything, unless the user just asked for exactly that.',
+    'Save lasting facts about the user with memory_write. Check memory_search before asking something you may know.',
+    'After using tools, always reply in plain sentences: say what you did and the result. Never end with an empty or partial reply.',
+    'Reminders: task_add with remindAt. Recurring jobs: automation_create {name, schedule, prompt}.',
+    opts.kind === 'automation' ? 'This is an unattended automation run: do the task, never send/post/delete unless the prompt says so, end with a short summary.' : '',
+  ].filter(Boolean);
+  const lines = [
+    `You are ${name}, the user's personal AI operating system.`,
+    ...managerRole(true),
+    '',
+    'RULES:',
+    ...rules.map((r, i) => `${i + 1}. ${r}`),
+    '',
+    `Now: ${localNow} (${tz}).${s.user.location ? ` Location: ${s.user.location.name}.` : ''} Units: ${s.user.units}.`,
+  ];
+  if (deferToolsEnabled()) {
+    let index = '';
+    try {
+      index = deferredToolIndex(claude ? sdkToolDefs() : piToolDefs(opts.kind), 400, true);
+    } catch {
+      index = '';
+    }
+    if (index) lines.push('', `More tools (load with ${search}):`, index);
+  }
+  if (claude) lines.push('Monarch tools are named mcp__monarch__<name>.');
+  const agents = claude ? await codingAgentsSection(opts.sessionId) : [];
+  if (agents.length) lines.push('', ...agents);
+  if (memory.trim()) lines.push('', 'ABOUT THE USER (memory):', memory.trim().slice(0, 2000));
+  if (s.assistant.persona?.trim()) lines.push('', 'USER INSTRUCTIONS:', s.assistant.persona.trim().slice(0, 1500));
+  return lines.join('\n');
 }
 
 /** "## Tools": core tools are loaded; the rest are found with tool search (index by group) */

@@ -159,6 +159,47 @@ async function waitAndReport(id: string, timeoutSec: number, signal: AbortSignal
   }
 }
 
+/* ─────────────── compact (small-model) rendering ─────────────── */
+
+type Status = Awaited<ReturnType<typeof statusOf>>;
+
+function compactStatus(s: Status & { finished?: boolean; note?: string; finalReply?: string }): string {
+  const lines = [`Coding agent ${s.sessionId} "${s.title}" — ${s.state}${s.finished === false ? ' (not finished yet)' : ''}`, `cwd: ${s.cwd ?? '?'} · model: ${s.model || s.engine}`];
+  if (s.error) lines.push(`error: ${clip(s.error, 300)}`);
+  if (s.pendingApprovals.length) lines.push(`waiting for the user to approve: ${s.pendingApprovals.map((p) => p.summary).join('; ')}`);
+  if (s.recentTools.length) lines.push(`recent tools: ${s.recentTools.slice(-5).join(', ')}`);
+  const reply = s.finalReply || s.lastAssistant;
+  if (reply) lines.push(`${s.finalReply ? 'final reply' : 'last reply'}: ${clip(reply.replace(/\s+/g, ' '), 1200)}`);
+  if (s.note) lines.push(s.note);
+  return lines.join('\n');
+}
+
+/**
+ * Short list of recent coding agents for the manager's prompt: this chat's own agents first, then others.
+ * One line each: id, title, cwd basename, state, model.
+ */
+export async function codingAgentsBrief(parentId: string, limit = 8): Promise<string> {
+  const o = await orch();
+  const S = await sess();
+  const all = S.listSessions('coding');
+  const mine = all.filter((x) => x.parentSessionId === parentId);
+  const others = all.filter((x) => x.parentSessionId !== parentId);
+  const pick = [...mine, ...others].slice(0, limit);
+  if (!pick.length) return '';
+  const lines: string[] = [];
+  for (const x of pick) {
+    let state = o.isSessionRunning(x.id) ? 'running' : 'idle';
+    if (state === 'idle') {
+      const r = S.getSession(x.id);
+      const items = r?.items ?? [];
+      const lastUser = items.map((i) => i.kind).lastIndexOf('user');
+      if (items.some((i, idx) => i.kind === 'error' && idx > lastUser)) state = 'error';
+    }
+    lines.push(`- ${x.id} "${clip(x.title, 50)}" in ${x.cwd ? basename(x.cwd) : '?'} · ${state} · ${x.model || x.engine}${x.parentSessionId === parentId ? '' : ' · (not from this chat)'}`);
+  }
+  return lines.join('\n');
+}
+
 const KEYWORDS = ['coding', 'code', 'delegate', 'workshop', 'implement', 'fix bug', 'refactor', 'programming', 'sub-agent', 'developer', 'repository', 'project'];
 const common = { group: 'coding-agents', keywords: KEYWORDS, tag: 'CODE' as const };
 
@@ -186,7 +227,7 @@ export const tools: ToolDef[] = [
         .string()
         .optional()
         .describe("claude-sdk: an alias (opus, sonnet, haiku) or a full Claude model id. pi: '<provider>/<model-id>' as listed by coding_agent_models. A '/' implies engine pi."),
-      wait: z.boolean().optional().describe('block until the agent finishes its turn (default false)'),
+      wait: z.boolean().optional().describe('block until the agent finishes its turn (default false; true in small-model mode)'),
       timeoutSec: z.number().int().min(5).max(1800).optional().describe('when wait=true (default 300)'),
     }),
     summarize: (i) => `Start coding agent in ${i.cwd || 'default workspace'}: ${clip(i.task, 120)}`,
@@ -205,7 +246,11 @@ export const tools: ToolDef[] = [
         cwd,
         parentSessionId: ctx.sessionId,
       });
-      if (i.wait) return waitAndReport(sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
+      if (i.wait ?? ctx.small) {
+        const r = await waitAndReport(sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
+        return ctx.small ? `Started coding agent ${sessionId}.\n${compactStatus(r)}` : r;
+      }
+      if (ctx.small) return `Started coding agent ${sessionId} "${title}" in ${cwd}. It is running in the background; follow it with coding_agent_wait {"sessionId": "${sessionId}"}.`;
       return { sessionId, link: link(sessionId), cwd, title, state: 'running', note: 'Running in the background. Use coding_agent_wait or coding_agent_status to follow it.' };
     },
   }),
@@ -222,7 +267,7 @@ export const tools: ToolDef[] = [
       model: z.string().optional().describe('switch to this model (same runtime) before sending; see coding_agent_models'),
     }),
     summarize: (i) => `Tell coding agent ${i.sessionId.slice(0, 8)}: ${clip(i.message, 120)}`,
-    async run(i) {
+    async run(i, ctx) {
       const rec = await codingSession(i.sessionId);
       let switched: string | undefined;
       if (i.model?.trim()) {
@@ -231,6 +276,7 @@ export const tools: ToolDef[] = [
         switched = `model now ${now}`;
       }
       const r = (await orch()).sendToSession(i.sessionId, i.message);
+      if (ctx.small) return `Sent to coding agent ${i.sessionId}: ${r === 'queued' ? 'it is busy, message queued for after its current turn' : 'turn started'}${switched ? ` (${switched})` : ''}. Use coding_agent_wait {"sessionId": "${i.sessionId}"} to get the result.`;
       return { sessionId: i.sessionId, link: link(i.sessionId), result: r, ...(switched ? { switched } : {}), note: r === 'queued' ? 'Agent is busy; message queued and will run after the current turn.' : 'Turn started.' };
     },
   }),
@@ -242,7 +288,10 @@ export const tools: ToolDef[] = [
     loading: 'always',
     schema: z.object({ sessionId: z.string(), tail: z.number().int().min(0).max(50).optional().describe('number of recent tool calls (default 8)') }),
     summarize: (i) => `Coding agent status ${i.sessionId.slice(0, 8)}`,
-    run: (i) => statusOf(i.sessionId, i.tail ?? 8),
+    run: async (i, ctx) => {
+      const st = await statusOf(i.sessionId, i.tail ?? 8);
+      return ctx.small ? compactStatus(st) : st;
+    },
   }),
   defineTool({
     ...common,
@@ -253,7 +302,8 @@ export const tools: ToolDef[] = [
     summarize: (i) => `Wait for coding agent ${i.sessionId.slice(0, 8)}`,
     async run(i, ctx) {
       await codingSession(i.sessionId);
-      return waitAndReport(i.sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
+      const r = await waitAndReport(i.sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
+      return ctx.small ? compactStatus(r) : r;
     },
   }),
   defineTool({
@@ -266,6 +316,12 @@ export const tools: ToolDef[] = [
       const o = await orch();
       let list = (await sess()).listSessions('coding');
       if (i.mine) list = list.filter((s) => s.parentSessionId === ctx.sessionId);
+      if (ctx.small) {
+        const pick = list.slice(0, i.limit ?? 15);
+        return pick.length
+          ? pick.map((s) => `- ${s.id} "${clip(s.title, 50)}" in ${s.cwd ? basename(s.cwd) : '?'} · ${o.isSessionRunning(s.id) ? 'running' : 'idle'}${s.parentSessionId === ctx.sessionId ? ' · from this chat' : ''}`).join('\n')
+          : 'No coding agents yet.';
+      }
       return list.slice(0, i.limit ?? 15).map((s) => ({
         sessionId: s.id,
         title: s.title,

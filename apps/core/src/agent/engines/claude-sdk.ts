@@ -29,6 +29,8 @@ import {
   deferToolsEnabled,
   loadsUpFront,
   builtinSummary,
+  repairArgs,
+  smallModeFor,
   errorText,
   runToolDef,
   sdkToolDefs,
@@ -128,6 +130,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: 
   const defs = sdkToolDefs();
   // deferred loading: core tools always in the prompt, the rest behind Claude Code's ToolSearch
   const defer = deferToolsEnabled();
+  const small = !coding && smallModeFor(rec.model || settings.claudeSdk.model);
   const defByName = new Map<string, ToolDef>(defs.map((d) => [d.name, d]));
 
   // MCP handlers don't receive the tool_use id; match them FIFO per tool name.
@@ -164,6 +167,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: 
                 cwd: ctx.cwd,
                 signal: ctx.signal,
                 progress: (t) => ctx.progress(callId, def.name, t),
+                small,
               });
               return { content: [{ type: 'text' as const, text }] };
             } catch (e) {
@@ -172,7 +176,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: 
           },
           {
             annotations: { readOnlyHint: def.risk === 'safe', destructiveHint: def.risk === 'dangerous' },
-            alwaysLoad: loadsUpFront(def, defer),
+            alwaysLoad: loadsUpFront(def, defer, small),
             searchHint: searchHint(def),
           },
         ),
@@ -201,21 +205,39 @@ async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: 
   };
   const DENY_MSG = 'The user declined this action. Do not retry it; ask how to proceed instead.';
 
+  /**
+   * Argument repair for Monarch tools must happen BEFORE the in-process MCP server validates the call
+   * against the zod shape (a missing/renamed required param would be rejected there with a generic
+   * error, and unknown keys stripped). PreToolUse runs first and can rewrite the input.
+   */
+  const repaired = (toolName: string, toolInput: Record<string, unknown>): Record<string, unknown> | undefined => {
+    const def = toolName.startsWith(MCP_PREFIX) ? defByName.get(displayName(toolName)) : undefined;
+    if (!def) return undefined;
+    const { args, repairs } = repairArgs(def, toolInput);
+    if (!repairs.length || !args || typeof args !== 'object') return undefined;
+    console.info(`[claude-sdk] repaired ${def.name} args: ${repairs.join('; ')}`);
+    return args as Record<string, unknown>;
+  };
+
   const canUseTool: CanUseTool = async (toolName, toolInput, opts) => {
-    const ok = await gate(toolName, toolInput, opts.toolUseID);
-    return ok ? { behavior: 'allow', updatedInput: toolInput } : { behavior: 'deny', message: DENY_MSG };
+    const fixed = repaired(toolName, toolInput) ?? toolInput;
+    const ok = await gate(toolName, fixed, opts.toolUseID);
+    return ok ? { behavior: 'allow', updatedInput: fixed } : { behavior: 'deny', message: DENY_MSG };
   };
 
   const preToolUse: HookCallback = async (hookInput, toolUseID) => {
     if (hookInput.hook_event_name !== 'PreToolUse') return {};
     const callId = hookInput.tool_use_id || toolUseID || '';
-    const toolInput = (hookInput.tool_input ?? {}) as Record<string, unknown>;
+    const raw = (hookInput.tool_input ?? {}) as Record<string, unknown>;
+    const fixed = repaired(hookInput.tool_name, raw);
+    const toolInput = fixed ?? raw;
     const ok = await gate(hookInput.tool_name, toolInput, callId);
     return {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: ok ? 'allow' : 'deny',
         permissionDecisionReason: ok ? 'Approved by Monarch policy' : DENY_MSG,
+        ...(ok && fixed ? { updatedInput: fixed } : {}),
       },
     };
   };

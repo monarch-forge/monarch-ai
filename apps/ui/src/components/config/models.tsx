@@ -228,6 +228,7 @@ export function ModelsSection() {
       </Panel>
 
       <ContextPanel />
+      <SmallModelPanel />
     </div>
   );
 }
@@ -273,3 +274,36 @@ function ContextPanel() {
   );
 }
 
+
+type SmallMode = 'auto' | 'on' | 'off';
+
+/** Settings.agent.smallModelMode — adapt prompts and tools for small/fast models */
+function SmallModelPanel() {
+  const s = settings.value!;
+  const [draft, set, dirty, reset] = useDraft<{ mode: SmallMode }>({ mode: s.agent?.smallModelMode ?? 'auto' });
+  const [saving, setSaving] = useState(false);
+  if (!draft) return null;
+  const save = async () => {
+    setSaving(true);
+    const ok = await saveSettings({ agent: { ...(s.agent ?? {}), smallModelMode: draft.mode } });
+    setSaving(false);
+    if (ok) reset();
+  };
+  return (
+    <Panel code="CFG.25" title="Small-model mode" right={<Tag tone={draft.mode === 'off' ? 'warn' : 'ok'}>{draft.mode}</Tag>}>
+      <div class="max-w-[260px]">
+        <Field
+          label="Mode"
+          hint="Auto turns it on for flash / lite / mini / haiku / nano / small 7–9B models or context windows under 64k: common tools loaded up front, a compact prompt, compact coding-agent results."
+        >
+          <select class={SELECT} value={draft.mode} onChange={(e) => set({ mode: (e.target as HTMLSelectElement).value as SmallMode })}>
+            <option value="auto">Auto (detect from the model)</option>
+            <option value="on">Always on</option>
+            <option value="off">Off</option>
+          </select>
+        </Field>
+      </div>
+      <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
+    </Panel>
+  );
+}

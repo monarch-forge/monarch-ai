@@ -15,7 +15,8 @@ import type { Usage } from '@monarch/shared';
 import { defineTool, truncate, type ToolDef } from '../../kernel.ts';
 import { getSettings } from '../../settings.ts';
 import { emptyUsage, addUsage, autoCompactPercent, type SessionRecord } from '../sessions.ts';
-import { deferToolsEnabled, errorText, groupOf, loadsUpFront, piToolDefs, runToolDef, searchToolDefs, toolSummary } from '../toolset.ts';
+import { deferToolsEnabled, errorText, loadsUpFront, piToolDefs, runToolDef, smallModeFor, toolJsonSchema, toolSearchReport, toolSummary } from '../toolset.ts';
+import { codingAgentsBrief } from '../../tools/delegate.ts';
 import { piModels, resolvePiModel } from '../pi-models.ts';
 import type { Engine, TurnContext, TurnResult } from './types.ts';
 
@@ -25,9 +26,19 @@ interface TurnState {
   byModel: Record<string, Usage>;
   model?: string;
   error?: string;
+  /** text of the current assistant message held back while it may be a stray tool-call fragment */
+  held: string;
+  /** the current assistant message's text has been released to the UI */
+  released: boolean;
+  /** the last assistant message was suppressed as a fragment */
+  fragment?: string;
+  /** the last reply was cut off for lack of room in the context window */
+  starved?: boolean;
 }
 
 interface Entry {
+  /** small-model mode for the model this Agent last ran with */
+  small: boolean;
   agent: Agent;
   turn: TurnState | null;
   /** deferred tools activated by tool_search (persisted in engineState.activatedTools) */
@@ -50,10 +61,7 @@ export const piTestHooks: { model?: Model<Api>; streamFn?: StreamFn } = {};
 
 /** JSON schema for a ToolDef's zod schema, as plain JSON (pi validates plain JSON Schema) */
 function jsonSchema(def: ToolDef): Record<string, unknown> {
-  const js = z.toJSONSchema(def.schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
-  delete js.$schema;
-  if (js.type !== 'object') return { type: 'object', properties: {}, ...js };
-  return js;
+  return toolJsonSchema(def);
 }
 
 function resultText(result: any): string {
@@ -76,7 +84,7 @@ function toolsFor(entry: Entry, rec: SessionRecord): AgentTool<any>[] {
   const all = piToolDefs(rec.kind);
   const defer = deferToolsEnabled();
   entry.defs = new Map(all.map((d) => [d.name, d]));
-  const loaded = all.filter((d) => loadsUpFront(d, defer) || entry.activated.has(d.name));
+  const loaded = all.filter((d) => loadsUpFront(d, defer, entry.small) || entry.activated.has(d.name));
   const list = loaded.map((def) => agentTool(entry, rec.id, def));
   if (defer && loaded.length < all.length) {
     const search = toolSearchDef(entry, rec);
@@ -109,6 +117,7 @@ function agentTool(entry: Entry, sessionId: string, def: ToolDef): AgentTool<any
         cwd: turn.ctx.cwd,
         signal: signal ?? turn.ctx.signal,
         progress: (t) => turn.ctx.progress(toolCallId, def.name, t),
+        small: entry.small,
       });
       return { content: [{ type: 'text', text }], details: {} };
     },
@@ -137,23 +146,15 @@ function toolSearchDef(entry: Entry, rec: SessionRecord): ToolDef {
     summarize: (i) => `Find tools: ${i.query}`,
     run: ({ query, limit }) => {
       const defer = deferToolsEnabled();
-      const candidates = [...entry.defs.values()].filter((d) => d.name !== TOOL_SEARCH && !loadsUpFront(d, defer));
-      const hits = searchToolDefs(candidates, query, limit ?? 5);
-      if (!hits.length) {
-        const groups = [...new Set(candidates.map(groupOf))].join(', ');
-        return `No tools matched "${query}". Deferred tool groups: ${groups || '(none)'}. Try other keywords.`;
-      }
-      const fresh = hits.filter((d) => !entry.activated.has(d.name));
-      for (const d of fresh) entry.activated.add(d.name);
-      if (fresh.length) {
+      const all = [...entry.defs.values()].filter((d) => d.name !== TOOL_SEARCH);
+      const isLoaded = (d: ToolDef) => loadsUpFront(d, defer, entry.small) || entry.activated.has(d.name);
+      const { text, activate } = toolSearchReport(all, isLoaded, query, limit ?? 5);
+      if (activate.length) {
+        for (const n of activate) entry.activated.add(n);
         entry.toolsDirty = true;
         stateOf(rec).activatedTools = [...entry.activated];
       }
-      const lines = hits.map((d) => {
-        const desc = d.description.replace(/\s+/g, ' ').trim().split(/(?<=\.)\s/)[0] ?? '';
-        return `- ${d.name} [${d.risk}]: ${desc}\n  parameters: ${JSON.stringify(jsonSchema(d))}`;
-      });
-      return `Loaded ${hits.length} tool(s); call them directly now:\n${lines.join('\n')}`;
+      return text;
     },
   });
 }
@@ -165,7 +166,17 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
   switch (ev.type) {
     case 'message_update': {
       const a = ev.assistantMessageEvent;
-      if (a.type === 'text_delta' && a.delta) emit({ type: 'text', delta: a.delta });
+      if (a.type === 'text_delta' && a.delta) {
+        if (turn.released) emit({ type: 'text', delta: a.delta });
+        else {
+          turn.held += a.delta;
+          if (!mayBeFragment(turn.held)) {
+            turn.released = true;
+            emit({ type: 'text', delta: turn.held });
+            turn.held = '';
+          }
+        }
+      }
       else if (a.type === 'thinking_delta' && a.delta) emit({ type: 'thinking', delta: a.delta });
       break;
     }
@@ -193,6 +204,16 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
         if (used > 0) turn.ctx.emit({ type: 'context', used, window: entry.agent.state.model?.contextWindow || undefined });
       }
       if (am.stopReason === 'error' || am.stopReason === 'aborted') turn.error = am.errorMessage || am.stopReason;
+      const hasToolCall = Array.isArray(am.content) && am.content.some((b: any) => b?.type === 'toolCall');
+      // out of room: the provider cut the reply after a few tokens (max_tokens clamped to what is left of the window)
+      const starved = am.stopReason === 'length' && !hasToolCall && (am.usage?.output ?? 0) < 16;
+      if (starved) turn.starved = true;
+      if (turn.held) {
+        if (!hasToolCall && (starved || isFragment(turn.held))) turn.fragment = turn.held;
+        else emit({ type: 'text', delta: turn.held });
+      } else if (starved && !turn.released) turn.fragment = turn.fragment ?? '';
+      turn.held = '';
+      turn.released = false;
       emit({ type: 'assistant-end' });
       break;
     }
@@ -214,6 +235,44 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
     default:
       break;
   }
+}
+
+/* ─────────────── stray-output guard ─────────────── */
+
+/** text that could still turn out to be a tool call written as text: hold it back from the UI */
+function mayBeFragment(text: string): boolean {
+  const t = text.trimStart();
+  if (t.length < 24 && !t.includes('\n')) return true; // could still be a cut-off reply ("Day", "Task")
+  if (!/^[{\[`]/.test(t)) return false;
+  return t.length < 400;
+}
+
+/** a reply that is only a piece of JSON / tool-call syntax (not a real answer) */
+export function isFragment(text: string): boolean {
+  const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+  if (!t) return false;
+  if (/^[{\[]"?\s*$/.test(t)) return true;
+  if (!/^[{\[]/.test(t)) return false;
+  try {
+    JSON.parse(t);
+    // complete JSON that looks like a tool call written as text
+    return /"(name|tool|function|arguments|args|parameters)"\s*:/.test(t);
+  } catch {
+    return t.length < 400; // truncated JSON
+  }
+}
+
+const NUDGE = 'Your last reply was cut off. If you meant to call a tool, call it properly with a tool call; otherwise answer in plain text.';
+
+function fragmentToolName(text: string): string | undefined {
+  return /"(?:name|tool|function)"\s*:\s*"([a-z0-9_]+)"/i.exec(text)?.[1];
+}
+
+/** drop the trailing suppressed assistant message (and a trailing nudge) from the transcript */
+function dropTrailingFragment(agent: Agent): void {
+  const msgs = agent.state.messages;
+  const last = msgs[msgs.length - 1] as any;
+  if (last?.role === 'assistant') agent.state.messages = msgs.slice(0, -1);
 }
 
 function thinkingFor(model: Model<Api>): ModelThinkingLevel {
@@ -316,10 +375,10 @@ function syntheticAssistant(model: Model<Api>, text: string): AgentMessage {
  * Summarize the older part of the persisted transcript with the session's own model, keep the recent turns
  * verbatim, persist, and drop the cached Agent so the next turn rebuilds it from the new transcript.
  */
-async function compactPi(ctx: TurnContext, model: Model<Api>, trigger: 'auto' | 'manual', streamFn: StreamFn): Promise<{ usage: Usage; error?: string }> {
+async function compactPi(ctx: TurnContext, model: Model<Api>, trigger: 'auto' | 'manual', streamFn: StreamFn, inPlace = false): Promise<{ usage: Usage; error?: string }> {
   const rec = ctx.session;
   const cached = agents.get(rec.id);
-  if (cached?.turn) return { usage: emptyUsage(), error: 'This session is still busy.' };
+  if (cached?.turn && !inPlace) return { usage: emptyUsage(), error: 'This session is still busy.' };
   const messages = (cached ? cached.agent.state.messages.filter((m) => roleOf(m) !== 'system') : (rec.engineState.piMessages ?? [])) as AgentMessage[];
   const window = model.contextWindow || DEFAULT_WINDOW;
   const pre = piContextTokens(messages, ctx.systemPrompt, rec.engineState.piUsageFrom ?? 0);
@@ -350,7 +409,12 @@ async function compactPi(ctx: TurnContext, model: Model<Api>, trigger: 'auto' | 
   const next = [...head, ...kept];
   rec.engineState.piMessages = next;
   rec.engineState.piUsageFrom = next.length; // kept assistant messages carry pre-compaction usage
-  agents.delete(rec.id); // rebuilt from piMessages on the next turn
+  rec.engineState.codingAgentsNote = undefined; // re-announce the coding agents after a compaction
+  if (inPlace && cached) {
+    // mid-turn (out of room): swap the live transcript, keep the leading system message
+    const lead = cached.agent.state.messages[0];
+    cached.agent.state.messages = roleOf(lead) === 'system' ? [lead, ...next] : next;
+  } else agents.delete(rec.id); // rebuilt from piMessages on the next turn
   ctx.save();
   const post = estimateTokens(next, ctx.systemPrompt);
   ctx.emit({ type: 'compacted', trigger, pre, post });
@@ -406,7 +470,10 @@ async function maybeAutoCompact(ctx: TurnContext, r: Resolved, extra = ''): Prom
   if (messages.length <= 2) return emptyUsage(); // nothing left worth summarizing (e.g. just a summary)
   const window = r.model.contextWindow || DEFAULT_WINDOW;
   const used = piContextTokens(messages, ctx.systemPrompt, rec.engineState.piUsageFrom ?? 0) + Math.ceil(extra.length / 4);
-  if ((used / window) * 100 < pct) return emptyUsage();
+  // pi-ai clamps max_tokens to window - input - 4096 (safety margin): on small windows the % threshold
+  // alone can leave no room to answer, so also compact when less than ~2k tokens of output would remain
+  const roomy = window - used - 4096 >= 2048;
+  if ((used / window) * 100 < pct && roomy) return emptyUsage();
   try {
     const out = await compactPi(ctx, r.model, 'auto', r.streamFn);
     if (out.error) console.warn(`[pi] auto-compaction skipped: ${out.error}`);
@@ -436,10 +503,17 @@ export const piEngine: Engine = {
     const rec = ctx.session;
     const preUsage = await maybeAutoCompact(ctx, r, ctx.text);
 
+    const small = smallModeFor(model.id, model.name, model.contextWindow);
     let entry = agents.get(rec.id);
+    // small-model mode changed (model switch / setting): rebuild with the matching prompt + tool set
+    if (entry && entry.small !== small && !entry.turn) {
+      agents.delete(rec.id);
+      entry = undefined;
+    }
     if (!entry) {
       const known = new Set(piToolDefs(rec.kind).map((d) => d.name));
       const fresh: Entry = {
+        small,
         agent: null as unknown as Agent,
         turn: null,
         // tools that no longer exist (removed extension) are dropped; their old calls stay in history
@@ -485,7 +559,7 @@ export const piEngine: Engine = {
       return { usage: emptyUsage(), model: model.id, error: 'This session is still busy.' };
     }
 
-    const turn: TurnState = { ctx, usage: preUsage, byModel: preUsage.inputTokens ? { [model.id]: preUsage } : {}, model: model.id };
+    const turn: TurnState = { ctx, usage: preUsage, byModel: preUsage.inputTokens ? { [model.id]: preUsage } : {}, model: model.id, held: '', released: false };
     entry.turn = turn;
     ctx.emit({ type: 'model', model: model.id });
 
@@ -494,9 +568,38 @@ export const piEngine: Engine = {
     if (ctx.signal.aborted) onAbort();
     else ctx.signal.addEventListener('abort', onAbort, { once: true });
     try {
-      await agent.prompt(ctx.text);
-    } catch (e) {
-      turn.error = turn.error ?? errorText(e);
+      await agent.prompt(await withAgentsNote(rec, ctx.text));
+      // stray-output guard: the turn ended with a bare tool-call fragment as text → retry once
+      if (turn.fragment !== undefined && !turn.error && !ctx.signal.aborted) {
+        const first = turn.fragment;
+        console.warn(`[pi] suppressed ${turn.starved ? 'cut-off (no room)' : 'fragment'} reply ${JSON.stringify(first.slice(0, 80))}; retrying once`);
+        turn.fragment = undefined;
+        dropTrailingFragment(agent);
+        if (turn.starved) {
+          turn.starved = false;
+          // make room first: summarize the older turns in place, then let the model answer again
+          try {
+            const out = await compactPi(ctx, model, 'auto', streamFn, true);
+            if (out.error) console.warn(`[pi] in-turn compaction skipped: ${out.error}`);
+            turn.usage = addUsage(turn.usage, out.usage);
+          } catch (e) {
+            console.warn('[pi] in-turn compaction failed', e);
+          }
+        }
+        const nudge = { role: 'user', content: `[Monarch system note] ${NUDGE}`, timestamp: Date.now() } as AgentMessage;
+        agent.state.messages = [...agent.state.messages, nudge];
+        await agent.continue();
+        // keep the transcript clean: drop the nudge (and a second fragment)
+        if (turn.fragment !== undefined) dropTrailingFragment(agent);
+        agent.state.messages = agent.state.messages.filter((m) => m !== nudge);
+        if (turn.fragment !== undefined && !turn.error) {
+          const tool = fragmentToolName(turn.fragment) ?? fragmentToolName(first);
+          const msg = `Sorry — my reply got cut off${tool ? ` while I was trying to use ${tool}` : ' while I was trying to call a tool'}. Could you say that again, or rephrase it?`;
+          ctx.emit({ type: 'text', delta: msg });
+          ctx.emit({ type: 'assistant-end' });
+          agent.state.messages = [...agent.state.messages, syntheticAssistant(model, msg)];
+        }
+      }
     } finally {
       ctx.signal.removeEventListener('abort', onAbort);
       entry.turn = null;
@@ -531,6 +634,23 @@ export const piEngine: Engine = {
     }
   },
 };
+
+/**
+ * Live "your coding agents" note for pi: prefixed to the user turn only when the list changed since the
+ * last note in this session, so the (cached) system prompt and transcript prefix stay stable.
+ */
+async function withAgentsNote(rec: SessionRecord, text: string): Promise<string> {
+  if (rec.kind === 'coding') return text;
+  let brief = '';
+  try {
+    brief = await codingAgentsBrief(rec.id);
+  } catch {
+    brief = '';
+  }
+  if (!brief || brief === stateOf(rec).codingAgentsNote) return text;
+  stateOf(rec).codingAgentsNote = brief;
+  return `<context>\nYour coding agents (manage them with coding_agent_send/status/wait; newest first):\n${brief}\n</context>\n\n${text}`;
+}
 
 /** forget all cached agents (e.g. after provider/model settings changed) */
 export function resetPiAgents(): void {

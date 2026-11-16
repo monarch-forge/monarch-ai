@@ -274,6 +274,11 @@ export interface Settings {
   agent?: {
     /** compact a session's context when it reaches this % of the model window (0 = Monarch never compacts; Claude Code keeps its own default). Default 75 */
     autoCompactPercent?: number;
+    /**
+     * Small-model mode: more tools loaded up front, a compact system prompt, compact coding-agent results.
+     * 'auto' (default) = on for models whose id/name looks small (flash, lite, mini, haiku, nano, 7b…) or with a context window under 64k.
+     */
+    smallModelMode?: 'auto' | 'on' | 'off';
   };
   user: {
     name: string; // "Tony"
@@ -516,6 +521,14 @@ export interface CalendarEvent {
   notes?: string;
   /** joinable meeting link if any */
   link?: string;
+  /** Google: organizer email */
+  organizer?: string;
+  /** Google: true when the connected account organizes the event */
+  isOrganizer?: boolean;
+  /** Google: the connected account's own RSVP when it is a guest ('needsAction' = pending invite) */
+  myResponse?: 'needsAction' | 'accepted' | 'declined' | 'tentative';
+  /** Google: number of (human) guests incl. organizer when listed */
+  attendeeCount?: number;
 }
 
 export interface Automation {
