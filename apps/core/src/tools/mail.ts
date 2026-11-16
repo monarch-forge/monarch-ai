@@ -3,7 +3,10 @@ import { z } from 'zod';
 import type { MailThreadSummary } from '@monarch/shared';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import {
+  BULK_HARD_CAP,
   MAIL_ACTIONS,
+  bulkModifyByQuery,
+  estimateMatches,
   createDraft,
   getThread,
   listGoogleAccounts,
@@ -85,15 +88,22 @@ const mailSearch = defineTool({
   run: async (i) => {
     const accounts = requireAccounts();
     const q = i.query?.trim() || undefined;
-    const threads = await listThreads({
-      accountId: i.account ? resolveGoogleAccount(i.account).id : undefined,
-      q,
-      labelIds: q ? [] : ['INBOX'],
-      max: i.max ?? 15,
-    });
+    const accountId = i.account ? resolveGoogleAccount(i.account).id : undefined;
+    const labelIds = q ? [] : ['INBOX'];
+    const scope = accountId ? accounts.filter((a) => a.id === accountId) : accounts;
+    const [threads, estimates] = await Promise.all([
+      listThreads({ accountId, q, labelIds, max: i.max ?? 15 }),
+      Promise.all(scope.map((a) => estimateMatches(a.id, q, labelIds).then((n) => ({ email: a.email, n })).catch(() => null))),
+    ]);
+    const est = estimates.filter((e): e is { email: string; n: number } => !!e);
+    const total = est.reduce((s, e) => s + e.n, 0);
+    const scale = est.length
+      ? `About ${total.toLocaleString('en-US')} matching message(s)${est.length > 1 ? ` (${est.map((e) => `${e.email}: ~${e.n.toLocaleString('en-US')}`).join(', ')})` : ''}.` +
+        (total > 50 ? ' To change all of them at once use mail_cleanup with this query (dry run first).' : '')
+      : '';
     if (!threads.length) return `No threads found${q ? ` for "${q}"` : ''}.`;
     const multi = !i.account && accounts.length > 1;
-    return `${threads.length} thread(s):\n${threads.map((t) => fmtSummary(t, multi)).join('\n')}`;
+    return `${scale ? `${scale}\n` : ''}Showing ${threads.length} thread(s):\n${threads.map((t) => fmtSummary(t, multi)).join('\n')}`;
   },
 });
 
@@ -212,4 +222,72 @@ const mailModify = defineTool({
   },
 });
 
-export const tools: ToolDef[] = [mailAccounts, mailSearch, mailReadThread, mailSend, mailDraft, mailModify] as unknown as ToolDef[];
+const n = (x: number) => x.toLocaleString('en-US');
+
+const mailCleanup = defineTool({
+  name: 'mail_cleanup',
+  group: 'mail',
+  keywords: ['gmail', 'bulk', 'cleanup', 'clean up inbox', 'mark all read', 'archive all', 'newsletters', 'promotions', 'inbox zero', 'mass archive', 'thousands of emails'],
+  description: [
+    'Bulk inbox cleanup: apply ONE action to EVERY email matching a Gmail search query, across all connected accounts (or one `account`), in a single call — thousands of messages at once.',
+    'Actions: read, unread, archive, unarchive, star, unstar. Never deletes or trashes anything.',
+    'ALWAYS call first with dryRun=true (the default) to see how many messages match plus a few samples; then call again with dryRun=false to apply.',
+    'Query examples: "category:promotions is:unread", "in:inbox older_than:30d", "from:newsletter@example.com", "label:updates in:inbox", "is:unread older_than:7d".',
+    'Use this instead of looping mail_search/mail_modify for hundreds or thousands of emails.',
+  ].join(' '),
+  risk: 'sensitive',
+  tag: 'MAIL',
+  schema: z.object({
+    query: z.string().min(1).describe('Gmail search query selecting the messages (same syntax as the Gmail search box), e.g. "category:promotions in:inbox".'),
+    action: z.enum(actions).describe('What to do with every matching message.'),
+    account: accountArg.describe('Account email or id. Omit to clean up ALL connected accounts.'),
+    dryRun: z.boolean().optional().describe('Default true: only count and preview. Set false to actually apply the action.'),
+    limit: z.number().int().min(1).max(BULK_HARD_CAP).optional().describe(`Max messages per account (default and cap ${n(BULK_HARD_CAP)}).`),
+  }),
+  summarize: (i) => `${i.dryRun === false ? 'Bulk' : 'Preview bulk'} ${i.action}: ${i.query}${i.account ? ` (${i.account})` : ''}`,
+  run: async (i, ctx) => {
+    const accounts = requireAccounts();
+    const dryRun = i.dryRun !== false;
+    const scope = i.account ? [resolveGoogleAccount(i.account)] : accounts;
+    const a = MAIL_ACTIONS[i.action] as { add?: readonly string[]; remove?: readonly string[] };
+    const lines: string[] = [];
+    let matched = 0;
+    let modified = 0;
+    let aborted = false;
+    for (const acct of scope) {
+      if (ctx.signal.aborted) {
+        aborted = true;
+        lines.push(`${acct.email}: skipped (aborted)`);
+        continue;
+      }
+      try {
+        const r = await bulkModifyByQuery(acct.id, i.query, [...(a.add ?? [])], [...(a.remove ?? [])], {
+          dryRun,
+          limit: i.limit,
+          signal: ctx.signal,
+          onProgress: (p) =>
+            ctx.progress(`${acct.email}: ${p.phase === 'collect' ? 'found' : `${i.action}`} ${n(p.done)}/${n(p.total)}${p.phase === 'collect' ? ' …' : ''}`),
+        });
+        matched += r.matched;
+        modified += r.modified;
+        if (r.aborted) aborted = true;
+        const head = dryRun
+          ? `${acct.email}: ${n(r.matched)} matching${r.truncated ? ` (stopped at limit ${n(r.matched)}; more exist)` : ''}`
+          : `${acct.email}: ${n(r.modified)}/${n(r.matched)} updated (${i.action})${r.aborted ? ' — ABORTED part-way' : ''}${r.truncated ? ' (limit reached; more remain)' : ''}`;
+        lines.push(head, ...r.samples.map((s) => `  • ${s.subject} — ${s.from} · ${fmtDate(s.date)}`));
+      } catch (e) {
+        if (ctx.signal.aborted) {
+          aborted = true;
+          lines.push(`${acct.email}: aborted`);
+        } else lines.push(`${acct.email}: ERROR ${(e as Error).message}`);
+      }
+    }
+    const summary = dryRun
+      ? `DRY RUN — nothing changed. ${n(matched)} message(s) match "${i.query}" across ${scope.length} account(s); action would be: ${i.action}.`
+      : `${aborted ? 'ABORTED — ' : ''}${i.action}: ${n(modified)} of ${n(matched)} matching message(s) updated across ${scope.length} account(s).`;
+    const hint = dryRun && matched ? '\nRun again with dryRun=false to apply.' : '';
+    return `${summary}\n${lines.join('\n')}${hint}`;
+  },
+});
+
+export const tools: ToolDef[] = [mailAccounts, mailSearch, mailReadThread, mailSend, mailDraft, mailModify, mailCleanup] as unknown as ToolDef[];

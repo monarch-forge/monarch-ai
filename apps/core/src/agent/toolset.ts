@@ -89,7 +89,7 @@ export const SMALL_MODE_UPFRONT = new Set([
   'tasks_list', 'task_add', 'task_update', 'task_complete',
   'calendar_list', 'calendar_add',
   'automations_list', 'automation_create',
-  'mail_search', 'mail_read_thread', 'mail_draft', 'mail_modify',
+  'mail_search', 'mail_read_thread', 'mail_draft', 'mail_modify', 'mail_cleanup',
   'slack_unread', 'slack_read', 'slack_search', 'slack_post', 'slack_mark_read', 'slack_react',
   'memory_search', 'memory_read', 'memory_write',
   'agent_start', 'agent_send', 'agent_status', 'agent_wait', 'agent_list',

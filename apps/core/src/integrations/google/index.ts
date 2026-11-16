@@ -54,5 +54,5 @@ export {
   callbackPage as googleCallbackPage,
   GOOGLE_REDIRECT_PATH,
 } from './auth.ts';
-export { listThreads, getThread, sendMail, createDraft, modifyThread, MAIL_ACTIONS } from './gmail.ts';
-export type { MailAction, ListThreadsOpts } from './gmail.ts';
+export { listThreads, getThread, sendMail, createDraft, modifyThread, MAIL_ACTIONS, bulkModifyByQuery, estimateMatches, BULK_HARD_CAP } from './gmail.ts';
+export type { MailAction, ListThreadsOpts, BulkModifyResult } from './gmail.ts';

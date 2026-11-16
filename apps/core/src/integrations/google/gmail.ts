@@ -4,7 +4,9 @@ import { HttpError, activity, changed } from '../../kernel.ts';
 import { getAccount, googleFetch, listAccounts, mapLimit, resolveAccount } from './auth.ts';
 import { base64UrlDecode, base64UrlEncode, buildMime, htmlToText, replySubject, sanitizeHtml } from './mime.ts';
 
-const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
+/** API base; overridable via MONARCH_GMAIL_API_BASE (test seam, read once at load) */
+const GMAIL_BASE = (process.env.MONARCH_GMAIL_API_BASE || 'https://gmail.googleapis.com/gmail/v1').replace(/\/+$/, '');
+const GMAIL = `${GMAIL_BASE}/users/me`;
 
 /* ─────────────── Gmail API shapes (subset) ─────────────── */
 
@@ -251,6 +253,156 @@ export const MAIL_ACTIONS = {
   unstar: { remove: ['STARRED'] },
 } as const satisfies Record<string, { add?: readonly string[]; remove?: readonly string[] }>;
 export type MailAction = keyof typeof MAIL_ACTIONS;
+
+/* ─────────────── bulk modify by query ─────────────── */
+
+export interface BulkSample {
+  id: string;
+  from: string;
+  subject: string;
+  date: string;
+}
+export interface BulkModifyResult {
+  accountId: string;
+  email: string;
+  matched: number;
+  modified: number;
+  /** true when `limit` stopped collection before all matches were gathered */
+  truncated: boolean;
+  /** set when the signal aborted during the modify phase (modified = what was applied before) */
+  aborted?: boolean;
+  samples: BulkSample[];
+}
+export interface BulkModifyOpts {
+  dryRun?: boolean;
+  /** max messages to collect/modify (default 50,000) */
+  limit?: number;
+  onProgress?: (p: { phase: 'collect' | 'modify'; done: number; total: number }) => void;
+  signal?: AbortSignal;
+}
+
+export const BULK_HARD_CAP = 50_000;
+const LIST_PAGE = 500;
+const BATCH_CHUNK = 1000;
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new HttpError(499, 'Bulk mail operation aborted');
+}
+
+/** googleFetch with extra backoff for 429 / 5xx (googleFetch itself only retries 429/503 briefly) */
+async function fetchRetry<T>(accountId: string, url: string, init: Parameters<typeof googleFetch>[2], signal?: AbortSignal): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    throwIfAborted(signal);
+    try {
+      return await googleFetch<T>(accountId, url, init);
+    } catch (e) {
+      const m = /Google API (\d{3})/.exec((e as Error).message ?? '');
+      const code = m ? Number(m[1]) : (e as HttpError).status === 502 ? 502 : 0;
+      const retryable = code === 429 || code >= 500;
+      if (!retryable || attempt >= 5) throw e;
+      const wait = Math.min(16_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250);
+      await new Promise<void>((res, rej) => {
+        const t = setTimeout(res, wait);
+        signal?.addEventListener('abort', () => (clearTimeout(t), rej(new HttpError(499, 'Bulk mail operation aborted'))), { once: true });
+      });
+    }
+  }
+}
+
+/** Gmail's rough match count for a query (resultSizeEstimate; not exact) */
+export async function estimateMatches(accountId: string, q: string | undefined, labelIds?: string[]): Promise<number> {
+  const acct = resolveAccount(accountId);
+  const r = await googleFetch<{ resultSizeEstimate?: number }>(acct.id, `${GMAIL}/messages`, {
+    query: { q, labelIds: labelIds?.length ? labelIds : undefined, maxResults: 1 },
+  });
+  return r.resultSizeEstimate ?? 0;
+}
+
+/**
+ * Apply label changes to EVERY message matching a Gmail query (users.messages.list paging + batchModify
+ * in chunks of 1000). dryRun only counts and samples. Never deletes or trashes.
+ */
+export async function bulkModifyByQuery(
+  accountId: string,
+  q: string,
+  addLabels: string[] = [],
+  removeLabels: string[] = [],
+  opts: BulkModifyOpts = {},
+): Promise<BulkModifyResult> {
+  const acct = resolveAccount(accountId);
+  if (!q.trim()) throw new HttpError(400, 'A Gmail search query is required for bulk changes');
+  if (!addLabels.length && !removeLabels.length) throw new HttpError(400, 'Nothing to change: pass addLabels and/or removeLabels');
+  const forbidden = [...addLabels].filter((l) => l === 'TRASH' || l === 'SPAM');
+  if (forbidden.length) throw new HttpError(400, `Bulk changes may not add ${forbidden.join(', ')}`);
+  const limit = Math.max(1, Math.min(BULK_HARD_CAP, opts.limit ?? BULK_HARD_CAP));
+  const { signal, onProgress } = opts;
+
+  // 1. collect ids
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  let estimate = 0;
+  let truncated = false;
+  do {
+    throwIfAborted(signal);
+    const page = await fetchRetry<{ messages?: { id: string }[]; nextPageToken?: string; resultSizeEstimate?: number }>(
+      acct.id,
+      `${GMAIL}/messages`,
+      { query: { q, maxResults: Math.min(LIST_PAGE, limit - ids.length), pageToken } },
+      signal,
+    );
+    estimate = Math.max(estimate, page.resultSizeEstimate ?? 0);
+    for (const m of page.messages ?? []) ids.push(m.id);
+    pageToken = page.nextPageToken;
+    if (ids.length >= limit) {
+      truncated = !!pageToken || ids.length > limit;
+      ids.length = Math.min(ids.length, limit);
+      pageToken = undefined;
+    }
+    onProgress?.({ phase: 'collect', done: ids.length, total: Math.max(estimate, ids.length) });
+  } while (pageToken);
+
+  // 2. sample a few
+  const samples = (
+    await mapLimit(ids.slice(0, 5), 5, (id) =>
+      fetchRetry<GMessage>(acct.id, `${GMAIL}/messages/${encodeURIComponent(id)}`, {
+        query: { format: 'metadata', metadataHeaders: ['From', 'Subject', 'Date'] },
+      }, signal)
+        .then((m): BulkSample => ({ id, from: header(m.payload, 'From'), subject: header(m.payload, 'Subject') || '(no subject)', date: isoFromMessage(m) }))
+        .catch((e) => {
+          if (signal?.aborted) throw e;
+          return null;
+        }),
+    )
+  ).filter((x): x is BulkSample => !!x);
+
+  const result: BulkModifyResult = { accountId: acct.id, email: acct.email, matched: ids.length, modified: 0, truncated, samples };
+  if (opts.dryRun || !ids.length) return result;
+
+  // 3. batchModify in chunks
+  try {
+    for (let i = 0; i < ids.length; i += BATCH_CHUNK) {
+      throwIfAborted(signal);
+      const chunk = ids.slice(i, i + BATCH_CHUNK);
+      await fetchRetry(acct.id, `${GMAIL}/messages/batchModify`, {
+        method: 'POST',
+        body: { ids: chunk, addLabelIds: addLabels, removeLabelIds: removeLabels },
+      }, signal);
+      result.modified += chunk.length;
+      onProgress?.({ phase: 'modify', done: result.modified, total: ids.length });
+    }
+  } catch (e) {
+    if (!signal?.aborted) throw e;
+    result.aborted = true;
+  } finally {
+    if (result.modified) {
+      unreadCache = null;
+      changed('mail');
+      const what = [addLabels.length ? `+${addLabels.join(',')}` : '', removeLabels.length ? `-${removeLabels.join(',')}` : ''].filter(Boolean).join(' ');
+      activity('MAIL', `Bulk ${what} on ${result.modified.toLocaleString('en-US')} message(s) in ${acct.email} matching "${q}"`);
+    }
+  }
+  return result;
+}
 
 /* ─────────────── unread count ─────────────── */
 
