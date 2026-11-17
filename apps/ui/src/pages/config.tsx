@@ -3,7 +3,7 @@
  */
 import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
-import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna, AudioLines, RefreshCcw } from 'lucide-preact';
+import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna, AudioLines, RefreshCcw, FolderGit2 } from 'lucide-preact';
 import { conn, health, navigate, settings } from '../lib/store.ts';
 import { Panel, Tag, ErrorLine } from '../components/ui.tsx';
 import { SettingsGate } from '../components/config/fields.tsx';
@@ -15,6 +15,7 @@ import { PermissionsSection } from '../components/config/permissions.tsx';
 import { EvolutionSection } from '../components/config/evolution.tsx';
 import { VoiceSection } from '../components/config/voice.tsx';
 import { SyncSection } from '../components/config/sync.tsx';
+import { ProjectsSection } from '../components/config/projects.tsx';
 
 const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
   { id: 'general', label: 'General', icon: UserRound, desc: 'Who you are, where you are, and how Monarch talks', page: GeneralSection, needsSettings: true },
@@ -22,6 +23,7 @@ const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: C
   { id: 'providers', label: 'Providers', icon: KeyRound, desc: 'Connect the services Monarch can use', page: ProvidersSection, needsSettings: false },
   { id: 'voice', label: 'Voice', icon: AudioLines, desc: 'Listening and speaking', page: VoiceSection, needsSettings: true },
   { id: 'accounts', label: 'Accounts', icon: Link2, desc: 'Google and Slack', page: AccountsSection, needsSettings: false },
+  { id: 'projects', label: 'Projects', icon: FolderGit2, desc: 'Code projects and how to build and check their repos', page: ProjectsSection, needsSettings: false },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'What Monarch may do without asking', page: PermissionsSection, needsSettings: true },
   { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'How Monarch grows new abilities', page: EvolutionSection, needsSettings: true },
   { id: 'sync', label: 'Sync', icon: RefreshCcw, desc: 'Keep your devices in step, end-to-end encrypted', page: SyncSection, needsSettings: true },

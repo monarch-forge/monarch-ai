@@ -6,7 +6,7 @@
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { LucideIcon } from 'lucide-preact';
-import { Wallet,
+import { BookOpen, Wallet,
   Activity,
   Bell,
   CalendarDays,
@@ -60,6 +60,7 @@ const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[]
   { id: 'evolve', label: 'Evolve', icon: Dna, keywords: 'extensions skills proposals self evolution tools reflect forge' },
   { id: 'systems', label: 'Systems', icon: Activity, keywords: 'cpu memory processes telemetry machine' },
   { id: 'config', label: 'Config', icon: SlidersHorizontal, keywords: 'settings providers models accounts preferences' },
+  { id: 'welcome', label: 'Welcome & guides', icon: BookOpen, keywords: 'welcome guide help how to start tutorial docs onboarding' },
 ];
 
 /** subsequence fuzzy score; higher is better, -1 = no match */

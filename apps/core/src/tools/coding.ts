@@ -164,6 +164,39 @@ const fsWrite = defineTool({
 
 /* ─────────────── fs_edit ─────────────── */
 
+/**
+ * Where old_string most likely was meant to match: the window of lines with the best whitespace-insensitive
+ * line overlap, returned verbatim with line numbers so the model can copy the exact current text.
+ */
+export function closestBlock(text: string, wanted: string): string {
+  const norm = (l: string) => l.trim().replace(/\s+/g, ' ');
+  const want = wanted.split('\n').map(norm).filter(Boolean);
+  if (!want.length) return '';
+  const lines = text.split('\n');
+  const n = Math.max(1, wanted.split('\n').length);
+  const wantSet = new Set(want);
+  let best = -1;
+  let score = 0;
+  for (let i = 0; i < lines.length; i++) {
+    let sc = 0;
+    for (let j = 0; j < n && i + j < lines.length; j++) if (wantSet.has(norm(lines[i + j]))) sc++;
+    if (sc > score) {
+      score = sc;
+      best = i;
+    }
+  }
+  // nothing matched line-wise: fall back to the first line containing the first wanted line's longest word
+  if (best < 0) {
+    const word = want[0].split(' ').sort((a, b) => b.length - a.length)[0];
+    if (word && word.length > 3) best = lines.findIndex((l) => l.includes(word));
+  }
+  if (best < 0) return ' No similar lines found: read the file again before editing.';
+  const from = Math.max(0, best - 2);
+  const to = Math.min(lines.length, best + n + 2);
+  const shown = lines.slice(from, to).map((l, k) => `${String(from + k + 1).padStart(5)}| ${l}`).join('\n');
+  return ` Closest current text (lines ${from + 1}-${to}; copy it exactly, without the line-number prefix):\n${shown}`;
+}
+
 const fsEdit = defineTool({
   name: 'fs_edit',
   loading: 'always',
@@ -185,7 +218,7 @@ const fsEdit = defineTool({
     const text = await fsp.readFile(file, 'utf8');
     if (input.old_string === input.new_string) throw new Error('old_string and new_string are identical');
     const count = text.split(input.old_string).length - 1;
-    if (count === 0) throw new Error(`old_string not found in ${file}`);
+    if (count === 0) throw new Error(`old_string not found in ${file}.${closestBlock(text, input.old_string)}`);
     if (count > 1 && !input.replace_all) throw new Error(`old_string matches ${count} times in ${file}; add context to make it unique or set replace_all`);
     const next = input.replace_all ? text.split(input.old_string).join(input.new_string) : text.replace(input.old_string, () => input.new_string);
     await fsp.writeFile(file, next, 'utf8');

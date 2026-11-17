@@ -524,6 +524,53 @@ export interface Task {
   completedAt?: ISODate | null;
 }
 
+/* ─────────────── projects & repo profiles (coding workers) ─────────────── */
+
+/** a folder grouping several repos (e.g. backend + frontend + services); repos are discovered inside it */
+export interface Project {
+  id: ID;
+  name: string;
+  root: string;
+  createdAt: ISODate;
+}
+
+export interface RepoCommands {
+  install?: string;
+  build?: string;
+  test?: string;
+  lint?: string;
+  typecheck?: string;
+  dev?: string;
+}
+
+/** what Monarch detected about a repo from its own files; rebuilt when HEAD moves */
+export interface RepoProfile {
+  path: string;
+  name: string;
+  /** git HEAD the profile was built from (null when not a git repo) */
+  head: string | null;
+  branch?: string;
+  scannedAt: ISODate;
+  stack: string[];
+  packageManager?: string;
+  commands: RepoCommands;
+  /** commands the CI config runs (what the team keeps green) */
+  ciCommands: string[];
+  /** command the core runs before a worker may report done (user override wins) */
+  check?: string;
+  checkSource?: 'user' | 'detected';
+  layout: string[];
+  ports: string[];
+  envKeys: string[];
+  /** docker-compose services */
+  services: string[];
+  readme?: string;
+}
+
+export interface ProjectView extends Project {
+  repos: RepoProfile[];
+}
+
 /* ─────────────── ledger (personal finance) ─────────────── */
 
 export type LedgerType = 'expense' | 'income' | 'transfer';
@@ -1158,7 +1205,8 @@ export type ServerEvent =
         | 'evolution'
         | 'sync'
         | 'mcp'
-        | 'ledger';
+        | 'ledger'
+        | 'projects';
     }
   /** voice pipeline state (mic level 0..1 while listening) */
   | { type: 'voice.state'; phase: 'idle' | 'listening' | 'transcribing' | 'speaking'; level?: number }
@@ -1289,6 +1337,11 @@ export type ClientCommand =
  * PATCH  /api/mcp/servers/:id Partial<McpServerInput> -> McpServer  (reconnects when transport/command/env/url/headers change)
  * DELETE /api/mcp/servers/:id                -> { ok }      (also forgets its secrets)
  * POST   /api/mcp/servers/:id/reconnect      -> McpServer
+ * GET    /api/projects                       -> ProjectView[]
+ * POST   /api/projects {name?, root}         -> ProjectView
+ * DELETE /api/projects/:id                   -> { ok }
+ * POST   /api/projects/:id/rescan            -> ProjectView (re-detect every repo)
+ * PUT    /api/repos/check {path, check}      -> RepoProfile (check '' = back to detected)
  * GET    /api/ledger?from&to&type&category&account&currency&q&tag&sourceRef&limit -> LedgerEntry[] (newest first)
  * POST   /api/ledger  Partial<LedgerEntry>   -> LedgerEntry
  * PATCH  /api/ledger/:id Partial<LedgerEntry> -> LedgerEntry

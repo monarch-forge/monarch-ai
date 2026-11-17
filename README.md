@@ -13,6 +13,7 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **HUD dashboard.** Clock, weather, agenda, unread counts, system telemetry, an activity log and the agent's state, laid out on a dense, low-key grid (no neon).
 - **Chat.** Responses stream in. Tool calls show up as cards you can expand, risky tools pause for your approval, and you can choose the engine per session.
 - **Auto mode.** Click **Auto** in the top bar and Monarch works through requests on its own without asking in chat. Only sending, posting and deleting show an approval card, and you approve each tool once per session. You get a notification when it needs your approval or input, fails, or finishes a long job.
+- **Projects.** Add a folder of repos (backend, frontend, services). Monarch reads each repo's own files (package.json, Makefile, go.mod, CI workflows, compose, .env.example) to learn how to build, test and run it, and refreshes that profile whenever the repo's commit changes, so no AGENTS.md is needed. Workers get the profile automatically, and after they edit files Monarch runs the repo's check command and sends failures back (up to 2 fix rounds) before reporting done.
 - **Coding workshop.** Point the agent at a workspace. It uses Claude Code's own tools (Claude Agent SDK) or pi's coding tools: read, edit, bash, grep and so on.
 - **Mail.** Several Gmail accounts in one place, with read, search, draft and send. Sending always needs approval.
 - **Slack.** Read channels, DMs and threads, catch up on unread messages, search, post and reply in threads, react, edit, delete and schedule messages, mark conversations as read, and DM anyone by name, all as yourself with a user token.
@@ -73,8 +74,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.12.1/monarch-ai-bin-0.12.1-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.12.1-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.13.0/monarch-ai-bin-0.13.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.13.0-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -99,30 +100,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.12.1_amd64.deb
+sudo apt install ./Monarch_0.13.0_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.12.1-1.x86_64.rpm
+sudo dnf install ./Monarch-0.13.0-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.12.1_amd64.AppImage && ./Monarch_0.12.1_amd64.AppImage
+chmod +x Monarch_0.13.0_amd64.AppImage && ./Monarch_0.13.0_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.12.1_aarch64.dmg` (Apple Silicon) or `Monarch_0.12.1_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.13.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.13.0_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.12.1_x64-setup.exe`, or `Monarch_0.12.1_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.13.0_x64-setup.exe`, or `Monarch_0.13.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 

@@ -40,6 +40,7 @@ import RouterPage from './pages/router.tsx';
 import EvolvePage from './pages/evolve.tsx';
 import ConfigPage from './pages/config.tsx';
 import LedgerPage from './pages/ledger.tsx';
+import WelcomePage from './pages/welcome.tsx';
 import { ApprovalDock, focusApprovals } from './components/approvals.tsx';
 import { CommandPalette, paletteOpen } from './components/command-palette.tsx';
 import { NotificationDrawer, notificationsOpen } from './components/notifications.tsx';
@@ -69,12 +70,24 @@ export function App() {
     current = 'chat';
     location.replace('#/' + ['chat', ...params].map(encodeURIComponent).join('/'));
   }
+  useEffect(() => {
+    // first launch: show the guides once
+    try {
+      if (!localStorage.getItem('monarch.welcomed')) {
+        localStorage.setItem('monarch.welcomed', '1');
+        if (!location.hash || location.hash === '#/' || location.hash === '#/overview') location.replace('#/welcome');
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const hidden = current === 'welcome';
   const entry = NAV.find((n) => n.id === current) ?? NAV[0];
-  const Page = entry.page;
+  const Page = hidden ? WelcomePage : entry.page;
   return (
     <div class="h-full flex flex-col">
-      <TopBar active={entry.id} />
-      <main class="flex-1 min-h-0 relative animate-monarch-fade" key={entry.id}>
+      <TopBar active={hidden ? current : entry.id} />
+      <main class="flex-1 min-h-0 relative animate-monarch-fade" key={hidden ? current : entry.id}>
         <Page params={params} />
       </main>
       <OfflineBanner />

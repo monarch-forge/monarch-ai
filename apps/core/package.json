@@ -1,9 +1,10 @@
 {
   "name": "@monarch/core",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "start": "node dist/core.mjs",
     "build": "node scripts/build.mjs",

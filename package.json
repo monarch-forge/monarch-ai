@@ -1,10 +1,11 @@
 {
   "name": "monarch-ai",
   "private": true,
-  "version": "0.12.1",
+  "version": "0.13.0",
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
+    "test": "npm run test -w apps/core",
     "dev": "npm run dev --workspace @monarch/core & npm run dev --workspace @monarch/ui; wait",
     "dev:core": "npm run dev --workspace @monarch/core",
     "dev:ui": "npm run dev --workspace @monarch/ui",

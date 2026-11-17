@@ -6,6 +6,7 @@ import { memoryPromptContext } from '../integrations/memory/index.ts';
 import { skillsPromptContext } from '../extensions/index.ts';
 import { autonomyHigh } from './autonomy.ts';
 import { autoMode } from './approvals.ts';
+import { projectsBrief, workerContext } from '../services/projects.ts';
 import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs, smallModeForSession } from './toolset.ts';
 
 export interface PromptOptions {
@@ -145,6 +146,13 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
 
   const agents = opts.engine === 'claude-sdk' && opts.kind !== 'coding' ? await codingAgentsSection(opts.sessionId) : [];
   if (agents.length) lines.push('', ...agents);
+  if (opts.kind === 'coding') {
+    const repo = await withTimeout(workerContext(opts.cwd ?? s.coding.defaultWorkspace), 4000).catch(() => '');
+    if (repo) lines.push('', repo, '- When you finish, Monarch runs the check command above; if it fails you get the output and must fix it.');
+  } else {
+    const brief = projectsBrief();
+    if (brief) lines.push('', '## Code projects (repos are folders; use the repo path as cwd for agent_start)', brief);
+  }
   lines.push('', ...toolsSection(opts), '', ...evolutionSection(s.evolution?.enabled !== false, opts.engine));
 
   let skills = '';
@@ -234,6 +242,8 @@ async function buildCompactPrompt(opts: PromptOptions): Promise<string> {
     if (index) lines.push('', `More tools (load with ${search}):`, index);
   }
   if (claude) lines.push('Monarch tools are named mcp__monarch__<name>.');
+  const brief = projectsBrief();
+  if (brief) lines.push('', 'CODE PROJECTS (use a repo path as cwd for agent_start):', brief);
   const agents = claude ? await codingAgentsSection(opts.sessionId) : [];
   if (agents.length) lines.push('', ...agents);
   if (memory.trim()) lines.push('', 'ABOUT THE USER (memory):', memory.trim().slice(0, 2000));

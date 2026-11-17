@@ -8,6 +8,7 @@
  *  - extensions.ts     (Evo)    extensions, skills, evolution, tool catalog, extension-api
  *  - sync.ts                    encrypted sync of the data dir to a private git remote
  *  - mcp.ts                     MCP servers (Monarch as an MCP client)
+ *  - projects.ts                code projects + repo profiles
  *  - ledger.ts                  personal finance ledger + budgets
  *  - voice.ts                   cloud speech-to-text / text-to-speech, mic capture, playback
  */
@@ -21,6 +22,7 @@ import { register as voice } from './voice.ts';
 import { register as sync } from './sync.ts';
 import { register as mcp } from './mcp.ts';
 import { register as ledger } from './ledger.ts';
+import { register as projects } from './projects.ts';
 
 export function registerRoutes(app: Hono): void {
   system(app);
@@ -32,4 +34,5 @@ export function registerRoutes(app: Hono): void {
   sync(app);
   mcp(app);
   ledger(app);
+  projects(app);
 }

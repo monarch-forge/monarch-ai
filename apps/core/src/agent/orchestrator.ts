@@ -8,6 +8,8 @@ import type { AgentPhase, ChatItem, ClientCommand, EngineId, SessionKind, Usage 
 import { activity, bus, newId, notify, nowIso, truncate } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { recordUsage } from '../services/usage.ts';
+import { spawn } from 'node:child_process';
+import { getRepoProfile } from '../services/projects.ts';
 import { autoMode, needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances } from './approvals.ts';
 import {
   addUsage,
@@ -430,12 +432,13 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
 
   const text = turn.texts.length ? turn.texts[turn.texts.length - 1] : '';
   const moreQueued = !aborted && !!q?.length;
+  if (!moreQueued && !aborted && !error && rec.kind === 'coding' && [...turn.tools.values()].some((t) => EDIT_TOOLS.test(t.name))) {
+    checking.add(rec.id);
+    void runCheck(rec, text).finally(() => checking.delete(rec.id));
+    return { text, error };
+  }
   if (!moreQueued) {
-    const ws = idleWaiters.get(rec.id);
-    if (ws) {
-      idleWaiters.delete(rec.id);
-      for (const w of ws) w({ text, error });
-    }
+    resolveIdle(rec.id, { text, error });
     if (!rec.parentSessionId && rec.kind !== 'automation' && autoMode()) attentionNotify(rec, text, error, aborted, Date.now() - turn.startedAt, turn.tools.size);
     if (rec.parentSessionId) {
       const parent = getSession(rec.parentSessionId);
@@ -449,6 +452,81 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
     }
   }
   return { text, error };
+}
+
+/* ─────────────── check before done (coding workers) ─────────────── */
+
+const EDIT_TOOLS = /^(fs_write|fs_edit|Write|Edit|MultiEdit|NotebookEdit)$/;
+const MAX_CHECK_ROUNDS = 2;
+/** sessions whose post-turn check is running (count as busy for agent_wait) */
+const checking = new Set<string>();
+
+function resolveIdle(id: string, o: TurnOutcome): void {
+  const ws = idleWaiters.get(id);
+  if (!ws) return;
+  idleWaiters.delete(id);
+  for (const w of ws) w(o);
+}
+
+/**
+ * After a worker turn that edited files: run the repo's check command. Pass → report "done" (with the check
+ * result). Fail → feed the output back as a follow-up turn, up to MAX_CHECK_ROUNDS times, then report honestly.
+ */
+async function runCheck(rec: SessionRecord, text: string): Promise<void> {
+  const cwd = effectiveCwd(rec);
+  const prof = await getRepoProfile(cwd).catch(() => null);
+  const finish = (note?: string) => {
+    if (note) pushItem(rec, { kind: 'system', id: newId(), ts: nowIso(), text: note });
+    const out = { text: note ? `${text}\n\n[${note}]` : text };
+    resolveIdle(rec.id, out);
+    if (!rec.parentSessionId && autoMode()) attentionNotify(rec, out.text, undefined, false, 0, 0);
+    if (rec.parentSessionId) notify('Coding agent finished', `${clip(rec.title, 60)}${note ? ` — ${clip(note, 80)}` : ''}`, 'info', `#/workshop/${encodeURIComponent(rec.id)}`, { desktop: false });
+  };
+  if (!prof?.check) return finish();
+  pushItem(rec, { kind: 'system', id: newId(), ts: nowIso(), text: `Running check: ${prof.check}` });
+  const r = await runShell(prof.check, prof.path, 10 * 60_000);
+  if (r.code === 0) return finish(`Check passed: ${prof.check}`);
+  const rounds = rec.engineState.checkRounds ?? 0;
+  const tail = r.output.length > 4000 ? `…${r.output.slice(-4000)}` : r.output;
+  // exit 126/127 = command missing / not runnable: an environment problem, not something to loop on
+  if (r.code === 126 || r.code === 127 || r.timedOut || rounds >= MAX_CHECK_ROUNDS) {
+    const why = r.timedOut ? 'timed out after 10 min' : r.code >= 126 ? 'could not run (missing tool or setup?)' : `still failing after ${rounds} fix round${rounds === 1 ? '' : 's'}`;
+    return finish(`Check FAILED (${why}): ${prof.check}\n${tail.slice(-1500)}`);
+  }
+  rec.engineState.checkRounds = rounds + 1;
+  const msg = `[Monarch check] \`${prof.check}\` failed (exit ${r.code}) after your changes. Fix the cause, then finish. Output:\n\`\`\`\n${tail}\n\`\`\``;
+  appendUser(rec, msg);
+  void startTurn(rec, msg);
+}
+
+function runShell(cmd: string, cwd: string, timeoutMs: number): Promise<{ code: number; output: string; timedOut: boolean }> {
+  return new Promise((res) => {
+    const child = spawn('bash', ['-lc', cmd], { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    let out = '';
+    const add = (d: Buffer) => {
+      out += d.toString('utf8');
+      if (out.length > 200_000) out = out.slice(-100_000);
+    };
+    child.stdout.on('data', add);
+    child.stderr.on('data', add);
+    let timedOut = false;
+    const t = setTimeout(() => {
+      timedOut = true;
+      try {
+        process.kill(-child.pid!, 'SIGKILL');
+      } catch {
+        child.kill('SIGKILL');
+      }
+    }, timeoutMs);
+    child.on('error', (e) => {
+      clearTimeout(t);
+      res({ code: 127, output: String(e), timedOut: false });
+    });
+    child.on('close', (code) => {
+      clearTimeout(t);
+      res({ code: code ?? 1, output: out, timedOut });
+    });
+  });
 }
 
 /**
@@ -555,6 +633,7 @@ function chatSend(cmd: Extract<ClientCommand, { type: 'chat.send' }>): void {
     activity(rec.kind === 'coding' ? 'CODE' : 'AGT', `Queued follow-up · ${clip(text, 60)}`, 'info', rec.id);
     return;
   }
+  rec.engineState.checkRounds = 0;
   appendUser(rec, text);
   void startTurn(rec, text);
 }
@@ -678,7 +757,7 @@ export function flushAgentState(): void {
 }
 
 export function isSessionRunning(sessionId: string): boolean {
-  return active.has(sessionId);
+  return active.has(sessionId) || checking.has(sessionId);
 }
 
 /* ─────────────── delegation helpers (tools/delegate.ts) ─────────────── */
@@ -699,6 +778,7 @@ export function sendToSession(sessionId: string, text: string): 'started' | 'que
     activity(rec.kind === 'coding' ? 'CODE' : 'AGT', `Queued follow-up · ${clip(t, 60)}`, 'info', rec.id);
     return 'queued';
   }
+  rec.engineState.checkRounds = 0;
   appendUser(rec, t);
   void startTurn(rec, t);
   return 'started';
@@ -726,7 +806,7 @@ export function sessionPhase(sessionId: string): AgentPhase {
  * or `null` on timeout / abort of the waiting signal. Resolves immediately when already idle.
  */
 export function waitForSessionIdle(sessionId: string, timeoutMs: number, signal?: AbortSignal): Promise<TurnOutcome | null> {
-  if (!active.has(sessionId) && !queued.get(sessionId)?.length) return Promise.resolve({ text: '' });
+  if (!active.has(sessionId) && !checking.has(sessionId) && !queued.get(sessionId)?.length) return Promise.resolve({ text: '' });
   return new Promise((resolve) => {
     let set = idleWaiters.get(sessionId);
     if (!set) idleWaiters.set(sessionId, (set = new Set()));

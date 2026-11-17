@@ -28,6 +28,8 @@ export interface EngineState {
   piUsageFrom?: number;
   /** pi: the last "your coding agents" context note injected into a user turn (re-sent only on change) */
   codingAgentsNote?: string;
+  /** coding: automatic check-fix rounds since the last message from the user/manager */
+  checkRounds?: number;
 }
 
 export interface SessionRecord extends SessionDetail {
