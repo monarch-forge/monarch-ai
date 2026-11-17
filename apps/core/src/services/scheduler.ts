@@ -1,6 +1,7 @@
 /** Background scheduler: automations (croner + interval ticker) and task reminders. */
 import { startAutomations, stopAutomations, tickIntervalAutomations } from './automations.ts';
 import { checkReminders } from './tasks.ts';
+import { checkLedgerDue } from './ledger.ts';
 
 let ticker: NodeJS.Timeout | null = null;
 
@@ -9,6 +10,11 @@ function tick(): void {
     checkReminders();
   } catch (e) {
     console.error('[scheduler] reminders failed:', e);
+  }
+  try {
+    checkLedgerDue();
+  } catch (e) {
+    console.error('[scheduler] ledger due check failed:', e);
   }
   try {
     tickIntervalAutomations();

@@ -161,11 +161,11 @@ function toolSearchDef(entry: Entry, rec: SessionRecord): ToolDef {
       const all = [...entry.defs.values()].filter((d) => d.name !== TOOL_SEARCH);
       const isLoaded = (d: ToolDef) => loadsUpFront(d, defer, entry.small) || entry.activated.has(d.name);
       const { text, activate } = toolSearchReport(all, isLoaded, query, limit ?? 5);
-      // small tool families (e.g. ledger_*) load together, so the model sees every capability of that area
+      // small tool families (≤10, e.g. ledger_*) load together, so the model sees every capability of that area
       const extra: string[] = [];
       for (const g of new Set(activate.map((n) => entry.defs.get(n)?.group).filter(Boolean))) {
         const family = all.filter((d) => d.group === g);
-        if (family.length > 8) continue;
+        if (family.length > 10) continue;
         for (const d of family) if (!activate.includes(d.name) && !isLoaded(d)) extra.push(d.name);
       }
       activate.push(...extra);

@@ -3,8 +3,13 @@ import { z } from 'zod';
 import type { LedgerEntry } from '@monarch/shared';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import { parseWhen } from '../services/dates.ts';
+import type { LedgerAccountView } from '@monarch/shared';
 import {
   addLedgerEntry,
+  deleteAccount,
+  findAccount,
+  listAccounts,
+  upsertAccount,
   deleteLedgerEntry,
   findByRef,
   getLedgerEntry,
@@ -232,4 +237,76 @@ const ledgerBudget = defineTool({
   },
 });
 
-export const tools: ToolDef[] = [ledgerList, ledgerAdd, ledgerUpdate, ledgerDelete, ledgerSummaryTool, ledgerMetaTool, ledgerBudget];
+/* ─────────────── accounts ─────────────── */
+
+const d10 = (iso?: string) => iso?.slice(0, 10);
+const fmtAccount = (a: LedgerAccountView): string =>
+  [
+    `${a.archived ? '(archived) ' : ''}${a.name} [${a.type}]`,
+    `id=${a.id}`,
+    a.type === 'credit' ? `owed=${a.owed} ${a.currency}` : `balance=${a.balance} ${a.currency}`,
+    a.creditLimit ? `limit=${a.creditLimit} available=${a.available}` : null,
+    a.amountDue !== undefined ? `amountDue=${a.amountDue}` : null,
+    a.nextDue ? `nextDue=${d10(a.nextDue)}${a.amountDue && new Date(`${a.nextDue}T23:59:59`).getTime() < Date.now() ? ' (OVERDUE)' : ''}` : null,
+    a.lastStatement ? `lastStatement=${d10(a.lastStatement)} nextStatement=${d10(a.nextStatement)}` : null,
+    a.cycleSpend !== undefined ? `cycleSpend=${a.cycleSpend}` : null,
+    a.aliases.length ? `aliases=${a.aliases.join(',')}` : null,
+    `entries=${a.entryCount}`,
+    a.notes ? `notes=${JSON.stringify(a.notes.slice(0, 120))}` : null,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
+const ledgerAccounts = defineTool({
+  name: 'ledger_accounts',
+  group: 'ledger',
+  keywords: [...KW, 'credit card', 'balance', 'due date', 'statement', 'account'],
+  description:
+    'List money accounts (bank, cash, e-wallet, credit card, investment) with computed balances. Credit cards also show amount owed, available credit, last/next statement, the unpaid statement amount and the next due date. Entries belong to an account when their `account` (or transfer `toAccount`) equals its name or an alias.',
+  risk: 'safe',
+  schema: z.object({ includeArchived: z.boolean().optional() }),
+  summarize: () => 'Ledger accounts',
+  run: ({ includeArchived }) => {
+    const list = listAccounts(includeArchived ?? false);
+    return list.length ? list.map(fmtAccount).join('\n') : 'No accounts defined yet.';
+  },
+});
+
+const ledgerAccountSet = defineTool({
+  name: 'ledger_account_set',
+  group: 'ledger',
+  keywords: [...KW, 'credit card', 'account', 'limit', 'due date'],
+  description: 'Create a money account, or update one matched by id or name/alias. Only the fields given are changed.',
+  risk: 'sensitive',
+  tag: 'FIN',
+  schema: z.object({
+    id: z.string().optional(),
+    name: z.string().optional().describe('Account name; entries use it in their `account` field.'),
+    aliases: z.array(z.string()).optional().describe('Other names entries may use, e.g. card last digits "4411". Replaces the list.'),
+    type: z.enum(['bank', 'cash', 'credit', 'ewallet', 'investment', 'other']).optional(),
+    currency: z.string().optional(),
+    openingBalance: z.union([z.number(), z.string()]).optional().describe('Balance at openingDate. For credit cards: the amount owed then (positive).'),
+    openingDate: z.string().optional().describe(`Entries before this date are not counted. ${DATE}`),
+    creditLimit: z.union([z.number(), z.string()]).optional(),
+    statementDay: z.number().int().min(1).max(31).optional().describe('Day of month the card statement closes.'),
+    dueDay: z.number().int().min(1).max(31).optional().describe('Day of month the card payment is due.'),
+    archived: z.boolean().optional(),
+    notes: z.string().optional(),
+  }),
+  summarize: (i) => `${i.id || (i.name && findAccount(i.name)) ? 'Update' : 'Create'} account ${i.name ?? i.id}`,
+  run: (i) => fmtAccount(upsertAccount(i)),
+});
+
+const ledgerAccountDelete = defineTool({
+  name: 'ledger_account_delete',
+  group: 'ledger',
+  keywords: [...KW, 'account'],
+  description: 'Delete an account definition by id. Its entries are kept (they still carry the account name).',
+  risk: 'dangerous',
+  tag: 'FIN',
+  schema: z.object({ id: z.string() }),
+  summarize: (i) => `Delete account ${findAccount(i.id)?.name ?? i.id}`,
+  run: ({ id }) => `Deleted account ${deleteAccount(id).name}`,
+});
+
+export const tools: ToolDef[] = [ledgerList, ledgerAdd, ledgerUpdate, ledgerDelete, ledgerSummaryTool, ledgerMetaTool, ledgerBudget, ledgerAccounts, ledgerAccountSet, ledgerAccountDelete];

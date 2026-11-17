@@ -1,6 +1,6 @@
 /** Ledger: personal finance entries + monthly category budgets (local, data/ledger.json + data/ledger-budgets.json). */
-import type { LedgerBudget, LedgerEntry, LedgerMeta, LedgerSummary, LedgerType } from '@monarch/shared';
-import { changed, HttpError, newId, nowIso } from '../kernel.ts';
+import type { LedgerAccount, LedgerAccountType, LedgerAccountView, LedgerBudget, LedgerEntry, LedgerMeta, LedgerSeriesPoint, LedgerSummary, LedgerType } from '@monarch/shared';
+import { changed, HttpError, newId, notify, nowIso } from '../kernel.ts';
 import { serviceStore } from './persist.ts';
 import { parseWhen } from './dates.ts';
 
@@ -251,6 +251,7 @@ export function ledgerMeta(): LedgerMeta {
     for (const t of e.tags) tags.add(t);
   }
   for (const b of budgets.get()) cats.add(b.category);
+  for (const a of accounts.get()) if (!a.archived) accs.add(a.name);
   const sort = (s: Set<string>) => [...s].sort((a, b) => a.localeCompare(b));
   return { categories: sort(cats), accounts: sort(accs), currencies: sort(curs), tags: sort(tags), defaultCurrency: defaultCurrency() };
 }
@@ -274,4 +275,192 @@ export function setBudget(input: { category?: string; currency?: string; limit?:
   });
   changed('ledger');
   return budgets.get();
+}
+
+/* ─────────────── series (charts) ─────────────── */
+
+export function ledgerSeries(from: Date, to: Date, bucket: 'day' | 'month'): LedgerSeriesPoint[] {
+  const key = (d: Date) => (bucket === 'month' ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  const out = new Map<string, LedgerSeriesPoint>();
+  const currencies = new Set<string>();
+  for (const e of listLedger({ from, to })) currencies.add(e.currency);
+  // every bucket present (zeros included) so charts have a continuous axis
+  for (const c of currencies) {
+    for (let d = new Date(from); d < to; d = bucket === 'month' ? new Date(d.getFullYear(), d.getMonth() + 1, 1) : new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+      out.set(`${key(d)}|${c}`, { key: key(d), currency: c, income: 0, expense: 0 });
+    }
+  }
+  for (const e of listLedger({ from, to })) {
+    if (e.type === 'transfer') continue;
+    const p = out.get(`${key(new Date(timeOf(e.date)))}|${e.currency}`);
+    if (p) p[e.type] = r2(p[e.type] + e.amount);
+  }
+  return [...out.values()].sort((a, b) => a.key.localeCompare(b.key) || a.currency.localeCompare(b.currency));
+}
+
+/* ─────────────── accounts ─────────────── */
+
+const accounts = serviceStore<LedgerAccount[]>('ledger-accounts', []);
+const dueReminded = serviceStore<Record<string, string>>('ledger-due-reminded', {});
+const ACCOUNT_TYPES: LedgerAccountType[] = ['bank', 'cash', 'credit', 'ewallet', 'investment', 'other'];
+
+export interface AccountInput {
+  id?: string;
+  name?: string;
+  aliases?: string[];
+  type?: LedgerAccountType;
+  currency?: string;
+  openingBalance?: number | string;
+  openingDate?: string | null;
+  creditLimit?: number | string | null;
+  statementDay?: number | null;
+  dueDay?: number | null;
+  archived?: boolean;
+  notes?: string | null;
+}
+
+/** like parseAmount but keeps a leading minus (overdrawn opening balances) */
+const signedAmount = (v: number | string): number => (String(v).trim().startsWith('-') ? -1 : 1) * parseAmount(v);
+
+const namesOf = (a: LedgerAccount) => [a.name, ...a.aliases].map((n) => n.toLowerCase());
+const matches = (a: LedgerAccount, v?: string) => !!v && namesOf(a).includes(v.toLowerCase());
+
+export function findAccount(nameOrId: string): LedgerAccount | undefined {
+  return accounts.get().find((a) => a.id === nameOrId || matches(a, nameOrId));
+}
+
+/** local calendar date "YYYY-MM-DD" (not UTC) */
+const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** clamp a day-of-month into the given month */
+const dayIn = (y: number, m: number, day: number) => new Date(y, m, Math.min(day, new Date(y, m + 1, 0).getDate()));
+
+function signedFlow(a: LedgerAccount, e: LedgerEntry): number {
+  let f = 0;
+  if (matches(a, e.account)) f += e.type === 'income' ? e.amount : -e.amount;
+  if (e.type === 'transfer' && matches(a, e.toAccount)) f += e.amount;
+  return f;
+}
+
+export function accountView(a: LedgerAccount, now = new Date()): LedgerAccountView {
+  const since = a.openingDate ? timeOf(a.openingDate) : -Infinity;
+  const mine = store.get().filter((e) => timeOf(e.date) >= since && (matches(a, e.account) || matches(a, e.toAccount)));
+  const flowUntil = (t: number) => mine.filter((e) => timeOf(e.date) < t).reduce((s, e) => s + signedFlow(a, e), 0);
+  const flow = mine.reduce((s, e) => s + signedFlow(a, e), 0);
+  const v: LedgerAccountView = { ...a, balance: r2(a.openingBalance + flow), entryCount: mine.length };
+  if (a.type !== 'credit') return v;
+  const owed = r2(a.openingBalance - flow);
+  v.owed = owed;
+  v.balance = -owed;
+  if (a.creditLimit) v.available = r2(a.creditLimit - owed);
+  if (a.statementDay) {
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    // statement closes at the end of statementDay
+    let last = dayIn(y, m, a.statementDay);
+    last.setDate(last.getDate() + 1);
+    if (last.getTime() > now.getTime()) last = new Date(dayIn(y, m - 1, a.statementDay).getTime() + 86400e3);
+    const next = new Date(dayIn(last.getFullYear(), last.getMonth() + 1, a.statementDay).getTime() + 86400e3);
+    v.lastStatement = localDay(new Date(last.getTime() - 86400e3));
+    v.nextStatement = localDay(new Date(next.getTime() - 86400e3));
+    const owedAtStatement = a.openingBalance - flowUntil(last.getTime());
+    const after = mine.filter((e) => timeOf(e.date) >= last.getTime());
+    const paid = after.reduce((s, e) => s + Math.max(0, signedFlow(a, e)), 0);
+    v.amountDue = r2(Math.max(0, owedAtStatement - paid));
+    v.cycleSpend = r2(after.filter((e) => e.type === 'expense' && matches(a, e.account)).reduce((s, e) => s + e.amount, 0));
+    if (a.dueDay) {
+      const closeDay = new Date(last.getTime() - 86400e3);
+      let due = dayIn(closeDay.getFullYear(), closeDay.getMonth(), a.dueDay);
+      if (due.getTime() <= closeDay.getTime()) due = dayIn(closeDay.getFullYear(), closeDay.getMonth() + 1, a.dueDay);
+      v.nextDue = localDay(due);
+    }
+  }
+  return v;
+}
+
+export function listAccounts(includeArchived = true): LedgerAccountView[] {
+  const order: Record<LedgerAccountType, number> = { bank: 0, ewallet: 1, cash: 2, credit: 3, investment: 4, other: 5 };
+  return accounts
+    .get()
+    .filter((a) => includeArchived || !a.archived)
+    .map((a) => accountView(a))
+    .sort((x, y) => Number(!!x.archived) - Number(!!y.archived) || order[x.type] - order[y.type] || x.name.localeCompare(y.name));
+}
+
+const dayNum = (v: unknown, what: string): number | undefined => {
+  if (v === null || v === undefined || v === '') return undefined;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 31) throw new HttpError(400, `${what} must be a day of month 1–31`);
+  return n;
+};
+
+/** create, or update when id / name (or alias) matches an existing account */
+export function upsertAccount(input: AccountInput): LedgerAccountView {
+  const cur = input.id ? accounts.get().find((a) => a.id === input.id) : input.name ? findAccount(input.name) : undefined;
+  if (input.id && !cur) throw new HttpError(404, `Account ${input.id} not found`);
+  const name = opt(input.name) ?? cur?.name;
+  if (!name) throw new HttpError(400, 'name is required');
+  const type = input.type ?? cur?.type ?? 'bank';
+  if (!ACCOUNT_TYPES.includes(type)) throw new HttpError(400, `type must be one of ${ACCOUNT_TYPES.join(', ')}`);
+  const clash = accounts.get().find((a) => a.id !== cur?.id && matches(a, name));
+  if (clash) throw new HttpError(409, `another account already uses the name "${name}" (${clash.name})`);
+  const now = nowIso();
+  const a: LedgerAccount = {
+    id: cur?.id ?? newId(),
+    name,
+    aliases: input.aliases !== undefined ? cleanTags(input.aliases).filter((x) => x.toLowerCase() !== name.toLowerCase()) : (cur?.aliases ?? []),
+    type,
+    currency: (opt(input.currency) ?? cur?.currency ?? defaultCurrency()).toUpperCase(),
+    openingBalance: input.openingBalance !== undefined ? signedAmount(input.openingBalance) : (cur?.openingBalance ?? 0),
+    createdAt: cur?.createdAt ?? now,
+    updatedAt: now,
+  };
+  const od = input.openingDate === undefined ? cur?.openingDate : input.openingDate ? cleanDate(input.openingDate) : undefined;
+  if (od) a.openingDate = od;
+  const lim = input.creditLimit === undefined ? cur?.creditLimit : input.creditLimit === null || input.creditLimit === '' ? undefined : parseAmount(input.creditLimit);
+  const sd = input.statementDay === undefined ? cur?.statementDay : dayNum(input.statementDay, 'statementDay');
+  const dd = input.dueDay === undefined ? cur?.dueDay : dayNum(input.dueDay, 'dueDay');
+  if (type === 'credit') {
+    if (lim) a.creditLimit = lim;
+    if (sd) a.statementDay = sd;
+    if (dd) a.dueDay = dd;
+  }
+  const archived = input.archived ?? cur?.archived;
+  if (archived) a.archived = true;
+  const notes = input.notes === undefined ? cur?.notes : opt(input.notes);
+  if (notes) a.notes = notes;
+  accounts.update((list) => {
+    const i = list.findIndex((x) => x.id === a.id);
+    if (i >= 0) list[i] = a;
+    else list.push(a);
+  });
+  changed('ledger');
+  return accountView(a);
+}
+
+export function deleteAccount(id: string): LedgerAccount {
+  const a = accounts.get().find((x) => x.id === id);
+  if (!a) throw new HttpError(404, `Account ${id} not found`);
+  accounts.update((list) => {
+    const i = list.findIndex((x) => x.id === id);
+    if (i >= 0) list.splice(i, 1);
+  });
+  changed('ledger');
+  return a;
+}
+
+/** scheduler tick: notify once per card per due date when an unpaid statement is due within 3 days */
+export function checkLedgerDue(now = new Date()): void {
+  for (const v of listAccounts(false)) {
+    if (v.type !== 'credit' || !v.nextDue || !v.amountDue) continue;
+    const ms = new Date(`${v.nextDue}T23:59:59`).getTime() - now.getTime();
+    if (ms < 0 || ms > 3 * 86400e3) continue;
+    const key = v.nextDue;
+    if (dueReminded.get()[v.id] === key) continue;
+    dueReminded.update((m) => {
+      m[v.id] = key;
+    });
+    const day = new Date(`${v.nextDue}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    notify(`${v.name} payment due ${day}`, `Amount due: ${v.amountDue.toLocaleString()} ${v.currency}${v.owed !== v.amountDue ? ` (total owed ${v.owed?.toLocaleString()})` : ''}`, 'warn', '#/ledger');
+  }
 }

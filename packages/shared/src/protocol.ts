@@ -554,6 +554,58 @@ export interface LedgerEntry {
   updatedAt: ISODate;
 }
 
+export type LedgerAccountType = 'bank' | 'cash' | 'credit' | 'ewallet' | 'investment' | 'other';
+
+export interface LedgerAccount {
+  id: ID;
+  /** matched case-insensitively against LedgerEntry.account / toAccount */
+  name: string;
+  /** other names entries may use for this account, e.g. card last digits "4411", "Visa 4411" */
+  aliases: string[];
+  type: LedgerAccountType;
+  currency: string;
+  /** balance on openingDate; for credit cards: the amount owed (positive) */
+  openingBalance: number;
+  /** entries before this date are not counted (default: all) */
+  openingDate?: ISODate;
+  /** credit cards */
+  creditLimit?: number;
+  /** day of month the statement closes (1–31) */
+  statementDay?: number;
+  /** day of month payment is due (1–31) */
+  dueDay?: number;
+  archived?: boolean;
+  notes?: string;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface LedgerAccountView extends LedgerAccount {
+  /** bank/cash/…: current balance; credit: negative of owed */
+  balance: number;
+  /** credit: amount owed now */
+  owed?: number;
+  /** credit: creditLimit − owed */
+  available?: number;
+  /** credit: last statement close and the due date that follows (local dates "YYYY-MM-DD"); nextDue in the past + amountDue > 0 = overdue */
+  lastStatement?: ISODate;
+  nextStatement?: ISODate;
+  nextDue?: ISODate;
+  /** credit: statement balance still unpaid (owed at last statement − payments since) */
+  amountDue?: number;
+  /** credit: purchases since the last statement */
+  cycleSpend?: number;
+  entryCount: number;
+}
+
+export interface LedgerSeriesPoint {
+  /** bucket start (YYYY-MM-DD) */
+  key: string;
+  currency: string;
+  income: number;
+  expense: number;
+}
+
 export interface LedgerBudget {
   category: string;
   currency: string;
@@ -1243,6 +1295,10 @@ export type ClientCommand =
  * DELETE /api/ledger/:id                     -> { ok }
  * GET    /api/ledger/summary?from&to         -> LedgerSummary (default: this month)
  * GET    /api/ledger/meta                    -> LedgerMeta
+ * GET    /api/ledger/accounts                -> LedgerAccountView[]
+ * PUT    /api/ledger/accounts Partial<LedgerAccount> (id or name to update) -> LedgerAccountView
+ * DELETE /api/ledger/accounts/:id            -> { ok } (entries keep their account name)
+ * GET    /api/ledger/series?from&to&bucket=day|month -> LedgerSeriesPoint[]
  * GET    /api/ledger/budgets                 -> LedgerBudget[]
  * PUT    /api/ledger/budgets  LedgerBudget   -> LedgerBudget[] (upsert by category+currency; limit 0 removes)
  * POST   /api/mcp/servers/:id/auth           -> {url?: string, server: McpServer}  (OAuth sign-in: open url; null when already authorized)
