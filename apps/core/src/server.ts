@@ -195,7 +195,7 @@ export interface CoreServer {
 
 export function createServer(): CoreServer {
   const app = createApp();
-  const server = createAdaptorServer({ fetch: app.fetch }) as Server;
+  const server = createAdaptorServer({ fetch: app.fetch, overrideGlobalObjects: false }) as Server;
   const ws = attachWebSocket(server);
   return {
     server,
