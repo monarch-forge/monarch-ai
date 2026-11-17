@@ -12,10 +12,10 @@ import { Btn, Spinner } from '../ui.tsx';
 
 /* ─────────── ask Monarch ─────────── */
 
-/** hand a prompt to the agent in a fresh chat session and jump to Beru */
+/** hand a prompt to the agent in a fresh chat session and jump to Chat */
 export function askMonarch(text: string): void {
   socket.send({ type: 'chat.send', text });
-  navigate('beru');
+  navigate('chat');
 }
 
 /* ─────────── account colour markers (calm, never red — red means attention) ─────────── */

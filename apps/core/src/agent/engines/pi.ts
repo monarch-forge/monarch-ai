@@ -15,7 +15,7 @@ import type { Usage } from '@monarch/shared';
 import { defineTool, truncate, type ToolDef } from '../../kernel.ts';
 import { getSettings } from '../../settings.ts';
 import { emptyUsage, addUsage, autoCompactPercent, type SessionRecord } from '../sessions.ts';
-import { deferToolsEnabled, errorText, loadsUpFront, piToolDefs, runToolDef, smallModeFor, toolJsonSchema, toolSearchReport, toolSummary } from '../toolset.ts';
+import { deferToolsEnabled, errorText, shortDesc, loadsUpFront, piToolDefs, runToolDef, smallModeFor, toolJsonSchema, toolSearchReport, toolSummary } from '../toolset.ts';
 import { parseLooseObject, parseTextToolCalls, textToolResultsMessage, type TextToolCall } from '../text-tools.ts';
 import { codingAgentsBrief } from '../../tools/delegate.ts';
 import { piModels, resolvePiModel } from '../pi-models.ts';
@@ -110,7 +110,7 @@ function agentTool(entry: Entry, sessionId: string, def: ToolDef): AgentTool<any
   return {
     name: def.name,
     label: def.name,
-    description: def.description,
+    description: entry.small ? (shortDesc(def.description, 360) ?? '') : def.description,
     parameters: jsonSchema(def),
     executionMode: 'sequential',
     async execute(toolCallId, params, signal) {
@@ -171,7 +171,7 @@ function toolSearchDef(entry: Entry, rec: SessionRecord): ToolDef {
   });
 }
 
-function onEvent(entry: Entry, ev: AgentEvent): void {
+function onEvent(entry: Entry, ev: AgentEvent, rec?: SessionRecord): void {
   const turn = entry.turn;
   if (!turn) return;
   const emit = turn.ctx.emit;
@@ -256,6 +256,12 @@ function onEvent(entry: Entry, ev: AgentEvent): void {
       break;
     }
     case 'tool_execution_end': {
+      // small models call deferred tools by name without tool_search: load it now so the retry works
+      if (ev.isError && entry.defs.has(ev.toolName) && !entry.activated.has(ev.toolName) && /not found/i.test(resultText(ev.result))) {
+        entry.activated.add(ev.toolName);
+        entry.toolsDirty = true;
+        if (rec) stateOf(rec).activatedTools = [...entry.activated];
+      }
       emit({
         type: 'tool-end',
         callId: ev.toolCallId,
@@ -661,7 +667,7 @@ export const piEngine: Engine = {
         toolExecution: 'sequential',
         identity: { attribution: null, userAgent: 'short' },
       });
-      fresh.agent.subscribe((ev) => onEvent(fresh, ev));
+      fresh.agent.subscribe((ev) => onEvent(fresh, ev, rec));
       agents.set(rec.id, fresh);
       entry = fresh;
     } else {

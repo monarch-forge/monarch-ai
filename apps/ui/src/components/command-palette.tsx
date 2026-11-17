@@ -1,6 +1,6 @@
 /**
  * Command palette — Ctrl/Cmd+K (or "/" when not typing). Fuzzy-filters navigation targets and actions,
- * and offers "Ask Monarch: <query>" which starts a new chat and jumps to Beru.
+ * and offers "Ask Monarch: <query>" which starts a new chat and jumps to Chat.
  * OWNED BY UI-A.
  */
 import { signal } from '@preact/signals';
@@ -50,7 +50,7 @@ interface Item {
 
 const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid, keywords: 'home dashboard hud' },
-  { id: 'beru', label: 'Beru', icon: MessageSquare, keywords: 'beru comms chat sessions conversations' },
+  { id: 'chat', label: 'Chat', icon: MessageSquare, keywords: 'chat beru comms sessions conversations' },
   { id: 'workshop', label: 'Workshop', icon: Wrench, keywords: 'coding code terminal' },
   { id: 'mail', label: 'Mail', icon: Mail, keywords: 'gmail inbox email' },
   { id: 'slack', label: 'Slack', icon: Hash, keywords: 'channels messages' },
@@ -117,11 +117,11 @@ function askMonarch(q: string) {
   if (!text) return;
   if (conn.value !== 'open') toast('Core offline — question queued until the link is restored', 'warn');
   const { session } = sendNewChat(text);
-  navigate('beru');
+  navigate('chat');
   session.then(
     (id) => {
-      // only follow if the user is still waiting on Beru
-      if (/^#\/beru\/?$/.test(location.hash)) navigate(`beru/${encodeURIComponent(id)}`);
+      // only follow if the user is still waiting on Chat
+      if (/^#\/chat\/?$/.test(location.hash)) navigate(`chat/${encodeURIComponent(id)}`);
     },
     () => {
       /* comms page shows newest session anyway */
@@ -193,7 +193,7 @@ export function CommandPalette() {
         icon: MessageSquarePlus,
         run: () => {
           close();
-          navigate('beru/new');
+          navigate('chat/new');
         },
       },
       {

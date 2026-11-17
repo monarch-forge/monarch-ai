@@ -8,7 +8,7 @@ import type { AgentPhase, ChatItem, ClientCommand, EngineId, SessionKind, Usage 
 import { activity, bus, newId, notify, nowIso, truncate } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { recordUsage } from '../services/usage.ts';
-import { needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances } from './approvals.ts';
+import { autoMode, needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances } from './approvals.ts';
 import {
   addUsage,
   autoTitle,
@@ -436,6 +436,7 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
       idleWaiters.delete(rec.id);
       for (const w of ws) w({ text, error });
     }
+    if (!rec.parentSessionId && rec.kind !== 'automation' && autoMode()) attentionNotify(rec, text, error, aborted, Date.now() - turn.startedAt, turn.tools.size);
     if (rec.parentSessionId) {
       const parent = getSession(rec.parentSessionId);
       notify(
@@ -448,6 +449,21 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
     }
   }
   return { text, error };
+}
+
+/**
+ * Auto mode: tell the user only when they are needed — a question/blocker or a failure (desktop notification),
+ * or a long job finishing (in-app only). Short back-and-forth turns stay quiet.
+ */
+function attentionNotify(rec: SessionRecord, text: string, error: string | undefined, aborted: boolean, ms: number, tools: number): void {
+  if (aborted) return;
+  const href = rec.kind === 'coding' ? `#/workshop/${encodeURIComponent(rec.id)}` : `#/chat/${encodeURIComponent(rec.id)}`;
+  const last = text.trim();
+  if (error) return void notify('Agent failed', `${clip(rec.title, 60)} — ${clip(error, 140)}`, 'error', href);
+  const asks = /\?\s*(?:\*\*)?\s*$/.test(last.split('\n').filter(Boolean).pop() ?? '');
+  const long = ms >= 45_000 || tools >= 4;
+  if (asks && long) return void notify('Needs your input', `${clip(rec.title, 50)}: ${clip(last.split('\n').filter(Boolean).pop() ?? '', 160)}`, 'warn', href);
+  if (long) notify('Done', `${clip(rec.title, 50)} — ${clip(last.replace(/[#*`_>|-]+/g, ' ').replace(/\s+/g, ' '), 160)}`, 'success', href, { desktop: false });
 }
 
 /* ─────────────── commands ─────────────── */

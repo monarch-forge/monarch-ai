@@ -5,6 +5,7 @@ import { getSettings } from '../settings.ts';
 import { memoryPromptContext } from '../integrations/memory/index.ts';
 import { skillsPromptContext } from '../extensions/index.ts';
 import { autonomyHigh } from './autonomy.ts';
+import { autoMode } from './approvals.ts';
 import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs, smallModeForSession } from './toolset.ts';
 
 export interface PromptOptions {
@@ -57,7 +58,7 @@ function managerRole(compact: boolean): string[] {
     '- Never tell the user to go and do something in another tab (Workshop, Mail, Slack, Agenda) when one of your tools can do it. Offer the link as a convenience, not as the way to get it done.',
     '- Instructions about an existing agent ("tell it to…", "have it also…", "ask the agent…") are routed to that agent with agent_send (its sessionId is in your agents list); follow up with agent_wait and report back.',
     '- Review every worker result before relaying it: if it skipped or deferred parts, made suspiciously few tool calls, or did not verify (tests, commits) when the task asked for it, send it back with agent_send to finish, then agent_wait again. Never present a half-done result as done.',
-    '- Drafting, sending, posting and deleting still follow the confirmation rules below.',
+    autoMode() ? '' : '- Drafting, sending, posting and deleting still follow the confirmation rules below.',
   ];
 }
 
@@ -120,7 +121,9 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     '- Use your tools rather than guessing. If information may have changed (time, mail, calendar, weather, files), check it.',
     '- Bulk inbox cleanup (hundreds/thousands of emails): use mail_cleanup with a Gmail query — dry run first, then apply — instead of looping mail_search/mail_modify.',
     '- When you use web results, cite the sources (title or domain with link).',
-    '- Always confirm with the user before irreversible or externally visible actions — sending email, posting to Slack, deleting data, running destructive commands — unless they explicitly asked for exactly that action just now. Present a short draft/plan first.',
+    autoMode()
+      ? '- AUTO MODE is on: the user wants you to work without asking. Never ask for confirmation in chat and never stop to present a plan or draft for approval — act. Risky actions (send, post, delete) are gated by an approval card automatically: just call the tool. Ask a question only when you truly cannot proceed (missing information only the user has).'
+      : '- Always confirm with the user before irreversible or externally visible actions — sending email, posting to Slack, deleting data, running destructive commands — unless they explicitly asked for exactly that action just now. Present a short draft/plan first.',
     '- If a tool fails or is denied, say so plainly and offer an alternative; do not retry a denied action.',
     '',
     '## Memory',
@@ -202,7 +205,9 @@ async function buildCompactPrompt(opts: PromptOptions): Promise<string> {
     'Use the exact parameter names from the tool schema (e.g. task_add needs "title"). If a tool returns an error, read it, fix the arguments and call it again.',
     'Tools you already have can be called directly. Use tool_search only for tools you do not have yet.'.replace('tool_search', search),
     'Heavy work (code, full inbox triage, research, planning, long drafts): agent_start {task} (+ cwd for code). Follow-ups to an existing agent: agent_send {sessionId, message}. Results: agent_wait {sessionId}.',
-    'Ask before sending email, posting to Slack or deleting anything, unless the user just asked for exactly that.',
+    autoMode()
+      ? 'AUTO MODE: never ask for confirmation in chat — act. Send/post/delete tools show the user an approval card by themselves, so just call them. Ask only if you lack information only the user has.'
+      : 'Ask before sending email, posting to Slack or deleting anything, unless the user just asked for exactly that.',
     'Bulk inbox cleanup (hundreds/thousands of emails): use mail_cleanup with a Gmail query — dry run first, then apply — instead of looping mail_search/mail_modify.',
     ...(autonomyHigh() ? autonomyRules(true) : []),
     'Save lasting facts about the user with memory_write. Check memory_search before asking something you may know.',

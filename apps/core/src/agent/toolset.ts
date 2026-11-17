@@ -521,7 +521,33 @@ export async function runToolDef(def: ToolDef, rawInput: unknown, ctx: ToolConte
   if (!prep.ok) throw new Error(prep.error);
   if (def.tag) activity(def.tag, clip(toolSummary(def, prep.data), 120), 'info', ctx.sessionId);
   const result = await def.run(prep.data as Record<string, unknown>, ctx);
-  return toolResultText(result);
+  let text = toolResultText(result);
+  // small models drown in long results: keep the head and say how to get the rest
+  if (ctx.small && text.length > SMALL_RESULT_CHARS) {
+    text = `${text.slice(0, SMALL_RESULT_CHARS)}\n… [clipped ${text.length - SMALL_RESULT_CHARS} chars — narrow the query (filters, limit, a specific id) if you need more]`;
+  }
+  return text + repeatNote(ctx.sessionId, def.name, prep.data, text);
+}
+
+const SMALL_RESULT_CHARS = 6000;
+const recentCalls = new Map<string, { key: string; result: string; n: number; at: number }>();
+
+/** lite models loop on the same call; the 3rd identical call with an identical result gets a nudge to move on */
+function repeatNote(sessionId: string | undefined, name: string, args: unknown, result: string): string {
+  if (!sessionId) return '';
+  let key: string;
+  try {
+    key = `${name}:${JSON.stringify(args)}`;
+  } catch {
+    return '';
+  }
+  const prev = recentCalls.get(sessionId);
+  const now = Date.now();
+  const same = prev && prev.key === key && prev.result === result && now - prev.at < 10 * 60_000;
+  const n = same ? prev.n + 1 : 1;
+  recentCalls.set(sessionId, { key, result, n, at: now });
+  if (recentCalls.size > 500) recentCalls.delete(recentCalls.keys().next().value!);
+  return n >= 3 ? `\n\n[Monarch note: this is the same call with the same result ${n} times in a row. Stop repeating it — use this result, try a different approach, or report what you found.]` : '';
 }
 
 /* tool search report (shared by pi's tool_search) */
@@ -599,4 +625,23 @@ export function toolSearchReport(
 export function errorText(e: unknown): string {
   if (e instanceof Error) return e.message || e.name;
   return String(e);
+}
+
+/* ─────────────── compact tool specs for small models ─────────────── */
+
+/** first sentences of a description, up to `max` chars (never cuts mid-word) */
+export function shortDesc(text: string | undefined, max: number): string | undefined {
+  if (!text) return text;
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  // keep abbreviations (e.g., i.e., etc.) from ending a sentence
+  const sentences = (t.replace(/\b(e\.g|i\.e|etc|vs)\./gi, '$1\u0000').match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? []).map((x) => x.replace(/\u0000/g, '.'));
+  let out = '';
+  for (const sn of sentences) {
+    if ((out + sn).length > max) break;
+    out += sn;
+  }
+  if (out.trim().length >= max * 0.4) return out.trim();
+  const cut = t.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), max * 0.6))}…`;
 }

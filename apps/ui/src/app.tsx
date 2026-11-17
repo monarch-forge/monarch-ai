@@ -6,6 +6,7 @@
 import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
 import {
+  Zap,
   LayoutGrid,
   MessageSquare,
   Wrench,
@@ -46,7 +47,7 @@ window.addEventListener('monarch:focus-approvals', () => focusApprovals());
 
 const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ params: string[] }> }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid, page: OverviewPage },
-  { id: 'beru', label: 'Beru', icon: MessageSquare, page: CommsPage },
+  { id: 'chat', label: 'Chat', icon: MessageSquare, page: CommsPage },
   { id: 'workshop', label: 'Workshop', icon: Wrench, page: WorkshopPage },
   { id: 'mail', label: 'Mail', icon: Mail, page: MailPage },
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
@@ -60,10 +61,10 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
 
 export function App() {
   let [current, ...params] = route.value;
-  // legacy alias: "#/comms/..." (old notifications, stored links, tool output) -> canonical "#/beru/..."
-  if (current === 'comms') {
-    current = 'beru';
-    location.replace('#/' + ['beru', ...params].map(encodeURIComponent).join('/'));
+  // legacy aliases: "#/comms/..." and "#/beru/..." (old notifications, stored links, tool output) -> canonical "#/chat/..."
+  if (current === 'comms' || current === 'beru') {
+    current = 'chat';
+    location.replace('#/' + ['chat', ...params].map(encodeURIComponent).join('/'));
   }
   const entry = NAV.find((n) => n.id === current) ?? NAV[0];
   const Page = entry.page;
@@ -104,6 +105,7 @@ function TopBar(props: { active: string }) {
         })}
       </nav>
       <div class="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" data-tauri-drag-region>
+        <AutoSwitch />
         <EngineSwitch />
         <button
           type="button"
@@ -166,6 +168,37 @@ function OfflineBanner() {
 }
 
 /** top-right engine/model badge: a dropdown that sets the default engine + model for new sessions */
+/** Auto mode: the agent works hands-off and only pings you when it needs you (Config → Permissions has the details) */
+function AutoSwitch() {
+  const s = settings.value;
+  const [busy, setBusy] = useState(false);
+  if (!s) return null;
+  const on = s.permissions.mode === 'auto';
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      settings.value = await api.put<Settings>('/settings', { permissions: { mode: on ? 'ask' : 'auto' } });
+      toast(on ? 'Auto mode off: Monarch asks before sensitive actions' : 'Auto mode on: Monarch works on its own and notifies you when it needs you', 'success');
+    } catch (e: any) {
+      toast(`Could not switch: ${e?.message ?? e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => void toggle()}
+      title={on ? 'Auto mode on: hands-off, only send/post/delete need approval. Click to turn off.' : 'Turn on Auto mode: Monarch works on its own and notifies you only when it needs you.'}
+      class={`flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] transition-colors ${on ? 'text-fg bg-raised' : 'text-fg-3 hover:text-fg hover:bg-raised'}`}
+    >
+      <Zap size={13} strokeWidth={1.75} class={on ? 'text-red' : ''} />
+      <span class="hidden sm:inline">Auto</span>
+    </button>
+  );
+}
+
 function EngineSwitch() {
   const s = settings.value;
   const h = health.value;

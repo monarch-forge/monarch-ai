@@ -3,12 +3,14 @@
  *
  * Policy (settings.permissions.mode):
  *   ask        → ask for sensitive + dangerous
+ *   auto       → Auto mode: ask only for dangerous; an approval is remembered for the session; approvals notify
  *   auto-safe  → ask only for dangerous
  *   auto-all   → never ask
  * plus per-session "always allow <tool>" allowances granted via approval.respond {always:true}.
  */
 import type { ApprovalRequest, ToolRisk } from '@monarch/shared';
-import { bus, newId, nowIso } from '../kernel.ts';
+import { bus, newId, notify, nowIso } from '../kernel.ts';
+import { getSession } from './sessions.ts';
 import { getSettings } from '../settings.ts';
 
 interface Pending {
@@ -23,7 +25,7 @@ export function needsApproval(sessionId: string, toolName: string, risk: ToolRis
   if (allowances.get(sessionId)?.has(toolName)) return false;
   const mode = getSettings().permissions.mode;
   if (mode === 'auto-all') return false;
-  if (mode === 'auto-safe') return risk === 'dangerous';
+  if (mode === 'auto-safe' || mode === 'auto') return risk === 'dangerous';
   return risk !== 'safe';
 }
 
@@ -53,6 +55,11 @@ export function requestApproval(
     });
     signal?.addEventListener('abort', onAbort, { once: true });
     bus.broadcast({ type: 'approval.request', request: req });
+    if (autoMode()) {
+      const rec = getSession(sessionId);
+      const href = rec?.kind === 'coding' ? `#/workshop/${encodeURIComponent(sessionId)}` : `#/chat/${encodeURIComponent(sessionId)}`;
+      notify('Needs your approval', summary || toolName, 'warn', href);
+    }
   });
 }
 
@@ -69,7 +76,7 @@ function settle(id: string, allowed: boolean): boolean {
 export function respondApproval(id: string, allow: boolean, always?: boolean): boolean {
   const p = pending.get(id);
   if (!p) return false;
-  if (allow && always) {
+  if (allow && (always || autoMode())) {
     let set = allowances.get(p.req.sessionId);
     if (!set) allowances.set(p.req.sessionId, (set = new Set()));
     set.add(p.req.tool);
@@ -94,3 +101,5 @@ export function hasPendingFor(sessionId: string): boolean {
   for (const p of pending.values()) if (p.req.sessionId === sessionId) return true;
   return false;
 }
+
+export const autoMode = (): boolean => getSettings().permissions.mode === 'auto';

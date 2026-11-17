@@ -1,4 +1,4 @@
-/** Session metadata blocks shared by Beru / Workshop. */
+/** Session metadata blocks shared by Chat / Workshop. */
 import type { EngineId, SessionDetail, SessionSummary, Settings } from '@monarch/shared';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';

@@ -20,7 +20,12 @@ export type ID = string;
 
 export type EngineId = 'claude-sdk' | 'pi';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
-export type PermissionMode = 'ask' | 'auto-safe' | 'auto-all';
+/**
+ * ask = approve sensitive+dangerous; auto = Auto mode (agent works on its own, never asks in chat; only dangerous
+ * actions — send/post/delete — get one approval card, remembered for the session; you are notified when it needs you
+ * or finishes long work); auto-safe = approve dangerous only; auto-all = never ask
+ */
+export type PermissionMode = 'ask' | 'auto' | 'auto-safe' | 'auto-all';
 export type ToolRisk = 'safe' | 'sensitive' | 'dangerous';
 
 /** Agent orb / core visualization state. */

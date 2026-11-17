@@ -16,6 +16,13 @@ const MODES: { id: PermissionMode; title: string; body: string; asks: string; to
     tone: 'ok',
   },
   {
+    id: 'auto',
+    title: 'Auto',
+    body: 'Hands-off. Monarch works through your requests on its own and never stops to ask in chat. Only sending, posting and deleting show an approval card, and once you approve a tool it stays approved for that session. You get a notification when it needs you, fails, or finishes a long job.',
+    asks: 'asks: send / post / delete, once per session',
+    tone: 'warn',
+  },
+  {
     id: 'auto-safe',
     title: 'Auto (safe)',
     body: 'Routine sensitive actions (drafting, editing notes, file writes in workspaces) run without prompting. Only dangerous actions — destructive shell commands, sending on your behalf, deletions — need approval.',

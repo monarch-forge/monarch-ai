@@ -1,4 +1,4 @@
-/** Session list rows with inline rename + confirm-delete. Used by Beru and Workshop. */
+/** Session list rows with inline rename + confirm-delete. Used by Chat and Workshop. */
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { SessionSummary } from '@monarch/shared';
 import { Pencil, Trash2, X } from 'lucide-preact';

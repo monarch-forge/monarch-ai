@@ -333,7 +333,7 @@ function AutonomyPanel() {
       <div class="max-w-[260px]">
         <Field
           label="Level"
-          hint="High: Beru and its workers finish your commands end to end and are nudged on (up to 3 times) when they stop early, skip parts or ask about reversible steps. Sending, posting and deleting still ask."
+          hint="High: Chat and its workers finish your commands end to end and are nudged on (up to 3 times) when they stop early, skip parts or ask about reversible steps. Sending, posting and deleting still ask."
         >
           <select class={SELECT} value={draft.mode} onChange={(e) => set({ mode: (e.target as HTMLSelectElement).value as Autonomy })}>
             <option value="high">High (finish without asking)</option>

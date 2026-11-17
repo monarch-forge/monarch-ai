@@ -15,7 +15,7 @@ export const CONTINUE_NUDGE =
 
 /** settings.agent.autonomy (default 'high') */
 export function autonomyHigh(): boolean {
-  return getSettings().agent?.autonomy !== 'normal';
+  return getSettings().permissions.mode === 'auto' || getSettings().agent?.autonomy !== 'normal';
 }
 
 const DEFER = [/\bskipped\b[^\n]*\badd (it |them )?when\b/i, /^\s*(?:[-*]\s*)?(?:→\s*)?skipped:/im, /^\s*(?:\/\/\s*)?ponytail:/im];

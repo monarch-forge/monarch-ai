@@ -178,8 +178,8 @@ function ReplyPreview() {
         </span>
         <Tag tone={run.status === 'error' ? 'red' : working ? 'default' : 'plain'}>{statusLabel}</Tag>
         {run.sessionId && (
-          <a href={`#/beru/${run.sessionId}`} class="flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg whitespace-nowrap">
-            Open in Beru <ArrowRight size={11} strokeWidth={1.75} />
+          <a href={`#/chat/${run.sessionId}`} class="flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg whitespace-nowrap">
+            Open in Chat <ArrowRight size={11} strokeWidth={1.75} />
           </a>
         )}
         <button type="button" class="text-fg-3 hover:text-fg p-0.5" onClick={dismissConsoleRun} aria-label="Dismiss reply" title="Dismiss">

@@ -220,7 +220,7 @@ export function LogPanel(props: { class?: string }) {
                 <span class="font-mono text-[10.5px] text-fg-3 tabular-nums pt-px">{fmt.timeSec(e.ts)}</span>
                 <span class={`font-mono text-[10.5px] pt-px ${err ? 'text-red' : e.level === 'warn' ? 'text-warning' : e.tag === 'AGT' ? 'text-red/80' : 'text-fg-3'}`}>{e.tag}</span>
                 {e.sessionId ? (
-                  <a href={`#/beru/${e.sessionId}`} class={`text-[12px] leading-snug line-clamp-2 hover:text-fg ${err ? 'text-fg' : 'text-fg-2'}`} title={e.text}>
+                  <a href={`#/chat/${e.sessionId}`} class={`text-[12px] leading-snug line-clamp-2 hover:text-fg ${err ? 'text-fg' : 'text-fg-2'}`} title={e.text}>
                     {e.text}
                   </a>
                 ) : (
