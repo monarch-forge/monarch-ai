@@ -117,6 +117,10 @@ export interface McpServer {
   alwaysLoad: boolean;
   status: 'connected' | 'connecting' | 'error' | 'disabled';
   error?: string;
+  /** http/sse: the server asked for an OAuth sign-in (POST /api/mcp/servers/:id/auth) */
+  authRequired?: boolean;
+  /** http/sse: signed in with OAuth (tokens stored in the core) */
+  oauth?: boolean;
   serverInfo?: { name: string; version: string };
   instructions?: string;
   tools: McpToolInfo[];
@@ -1169,6 +1173,9 @@ export type ClientCommand =
  * PATCH  /api/mcp/servers/:id Partial<McpServerInput> -> McpServer  (reconnects when transport/command/env/url/headers change)
  * DELETE /api/mcp/servers/:id                -> { ok }      (also forgets its secrets)
  * POST   /api/mcp/servers/:id/reconnect      -> McpServer
+ * POST   /api/mcp/servers/:id/auth           -> {url?: string, server: McpServer}  (OAuth sign-in: open url; null when already authorized)
+ * DELETE /api/mcp/servers/:id/auth           -> McpServer   (sign out: forget OAuth tokens)
+ * GET    /mcp/oauth/callback?code&state      -> HTML (OAuth redirect target; reconnects the server)
  * POST   /api/mcp/servers/:id/tools/:tool/test {args} -> { ok: boolean; output: string; durationMs: number }
  * POST   /api/mcp/import {json}              -> McpServer[] (paste a Claude Desktop / Claude Code / Cursor style {"mcpServers": {...}} block)
  * GET    /api/sync/providers                 -> SyncProviders   (detected git/gh/glab + logged-in accounts)

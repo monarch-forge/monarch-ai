@@ -2,6 +2,7 @@
 import type { McpServer, McpServerInput } from '@monarch/shared';
 import { HttpError, activity, changed } from '../kernel.ts';
 import { callMcpTool, restartServer, startMcp, stopMcp, stopServer } from './manager.ts';
+import { finishOauth, forgetOauth, startOauth } from './oauth.ts';
 import { createConfig, deleteConfig, getConfig, parseImport, updateConfig } from './store.ts';
 import { publicServer, publicServers } from './tools.ts';
 
@@ -31,6 +32,7 @@ export async function addMcpServer(input: McpServerInput, opts: { renameOnCollis
 
 export async function patchMcpServer(id: string, patch: Partial<McpServerInput>): Promise<McpServer> {
   const before = getConfig(id);
+  if (patch.url !== undefined && before?.url && patch.url !== before.url) forgetOauth(id);
   const { cfg, reconnect } = updateConfig(id, patch);
   if (reconnect || before?.enabled !== cfg.enabled) await settle(restartServer(id));
   else changed('mcp');
@@ -40,6 +42,7 @@ export async function patchMcpServer(id: string, patch: Partial<McpServerInput>)
 export async function removeMcpServer(id: string): Promise<{ ok: true }> {
   const cfg = getConfig(id);
   deleteConfig(id);
+  forgetOauth(id);
   await stopServer(id, true);
   activity('SYS', `MCP server removed: ${cfg?.name ?? id}`);
   return { ok: true };
@@ -70,4 +73,35 @@ export async function importMcpServers(json: unknown): Promise<McpServer[]> {
   activity('SYS', `MCP: imported ${ids.length} server${ids.length === 1 ? '' : 's'}`);
   await settle(Promise.all(ids.map((id) => restartServer(id))));
   return ids.map(view);
+}
+
+/** OAuth sign-in: returns the authorization URL to open (null = already authorized, server reconnected) */
+export async function startMcpAuth(id: string): Promise<{ url: string | null; server: McpServer }> {
+  const cfg = getConfig(id);
+  if (!cfg) throw new HttpError(404, `no MCP server "${id}"`);
+  if (cfg.transport === 'stdio' || !cfg.url) throw new HttpError(400, 'OAuth is only for http/sse servers');
+  let url: string | null;
+  try {
+    url = await startOauth(id, cfg.url);
+  } catch (e) {
+    throw new HttpError(502, `OAuth sign-in could not start: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (!url) await settle(restartServer(id));
+  return { url, server: view(id) };
+}
+
+export async function signOutMcp(id: string): Promise<McpServer> {
+  if (!getConfig(id)) throw new HttpError(404, `no MCP server "${id}"`);
+  forgetOauth(id);
+  activity('SYS', `MCP ${getConfig(id)!.name}: signed out`);
+  await settle(restartServer(id));
+  return view(id);
+}
+
+/** OAuth redirect target: exchange the code, then reconnect */
+export async function completeMcpAuth(state: string, code: string): Promise<McpServer> {
+  const id = await finishOauth(state, code, (sid) => getConfig(sid)?.url);
+  activity('SYS', `MCP ${getConfig(id)?.name ?? id}: signed in`);
+  await settle(restartServer(id));
+  return view(id);
 }

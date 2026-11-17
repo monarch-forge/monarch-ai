@@ -3,6 +3,7 @@
  * Name: mcp_<serverId>_<tool>, sanitized to [a-z0-9_], ≤ 64 chars, deduped (core/extension tool names win).
  * Risk: toolRisks[tool] ?? (annotations.readOnlyHint && the user never set a server risk ? 'safe' : server risk).
  */
+import { hasOauthTokens } from './oauth.ts';
 import type { McpServer, McpToolInfo, ToolRisk } from '@monarch/shared';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { type ToolDef } from '../kernel.ts';
@@ -167,6 +168,8 @@ export function publicServer(cfg: McpServerConfig): McpServer {
     alwaysLoad: cfg.alwaysLoad,
     status: !cfg.enabled ? 'disabled' : (c?.status === 'disabled' ? 'connecting' : c?.status) ?? 'connecting',
     ...(c?.error ? { error: c.error } : {}),
+    ...(c?.authRequired ? { authRequired: true } : {}),
+    ...(cfg.transport !== 'stdio' && hasOauthTokens(cfg.id) ? { oauth: true } : {}),
     ...(c?.serverInfo ? { serverInfo: c.serverInfo } : {}),
     ...(c?.instructions ? { instructions: c.instructions } : {}),
     tools,

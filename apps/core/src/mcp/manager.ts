@@ -8,10 +8,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport, SseError } from '@modelcontextprotocol/sdk/client/sse.js';
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { ToolListChangedNotificationSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { activity, changed } from '../kernel.ts';
 import { CORE_VERSION } from '../services/meta.ts';
+import { oauthProvider, pendingAuthUrl } from './oauth.ts';
 import { getConfig, getSecrets, listConfigs, type McpServerConfig } from './store.ts';
 
 export type McpStatus = 'connected' | 'connecting' | 'error' | 'disabled';
@@ -29,6 +31,8 @@ export interface McpConn {
   connectedAt?: string;
   /** set when an 'http' server only answered over legacy SSE */
   usedSse?: boolean;
+  /** the server wants an OAuth sign-in (no retries until the user signs in) */
+  authRequired?: boolean;
   attempt: number;
   retryTimer?: NodeJS.Timeout;
   /** bumps on every (re)connect: callbacks from stale clients are ignored */
@@ -93,14 +97,24 @@ function buildTransport(cfg: McpServerConfig, c: McpConn, kind: 'stdio' | 'http'
   }
   const url = new URL(cfg.url!);
   const requestInit: RequestInit = { headers: { ...sec.headers } };
-  if (kind === 'http') return new StreamableHTTPClientTransport(url, { requestInit });
+  // OAuth unless the user supplied their own Authorization header (API key / bearer)
+  const authProvider = Object.keys(sec.headers).some((k) => k.toLowerCase() === 'authorization') ? undefined : oauthProvider(cfg.id);
+  if (kind === 'http') return new StreamableHTTPClientTransport(url, { requestInit, authProvider });
   // SSE: the initial GET uses eventSourceInit; attach headers there too
   return new SSEClientTransport(url, {
     requestInit,
+    authProvider,
     eventSourceInit: {
       fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), ...sec.headers } }),
     },
   });
+}
+
+function isUnauthorized(e: unknown): boolean {
+  if (e instanceof UnauthorizedError) return true;
+  if (e instanceof StreamableHTTPError && e.code === 401) return true;
+  if (e instanceof SseError && e.code === 401) return true;
+  return /\b401\b|unauthori[sz]ed/i.test(errMsg(e));
 }
 
 function isHttpNotSupported(e: unknown): boolean {
@@ -141,7 +155,7 @@ async function openClient(cfg: McpServerConfig, c: McpConn, epoch: number): Prom
   try {
     return await attemptWith('http');
   } catch (e) {
-    if (!isHttpNotSupported(e)) throw e;
+    if (isUnauthorized(e) || !isHttpNotSupported(e)) throw e;
     pushLog(c, `[monarch] Streamable HTTP failed (${errMsg(e)}) — trying legacy SSE`);
     const client = await attemptWith('sse');
     c.usedSse = true;
@@ -180,12 +194,24 @@ async function connect(id: string): Promise<void> {
   c.status = 'connecting';
   c.error = undefined;
   c.usedSse = false;
+  c.authRequired = false;
   bump();
   let client: Client;
   try {
     client = await openClient(cfg, c, epoch);
   } catch (e) {
     if (c.epoch !== epoch) return;
+    if (cfg.transport !== 'stdio' && isUnauthorized(e)) {
+      c.client = undefined;
+      c.status = 'error';
+      c.authRequired = true;
+      c.tools = [];
+      c.error = 'Sign-in required — this server uses OAuth';
+      pushLog(c, `[monarch] ${errMsg(e)}${pendingAuthUrl(id) ? ' — waiting for sign-in' : ''}`);
+      activity('SYS', `MCP ${cfg.name}: sign-in required`, 'warn');
+      bump();
+      return;
+    }
     onFailure(c, epoch, `connect failed: ${errMsg(e)}`);
     return;
   }

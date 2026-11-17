@@ -2,8 +2,8 @@
 import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import type { McpServer, McpServerInput, McpToolInfo, McpTransport, ToolRisk } from '@monarch/shared';
-import { ChevronRight, Plus, FileJson, RefreshCw, Pencil, Trash2, Play, Plug, X } from 'lucide-preact';
-import { api } from '../../lib/api.ts';
+import { ChevronRight, Plus, FileJson, RefreshCw, Pencil, Trash2, Play, Plug, X, KeyRound, LogOut } from 'lucide-preact';
+import { api, openExternal } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
 import { Panel, Tag, Spinner, Empty, Btn } from '../ui.tsx';
 import { Modal, useConfirm } from '../mail/kit.tsx';
@@ -182,6 +182,32 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
       setBusy(null);
     }
   };
+  const signIn = async () => {
+    setBusy('auth');
+    try {
+      const r = await api.post<{ url: string | null; server: McpServer }>(`/mcp/servers/${enc(s.id)}/auth`, {});
+      props.onReplace(r.server);
+      if (r.url) {
+        void openExternal(r.url);
+        toast(`Finish signing in to ${s.name} in your browser`, 'info');
+      } else toast(`${s.name}: already authorized`, 'success');
+    } catch (e) {
+      toast(`Sign-in failed: ${errMsg(e)}`, 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+  const signOut = async () => {
+    if (!(await confirm({ title: `Sign out of ${s.name}?`, body: 'The stored OAuth tokens are forgotten. You can sign in again any time.', confirmLabel: 'Sign out', danger: true }))) return;
+    setBusy('auth');
+    try {
+      props.onReplace(await api.del<McpServer>(`/mcp/servers/${enc(s.id)}/auth`));
+    } catch (e) {
+      toast(`Sign-out failed: ${errMsg(e)}`, 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
   const remove = async () => {
     if (!(await confirm({ title: `Remove ${s.name}?`, body: 'The server is disconnected and its stored env values and headers are forgotten.', confirmLabel: 'Remove', danger: true }))) return;
     try {
@@ -216,8 +242,9 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[13px] text-fg">{s.name}</span>
-            <Tag tone={STATUS_TONE[s.status]}>{s.status}</Tag>
+            <Tag tone={s.authRequired ? 'warn' : STATUS_TONE[s.status]}>{s.authRequired ? 'sign-in needed' : s.status}</Tag>
             <Tag>{s.transport}</Tag>
+            {s.oauth && !s.authRequired && <Tag>oauth</Tag>}
           </div>
           <div class="font-mono text-[11px] text-fg-3 truncate mt-0.5" title={target(s)}>
             {target(s) || '—'}
@@ -232,6 +259,18 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             <span class="text-fg-2">{s.calls}</span> calls
           </span>
         </div>
+        {s.authRequired && s.enabled && (
+          <button
+            class={`${BTN} btn-primary shrink-0`}
+            disabled={busy === 'auth'}
+            onClick={(e) => {
+              e.stopPropagation();
+              void signIn();
+            }}
+          >
+            {busy === 'auth' ? <span class="loading loading-spinner loading-xs" /> : <KeyRound size={10} />} Sign in
+          </button>
+        )}
         <input
           type="checkbox"
           class={TOGGLE}
@@ -376,6 +415,15 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             <button class={BTN_OUT} disabled={!s.enabled || busy === 'reconnect'} onClick={() => void reconnect()}>
               {busy === 'reconnect' ? <span class="loading loading-spinner loading-xs" /> : <RefreshCw size={10} />} Reconnect
             </button>
+            {s.transport !== 'stdio' && (s.oauth ? (
+              <button class={BTN_OUT} disabled={busy === 'auth'} onClick={() => void signOut()}>
+                <LogOut size={10} /> Sign out
+              </button>
+            ) : (
+              <button class={BTN_OUT} disabled={!s.enabled || busy === 'auth'} onClick={() => void signIn()}>
+                {busy === 'auth' ? <span class="loading loading-spinner loading-xs" /> : <KeyRound size={10} />} Sign in
+              </button>
+            ))}
             <button class={BTN_OUT} onClick={props.onEdit}>
               <Pencil size={10} /> Edit
             </button>
