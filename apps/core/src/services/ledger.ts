@@ -398,17 +398,21 @@ const dayNum = (v: unknown, what: string): number | undefined => {
 export function upsertAccount(input: AccountInput): LedgerAccountView {
   const cur = input.id ? accounts.get().find((a) => a.id === input.id) : input.name ? findAccount(input.name) : undefined;
   if (input.id && !cur) throw new HttpError(404, `Account ${input.id} not found`);
-  const name = opt(input.name) ?? cur?.name;
+  // matched by name/alias (no id): it identifies the account, it does not rename it
+  const name = (input.id ? opt(input.name) : undefined) ?? cur?.name ?? opt(input.name);
   if (!name) throw new HttpError(400, 'name is required');
   const type = input.type ?? cur?.type ?? 'bank';
   if (!ACCOUNT_TYPES.includes(type)) throw new HttpError(400, `type must be one of ${ACCOUNT_TYPES.join(', ')}`);
-  const clash = accounts.get().find((a) => a.id !== cur?.id && matches(a, name));
-  if (clash) throw new HttpError(409, `another account already uses the name "${name}" (${clash.name})`);
+  const aliases = input.aliases !== undefined ? cleanTags(input.aliases).filter((x) => x.toLowerCase() !== name.toLowerCase()) : (cur?.aliases ?? []);
+  for (const n of [name, ...aliases]) {
+    const clash = accounts.get().find((a) => a.id !== cur?.id && matches(a, n));
+    if (clash) throw new HttpError(409, `"${n}" is already used by account ${clash.name}`);
+  }
   const now = nowIso();
   const a: LedgerAccount = {
     id: cur?.id ?? newId(),
     name,
-    aliases: input.aliases !== undefined ? cleanTags(input.aliases).filter((x) => x.toLowerCase() !== name.toLowerCase()) : (cur?.aliases ?? []),
+    aliases,
     type,
     currency: (opt(input.currency) ?? cur?.currency ?? defaultCurrency()).toUpperCase(),
     openingBalance: input.openingBalance !== undefined ? signedAmount(input.openingBalance) : (cur?.openingBalance ?? 0),
@@ -450,7 +454,12 @@ export function deleteAccount(id: string): LedgerAccount {
 }
 
 /** scheduler tick: notify once per card per due date when an unpaid statement is due within 3 days */
+let lastDueHour = -1;
 export function checkLedgerDue(now = new Date()): void {
+  // due dates are day-granular: once an hour is plenty
+  const hour = Math.floor(now.getTime() / 3_600_000);
+  if (hour === lastDueHour) return;
+  lastDueHour = hour;
   for (const v of listAccounts(false)) {
     if (v.type !== 'credit' || !v.nextDue || !v.amountDue) continue;
     const ms = new Date(`${v.nextDue}T23:59:59`).getTime() - now.getTime();

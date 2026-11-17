@@ -72,10 +72,6 @@ const agents = new Map<string, Entry>();
 export const piTestHooks: { model?: Model<Api>; streamFn?: StreamFn } = {};
 
 /** JSON schema for a ToolDef's zod schema, as plain JSON (pi validates plain JSON Schema) */
-function jsonSchema(def: ToolDef): Record<string, unknown> {
-  return toolJsonSchema(def);
-}
-
 function resultText(result: any): string {
   const content = result?.content;
   if (Array.isArray(content)) {
@@ -111,7 +107,7 @@ function agentTool(entry: Entry, sessionId: string, def: ToolDef): AgentTool<any
     name: def.name,
     label: def.name,
     description: entry.small ? (shortDesc(def.description, 360) ?? '') : def.description,
-    parameters: jsonSchema(def),
+    parameters: toolJsonSchema(def),
     executionMode: 'sequential',
     async execute(toolCallId, params, signal) {
       const turn = entry.turn;

@@ -526,7 +526,8 @@ export async function runToolDef(def: ToolDef, rawInput: unknown, ctx: ToolConte
   if (ctx.small && text.length > SMALL_RESULT_CHARS) {
     text = `${text.slice(0, SMALL_RESULT_CHARS)}\n… [clipped ${text.length - SMALL_RESULT_CHARS} chars — narrow the query (filters, limit, a specific id) if you need more]`;
   }
-  return text + repeatNote(ctx.sessionId, def.name, prep.data, text);
+  // polling tools (worker status) legitimately repeat while work runs
+  return def.group === 'worker-agents' ? text : text + repeatNote(ctx.sessionId, def.name, prep.data, text);
 }
 
 const SMALL_RESULT_CHARS = 6000;
