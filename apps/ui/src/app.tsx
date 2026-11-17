@@ -7,6 +7,7 @@ import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
 import {
   Zap,
+  Wallet,
   LayoutGrid,
   MessageSquare,
   Wrench,
@@ -38,6 +39,7 @@ import SystemsPage from './pages/systems.tsx';
 import RouterPage from './pages/router.tsx';
 import EvolvePage from './pages/evolve.tsx';
 import ConfigPage from './pages/config.tsx';
+import LedgerPage from './pages/ledger.tsx';
 import { ApprovalDock, focusApprovals } from './components/approvals.tsx';
 import { CommandPalette, paletteOpen } from './components/command-palette.tsx';
 import { NotificationDrawer, notificationsOpen } from './components/notifications.tsx';
@@ -52,6 +54,7 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
   { id: 'mail', label: 'Mail', icon: Mail, page: MailPage },
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
+  { id: 'ledger', label: 'Ledger', icon: Wallet, page: LedgerPage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },
   { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
   { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },

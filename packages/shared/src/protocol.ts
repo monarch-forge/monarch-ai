@@ -524,6 +524,64 @@ export interface Task {
   completedAt?: ISODate | null;
 }
 
+/* ─────────────── ledger (personal finance) ─────────────── */
+
+export type LedgerType = 'expense' | 'income' | 'transfer';
+
+export interface LedgerEntry {
+  id: ID;
+  /** when the transaction happened (ISO date or datetime) */
+  date: ISODate;
+  type: LedgerType;
+  /** always positive; `type` gives the direction */
+  amount: number;
+  /** ISO 4217 code, e.g. "IDR", "USD" */
+  currency: string;
+  description: string;
+  merchant?: string;
+  category?: string;
+  /** money account / card, e.g. "BCA debit", "Visa 4411" */
+  account?: string;
+  /** transfer destination account */
+  toAccount?: string;
+  tags: string[];
+  notes?: string;
+  /** who recorded it */
+  source: 'manual' | 'agent';
+  /** external reference for de-duplication, e.g. "mail:<accountId>:<messageId>" or a bank reference number */
+  sourceRef?: string;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface LedgerBudget {
+  category: string;
+  currency: string;
+  /** monthly limit */
+  limit: number;
+}
+
+export interface LedgerSummary {
+  from: ISODate;
+  to: ISODate;
+  count: number;
+  /** per currency */
+  totals: { currency: string; income: number; expense: number; transfer: number; net: number }[];
+  /** expense + income by category, per currency */
+  byCategory: { category: string; currency: string; expense: number; income: number; count: number }[];
+  byAccount: { account: string; currency: string; expense: number; income: number; count: number }[];
+  /** budgets with spend in the summary window */
+  budgets: (LedgerBudget & { spent: number })[];
+}
+
+export interface LedgerMeta {
+  categories: string[];
+  accounts: string[];
+  currencies: string[];
+  tags: string[];
+  defaultCurrency: string;
+}
+
 export interface CalendarEvent {
   id: ID; // for google events: `${accountId}:${eventId}`
   source: 'local' | 'google';
@@ -761,7 +819,7 @@ export interface Weather {
   fetchedAt: ISODate;
 }
 
-export type LogTag = 'SYS' | 'AGT' | 'CAL' | 'TSK' | 'MEM' | 'MAIL' | 'SLK' | 'NET' | 'CODE' | 'AUTO' | 'EVO' | 'EXT' | 'ERR';
+export type LogTag = 'SYS' | 'AGT' | 'CAL' | 'TSK' | 'FIN' | 'MEM' | 'MAIL' | 'SLK' | 'NET' | 'CODE' | 'AUTO' | 'EVO' | 'EXT' | 'ERR';
 
 export interface ActivityEntry {
   id: ID;
@@ -1047,7 +1105,8 @@ export type ServerEvent =
         | 'skills'
         | 'evolution'
         | 'sync'
-        | 'mcp';
+        | 'mcp'
+        | 'ledger';
     }
   /** voice pipeline state (mic level 0..1 while listening) */
   | { type: 'voice.state'; phase: 'idle' | 'listening' | 'transcribing' | 'speaking'; level?: number }
@@ -1178,6 +1237,14 @@ export type ClientCommand =
  * PATCH  /api/mcp/servers/:id Partial<McpServerInput> -> McpServer  (reconnects when transport/command/env/url/headers change)
  * DELETE /api/mcp/servers/:id                -> { ok }      (also forgets its secrets)
  * POST   /api/mcp/servers/:id/reconnect      -> McpServer
+ * GET    /api/ledger?from&to&type&category&account&currency&q&tag&sourceRef&limit -> LedgerEntry[] (newest first)
+ * POST   /api/ledger  Partial<LedgerEntry>   -> LedgerEntry
+ * PATCH  /api/ledger/:id Partial<LedgerEntry> -> LedgerEntry
+ * DELETE /api/ledger/:id                     -> { ok }
+ * GET    /api/ledger/summary?from&to         -> LedgerSummary (default: this month)
+ * GET    /api/ledger/meta                    -> LedgerMeta
+ * GET    /api/ledger/budgets                 -> LedgerBudget[]
+ * PUT    /api/ledger/budgets  LedgerBudget   -> LedgerBudget[] (upsert by category+currency; limit 0 removes)
  * POST   /api/mcp/servers/:id/auth           -> {url?: string, server: McpServer}  (OAuth sign-in: open url; null when already authorized)
  * DELETE /api/mcp/servers/:id/auth           -> McpServer   (sign out: forget OAuth tokens)
  * GET    /mcp/oauth/callback?code&state      -> HTML (OAuth redirect target; reconnects the server)

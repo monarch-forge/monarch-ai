@@ -6,7 +6,7 @@
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { LucideIcon } from 'lucide-preact';
-import {
+import { Wallet,
   Activity,
   Bell,
   CalendarDays,
@@ -55,6 +55,7 @@ const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[]
   { id: 'mail', label: 'Mail', icon: Mail, keywords: 'gmail inbox email' },
   { id: 'slack', label: 'Slack', icon: Hash, keywords: 'channels messages' },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, keywords: 'calendar tasks events automations schedule' },
+  { id: 'ledger', label: 'Ledger', icon: Wallet, keywords: 'ledger finance money expenses income budget transactions' },
   { id: 'memory', label: 'Memory', icon: Network, keywords: 'vault notes graph obsidian' },
   { id: 'evolve', label: 'Evolve', icon: Dna, keywords: 'extensions skills proposals self evolution tools reflect forge' },
   { id: 'systems', label: 'Systems', icon: Activity, keywords: 'cpu memory processes telemetry machine' },

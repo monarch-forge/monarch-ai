@@ -17,6 +17,7 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Mail.** Several Gmail accounts in one place, with read, search, draft and send. Sending always needs approval.
 - **Slack.** Read channels, DMs and threads, catch up on unread messages, search, post and reply in threads, react, edit, delete and schedule messages, mark conversations as read, and DM anyone by name, all as yourself with a user token.
 - **Memory.** An Obsidian-compatible markdown vault with `[[wikilinks]]`, tags, backlinks and a graph view. The agent reads and writes it.
+- **Ledger.** Track spending and income by month, with categories, accounts, monthly budgets and multiple currencies. Add entries by hand, or let the agent record them (for example from transaction emails). It skips duplicates using a source reference.
 - **Agenda.** Google Calendar, plus local tasks, reminders and cron-style automations.
 - **9Router.** Live model proxy status check (localhost:20128) and chat completion gateway diagnostics.
 - **Voice.** Cloud speech in and out: the mic in the console and in Chat records your request, which is transcribed by OpenAI, Groq or any OpenAI-compatible endpoint. Replies are spoken by OpenAI, ElevenLabs or any OpenAI-compatible text-to-speech service. Set it up in **Config → Voice**: pick a provider and add its API key. On Linux the core records with `pw-record` (or `parecord` or `arecord`), stops when you go quiet, and plays replies with `pw-play`, so it doesn't depend on the webview.
@@ -72,8 +73,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.10.0/monarch-ai-bin-0.10.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.10.0-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.11.0/monarch-ai-bin-0.11.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.11.0-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -98,30 +99,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.10.0_amd64.deb
+sudo apt install ./Monarch_0.11.0_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.10.0-1.x86_64.rpm
+sudo dnf install ./Monarch-0.11.0-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.10.0_amd64.AppImage && ./Monarch_0.10.0_amd64.AppImage
+chmod +x Monarch_0.11.0_amd64.AppImage && ./Monarch_0.11.0_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.10.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.10.0_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.11.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.11.0_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.10.0_x64-setup.exe`, or `Monarch_0.10.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.11.0_x64-setup.exe`, or `Monarch_0.11.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 
