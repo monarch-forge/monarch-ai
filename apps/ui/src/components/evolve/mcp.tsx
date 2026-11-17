@@ -158,6 +158,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
   const [showInstr, setShowInstr] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [dialog, confirm] = useConfirm();
 
   const patch = async (p: Partial<McpServerInput>, key = 'patch') => {
@@ -188,8 +189,8 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
       const r = await api.post<{ url: string | null; server: McpServer }>(`/mcp/servers/${enc(s.id)}/auth`, {});
       props.onReplace(r.server);
       if (r.url) {
+        setAuthUrl(r.url);
         void openExternal(r.url);
-        toast(`Finish signing in to ${s.name} in your browser`, 'info');
       } else toast(`${s.name}: already authorized`, 'success');
     } catch (e) {
       toast(`Sign-in failed: ${errMsg(e)}`, 'error');
@@ -283,6 +284,28 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
         />
       </div>
 
+      {authUrl && s.authRequired && (
+        <div class="mx-3.5 mb-2.5 flex flex-wrap items-center gap-2 rounded-[6px] border border-line bg-[#121213] px-3 py-2 text-[12px] text-fg-2">
+          <span class="flex-1 min-w-[180px]">Finish signing in to {s.name} in your browser. If no tab opened, use the button.</span>
+          <button class={`${BTN} btn-primary`} onClick={() => void openExternal(authUrl)}>
+            <KeyRound size={10} /> Open sign-in page
+          </button>
+          <button
+            class={BTN_OUT}
+            onClick={() => {
+              void navigator.clipboard?.writeText(authUrl).then(
+                () => toast('Sign-in link copied', 'success'),
+                () => toast('Could not copy the link', 'warn'),
+              );
+            }}
+          >
+            Copy link
+          </button>
+          <button class={BTN_OUT} title="Dismiss" onClick={() => setAuthUrl(null)}>
+            <X size={10} />
+          </button>
+        </div>
+      )}
       {props.open && (
         <div class="px-3.5 pb-4 pt-1 flex flex-col gap-3 bg-subtle/20">
           {s.error && <div class="text-xs font-mono text-red break-words">{s.error}</div>}
