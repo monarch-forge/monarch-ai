@@ -13,6 +13,7 @@ import { SessionStats, ContextMeter, compactCommand } from '../components/chat/m
 import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { DirBrowser } from '../components/config/dir-browser.tsx';
 import { saveSettings } from '../components/config/fields.tsx';
+import { PrPanel } from '../components/pr-panel.tsx';
 import { useChatSession, useSessions } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast, useResource } from '../lib/store.ts';
 
@@ -265,6 +266,7 @@ export default function WorkshopPage(props: { params: string[] }) {
       {session?.id ? <SessionStats session={session} lastTurn={chat.lastTurn} /> : null}
       <EngineNote engine={session?.id ? session.engine : effEngine} />
       {cwd && <GitLog cwd={cwd} refreshKey={chat.running ? 1 : 0} />}
+      <PrPanel />
     </>
   );
 

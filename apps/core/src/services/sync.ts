@@ -145,7 +145,7 @@ interface RunResult {
   stdout: string;
   stderr: string;
 }
-function run(cmd: string, args: string[], opts: { cwd?: string; env?: Record<string, string>; timeoutMs?: number } = {}): Promise<RunResult> {
+export function run(cmd: string, args: string[], opts: { cwd?: string; env?: Record<string, string>; timeoutMs?: number } = {}): Promise<RunResult> {
   return new Promise((res) => {
     let child;
     try {

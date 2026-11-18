@@ -152,6 +152,7 @@ const ledgerDelete = defineTool({
   risk: 'dangerous',
   tag: 'FIN',
   schema: z.object({ ids: z.array(z.string()).min(1).describe('Entry ids.') }),
+  bulkCount: (i) => i.ids.length,
   summarize: (i) => {
     const names = i.ids.slice(0, 3).map((id) => {
       try {

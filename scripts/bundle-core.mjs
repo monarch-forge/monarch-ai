@@ -103,6 +103,12 @@ const skipFile = (p) => {
 };
 cpSync(DIST, STAGE, { recursive: true, dereference: true, filter: (src) => !skipFile(src) });
 log(`copied ${relative(ROOT, DIST)} → ${relative(ROOT, OUT)}`);
+// built UI for the phone-access listener (services/remote.ts looks for <core.mjs dir>/ui)
+const UI_DIST = join(ROOT, 'apps/ui/dist');
+if (existsSync(join(UI_DIST, 'index.html'))) {
+  cpSync(UI_DIST, join(STAGE, 'ui'), { recursive: true, dereference: true, filter: (src) => !skipFile(src) });
+  log(`copied ${relative(ROOT, UI_DIST)} → ${relative(ROOT, OUT)}/ui`);
+} else log('apps/ui/dist missing — phone access will report "UI not built"');
 
 /* ───────────── 3. find externals ───────────── */
 

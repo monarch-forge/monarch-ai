@@ -9,8 +9,11 @@ import { activity, bus, newId, notify, nowIso, truncate } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { recordUsage } from '../services/usage.ts';
 import { spawn } from 'node:child_process';
-import { getRepoProfile } from '../services/projects.ts';
-import { autoMode, needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances } from './approvals.ts';
+import { getRepoProfile, repoTarget } from '../services/projects.ts';
+import { autoMode, needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances, type ApprovalScope } from './approvals.ts';
+import { findTool } from '../tools/index.ts';
+import { maybeLearn } from './profile-learn.ts';
+import { resolve } from 'node:path';
 import {
   addUsage,
   autoTitle,
@@ -241,6 +244,7 @@ function onEngineEvent(turn: ActiveTurn, ev: EngineEvent): void {
       break;
     case 'compacted': {
       const rec = turn.rec;
+      maybeLearn(rec, true); // reads the UI transcript, which compaction keeps
       const prev = rec.context;
       rec.context = { ...(prev ?? { used: 0, window: 0, percent: 0, compactions: 0 }), compactions: (prev?.compactions ?? 0) + 1, lastCompactedAt: nowIso() };
       if (ev.post !== undefined) setContext(rec, ev.post);
@@ -289,13 +293,29 @@ function toolProgress(turn: ActiveTurn, callId: string | undefined, name: string
   );
 }
 
+/** auto-mode scope of a call: Monarch tools via ToolDef.target/bulkCount, Claude Code built-ins by repo */
+function approvalScope(turn: ActiveTurn, ask: ApprovalAsk): ApprovalScope {
+  const cwd = effectiveCwd(turn.rec);
+  const input = (ask.input ?? {}) as Record<string, unknown>;
+  const def = findTool(ask.name);
+  try {
+    if (def) return { target: def.target?.(input, cwd), bulk: def.bulkCount?.(input) };
+    if (ask.name === 'Bash') return { target: repoTarget(cwd) };
+    if (typeof input.file_path === 'string') return { target: repoTarget(resolve(cwd, input.file_path)) };
+  } catch {
+    /* malformed input: fall back to the plain policy */
+  }
+  return {};
+}
+
 async function approve(turn: ActiveTurn, ask: ApprovalAsk): Promise<boolean> {
-  if (!needsApproval(turn.rec.id, ask.name, ask.risk)) return true;
+  const scope = approvalScope(turn, ask);
+  if (!needsApproval(turn.rec.id, ask.name, ask.risk, scope)) return true;
   const item = toolStart(turn, { type: 'tool-start', callId: ask.callId, name: ask.name, input: ask.input, risk: ask.risk });
   item.status = 'pending-approval';
   updateItem(turn.rec, item);
   setPhase(turn, 'awaiting-approval', ask.summary);
-  const ok = await requestApproval(turn.rec.id, ask.name, ask.input, ask.risk, ask.summary, turn.abort.signal);
+  const ok = await requestApproval(turn.rec.id, ask.name, ask.input, ask.risk, ask.summary, turn.abort.signal, scope);
   item.status = ok ? 'running' : 'denied';
   if (!ok) item.output = 'Denied by user';
   updateItem(turn.rec, item);
@@ -406,6 +426,7 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
   saveSession(rec);
   bus.broadcast({ type: 'chat.done', sessionId: rec.id, usage, durationMs, error });
   broadcastSession(rec);
+  if (!error) maybeLearn(rec);
 
   const tag = rec.kind === 'coding' ? 'CODE' : 'AGT';
   const tokens = usage.inputTokens + usage.outputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);

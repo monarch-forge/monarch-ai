@@ -21,6 +21,7 @@ import { initEvolution, shutdownEvolution } from './extensions/index.ts';
 import { stopVoice } from './services/voice.ts';
 import { startMcp, stopMcp } from './mcp/index.ts';
 import { RESTART_EXIT_CODE, setRestartHandler, startSync, stopSync } from './services/sync.ts';
+import { startRemote, stopRemote } from './services/remote.ts';
 import { spawn } from 'node:child_process';
 import { openSync } from 'node:fs';
 import { join } from 'node:path';
@@ -58,7 +59,7 @@ async function shutdown(reason: string, code = 0, beforeExit?: () => void): Prom
     stopMetrics();
     stopVoice();
     stopSync();
-    await Promise.race([Promise.all([core.close(), shutdownEvolution(), stopMcp()]), new Promise((r) => setTimeout(r, 1500))]);
+    await Promise.race([Promise.all([core.close(), stopRemote(), shutdownEvolution(), stopMcp()]), new Promise((r) => setTimeout(r, 1500))]);
   } catch (e) {
     console.error('[core] error during shutdown:', e);
   }
@@ -137,6 +138,7 @@ async function main(): Promise<void> {
   }
   console.log(`[core] listening on http://${host}:${port} (ws://${host}:${port}/ws)`);
   activity('SYS', `Core online (v${CORE_VERSION})`);
+  await step('phone access', startRemote); // no-op unless enabled in Config → Phone access
 }
 
 void main();

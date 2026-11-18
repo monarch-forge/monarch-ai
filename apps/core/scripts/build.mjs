@@ -13,6 +13,8 @@ const external = [
   // spawns the bundled `claude` CLI binary resolved relative to its own package
   '@anthropic-ai/claude-agent-sdk',
   '@anthropic-ai/claude-agent-sdk/*',
+  // loads whatsapp-rust-bridge wasm + optional peers (sharp/jimp) relative to its package; staged by bundle-core
+  '@whiskeysockets/baileys',
   ...(process.env.MONARCH_BUNDLE_EXTERNAL ?? '')
     .split(',')
     .map((s) => s.trim())

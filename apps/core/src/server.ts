@@ -34,19 +34,20 @@ export function originAllowed(origin: string | undefined | null): boolean {
   return !origin || ALLOWED_ORIGINS.has(origin);
 }
 
-export function createApp(): Hono {
+/** `allowOrigin` defaults to the desktop/dev allowlist; the remote (phone) listener passes its own same-origin check. */
+export function createApp(allowOrigin: (origin: string | undefined | null) => boolean = originAllowed): Hono {
   const app = new Hono();
 
   // Reject cross-site requests outright: CORS alone does not stop a foreign page from *sending* a POST.
   app.use('*', async (c, next) => {
     const origin = c.req.header('origin');
-    if (!originAllowed(origin)) return c.json({ error: `origin ${origin} not allowed` }, 403);
+    if (!allowOrigin(origin)) return c.json({ error: `origin ${origin} not allowed` }, 403);
     await next();
   });
   app.use(
     '*',
     cors({
-      origin: (origin) => (origin && ALLOWED_ORIGINS.has(origin) ? origin : null),
+      origin: (origin) => (origin && allowOrigin(origin) ? origin : null),
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization'],
       maxAge: 600,
@@ -71,6 +72,12 @@ export function createApp(): Hono {
 
 const clients = new Set<WebSocket>();
 const alive = new WeakMap<WebSocket, boolean>();
+/** remote-device id per socket (local sockets have none), so revoking a device can drop its live sockets */
+const socketTag = new Map<WebSocket, string>();
+
+export function dropSockets(match: (tag: string) => boolean): void {
+  for (const [ws, tag] of socketTag) if (match(tag)) ws.terminate();
+}
 
 function send(ws: WebSocket, ev: ServerEvent | string): void {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -81,23 +88,41 @@ function send(ws: WebSocket, ev: ServerEvent | string): void {
   }
 }
 
-function attachWebSocket(server: Server): { close(): void } {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 });
+let hub: { wss: WebSocketServer; close(): void } | null = null;
 
-  server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+/**
+ * Attach the /ws upgrade handler to `server`. One shared hub (client set, bus fan-out, heartbeat) serves every listener.
+ * `authorize` returns null to refuse, '' for a local client, or a remote device tag.
+ */
+export function attachWebSocket(
+  server: Server,
+  authorize: (req: IncomingMessage) => string | null = (req) => (originAllowed(req.headers.origin) ? '' : null),
+): { close(): void } {
+  const wss = (hub ??= createHub()).wss;
+  const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     const path = (req.url ?? '').split('?')[0];
     if (path !== '/ws') {
       socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
-    if (!originAllowed(req.headers.origin)) {
+    const tag = authorize(req);
+    if (tag === null) {
       socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
-  });
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      if (tag) socketTag.set(ws, tag);
+      wss.emit('connection', ws, req);
+    });
+  };
+  server.on('upgrade', onUpgrade);
+  return { close: () => server.off('upgrade', onUpgrade) };
+}
+
+function createHub(): { wss: WebSocketServer; close(): void } {
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 });
 
   wss.on('connection', (ws) => {
     clients.add(ws);
@@ -129,6 +154,7 @@ function attachWebSocket(server: Server): { close(): void } {
     });
     const drop = () => {
       clients.delete(ws);
+      socketTag.delete(ws);
       setClientCount(clients.size);
     };
     ws.on('close', drop);
@@ -168,6 +194,7 @@ function attachWebSocket(server: Server): { close(): void } {
   hb.unref();
 
   return {
+    wss,
     close() {
       clearInterval(hb);
       offBus();
@@ -175,6 +202,7 @@ function attachWebSocket(server: Server): { close(): void } {
       clients.clear();
       setClientCount(0);
       wss.close();
+      hub = null;
     },
   };
 }
@@ -211,6 +239,7 @@ export function createServer(): CoreServer {
     },
     close() {
       ws.close();
+      hub?.close();
       return new Promise((resolve) => {
         server.close(() => resolve());
         server.closeAllConnections?.();

@@ -30,6 +30,9 @@ function requireWorkspaces() {
   return list;
 }
 
+/** approval target (auto mode asks once per new channel/person) */
+const slackTarget = (i: { channel: string; workspace?: string }) => `slack:${i.workspace ?? ''}:${i.channel.trim().toLowerCase()}`;
+
 const workspaceArg = z
   .string()
   .optional()
@@ -151,6 +154,7 @@ const slackPost = defineTool({
     workspace: workspaceArg,
     threadTs: z.string().optional().describe('Reply in this thread (ts of the parent message).'),
   }),
+  target: (i) => slackTarget(i),
   summarize: (i) => `Post to Slack ${i.channel}${i.workspace ? ` (${i.workspace})` : ''}: ${i.text.length > 80 ? `${i.text.slice(0, 80)}…` : i.text}`,
   run: async (i) => {
     requireWorkspaces();
@@ -246,6 +250,7 @@ const slackEdit = defineTool({
   risk: 'dangerous',
   tag: 'SLK',
   schema: z.object({ channel: convArg, ts: tsArg, text: z.string().min(1).describe('New full message text.'), workspace: workspaceArg }),
+  target: (i) => slackTarget(i),
   summarize: (i) => `Edit Slack message ${i.ts} in ${i.channel}: ${i.text.slice(0, 80)}`,
   run: async (i) => {
     requireWorkspaces();
@@ -264,6 +269,7 @@ const slackDelete = defineTool({
   risk: 'dangerous',
   tag: 'SLK',
   schema: z.object({ channel: convArg, ts: tsArg, workspace: workspaceArg }),
+  target: (i) => slackTarget(i),
   summarize: (i) => `Delete Slack message ${i.ts} in ${i.channel}`,
   run: async (i) => {
     requireWorkspaces();
@@ -288,6 +294,7 @@ const slackSchedule = defineTool({
     threadTs: z.string().optional(),
     workspace: workspaceArg,
   }),
+  target: (i) => slackTarget(i),
   summarize: (i) => `Schedule Slack message to ${i.channel} at ${i.at}: ${i.text.slice(0, 60)}`,
   run: async (i) => {
     requireWorkspaces();

@@ -28,6 +28,7 @@ import { BookOpen, Wallet,
   Volume2,
   VolumeX,
   Wrench,
+  MessageCircle,
 } from 'lucide-preact';
 import type { Settings } from '@monarch/shared';
 import { api } from '../lib/api.ts';
@@ -54,6 +55,7 @@ const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[]
   { id: 'workshop', label: 'Workshop', icon: Wrench, keywords: 'coding code terminal' },
   { id: 'mail', label: 'Mail', icon: Mail, keywords: 'gmail inbox email' },
   { id: 'slack', label: 'Slack', icon: Hash, keywords: 'channels messages' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, keywords: 'chats messages phone' },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, keywords: 'calendar tasks events automations schedule' },
   { id: 'ledger', label: 'Ledger', icon: Wallet, keywords: 'ledger finance money expenses income budget transactions' },
   { id: 'memory', label: 'Memory', icon: Network, keywords: 'vault notes graph obsidian' },

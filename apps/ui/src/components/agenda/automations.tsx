@@ -5,6 +5,7 @@ import { Play, Pencil, Plus, Trash, ArrowUpRight } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
 import { Btn } from '../ui.tsx';
+import { BackgroundSection } from './background.tsx';
 import { Button, LoadError, Loading, Modal, relTime, StateBlock, useConfirm } from '../mail/kit.tsx';
 
 const PRESETS: { id: string; label: string; schedule: string }[] = [
@@ -110,6 +111,7 @@ export function AutomationsPanel(props: { class?: string }) {
         </button>
       </header>
       <div class="flex-1 min-h-0 overflow-y-auto px-1.5 pb-3">
+        <BackgroundSection />
         {res.error && !res.data ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : res.data === undefined ? (

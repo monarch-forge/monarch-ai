@@ -1,6 +1,6 @@
 {
   "name": "@monarch/core",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,8 +17,10 @@
     "@hono/node-server": "^2.1.8",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@monarch/shared": "*",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
     "croner": "^11.0.0",
     "hono": "^4.13.18",
+    "qrcode": "1.5.4",
     "say": "^0.16.0",
     "systeminformation": "^5.33.21",
     "ws": "^8.23.0",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/qrcode": "1.5.5",
     "@types/ws": "^8.18.2",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15"

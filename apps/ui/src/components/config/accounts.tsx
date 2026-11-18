@@ -7,6 +7,7 @@ import { oauthFlows, toast, useResource } from '../../lib/store.ts';
 import { Panel, Tag, Spinner, ErrorLine, Empty, fmt } from '../ui.tsx';
 import { Field, INPUT, Kbd } from './fields.tsx';
 import { OAuthFlowView } from './oauth-flow.tsx';
+import { WhatsAppAccount } from './whatsapp.tsx';
 
 const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
 const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
@@ -70,6 +71,7 @@ export function AccountsSection() {
       <GoogleClient />
       <GoogleAccounts />
       <SlackWorkspaces />
+      <WhatsAppAccount />
     </div>
   );
 }

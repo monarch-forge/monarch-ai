@@ -29,6 +29,12 @@ const read = (p: string, max = 200_000) =>
     .catch(() => null);
 
 /** repo root containing `p` (nearest .git), or null */
+/** approval target key for the git repo containing p (undefined outside a repo) */
+export function repoTarget(p: string): string | undefined {
+  const root = repoRootOf(p);
+  return root ? `repo:${root}` : undefined;
+}
+
 export function repoRootOf(p: string): string | null {
   let cur = resolve(expandHome(p));
   for (;;) {

@@ -714,8 +714,17 @@ export async function promptContext(maxChars = 2000): Promise<string> {
   if (!notes.size) return '';
   const parts: string[] = [];
   let budget = maxChars - 120;
+  // learned profile first (Monarch/Profile.md, auto-extracted); the rest shares what is left
+  const profileId = resolveLink('Monarch/Profile');
+  if (profileId) {
+    const p = compact(notes.get(profileId)!.body, Math.min(700, budget));
+    if (p) {
+      parts.push(`What you know about the user (from [[${profileId}]]):\n${p}`);
+      budget -= p.length + 50;
+    }
+  }
   const meId = resolveLink('People/Me');
-  if (meId) {
+  if (meId && budget > 150) {
     const me = compact(notes.get(meId)!.body, Math.min(800, budget));
     if (me) {
       parts.push(`About the user (from [[${meId}]]):\n${me}`);
@@ -723,7 +732,7 @@ export async function promptContext(maxChars = 2000): Promise<string> {
     }
   }
   const pinned = [...notes.values()]
-    .filter((n) => n.id !== meId && n.tags.some((t) => t.toLowerCase() === 'pinned'))
+    .filter((n) => n.id !== meId && n.id !== profileId && n.tags.some((t) => t.toLowerCase() === 'pinned'))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   for (const p of pinned) {
     if (budget < 150) break;

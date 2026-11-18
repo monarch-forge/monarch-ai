@@ -1,0 +1,177 @@
+/** WhatsApp: chats (unread first by recency) + message view + reply box. Modeled on the Slack page. */
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import type { WhatsAppChat, WhatsAppMessage, WhatsAppStatus } from '@monarch/shared';
+import { CheckCheck, MessageCircle, Send, Users, X } from 'lucide-preact';
+import { api } from '../lib/api.ts';
+import { navigate, toast, useResource } from '../lib/store.ts';
+import { Btn } from '../components/ui.tsx';
+import { Button, LoadError, Loading, relTime, StateBlock } from '../components/mail/kit.tsx';
+
+const enc = encodeURIComponent;
+
+export default function WhatsAppPage(props: { params: string[] }) {
+  const chatId = props.params[0] ? decodeURIComponent(props.params[0]) : null;
+  const st = useResource<WhatsAppStatus>('/whatsapp/status', ['whatsapp']);
+  const linked = st.data && st.data.state !== 'unlinked' && st.data.state !== 'pairing';
+  const chatsRes = useResource<WhatsAppChat[]>(linked ? '/whatsapp/chats' : null, ['whatsapp']);
+  const msgRes = useResource<WhatsAppMessage[]>(linked && chatId ? `/whatsapp/chats/${enc(chatId)}/messages?limit=200` : null, ['whatsapp']);
+  const [filter, setFilter] = useState('');
+  const chats = (chatsRes.data ?? []).filter((c) => !filter || c.name.toLowerCase().includes(filter.toLowerCase()));
+  const chat = chatsRes.data?.find((c) => c.id === chatId);
+
+  if (st.data === undefined)
+    return <div class="h-full flex items-center justify-center p-4">{st.error ? <LoadError error={st.error} onRetry={st.reload} /> : <Loading label="Checking WhatsApp" />}</div>;
+  if (!linked)
+    return (
+      <div class="h-full flex items-center justify-center p-4">
+        <StateBlock icon={<MessageCircle size={30} strokeWidth={1.25} />} title="WhatsApp not linked">
+          <div>Link your phone by QR and Monarch can read your chats and reply for you (after you approve).</div>
+          <div class="mt-5">
+            <Btn variant="primary" onClick={() => navigate('config/accounts')}>
+              Link WhatsApp
+            </Btn>
+          </div>
+        </StateBlock>
+      </div>
+    );
+
+  const markRead = async () => {
+    try {
+      await api.post(`/whatsapp/chats/${enc(chatId!)}/read`, {});
+    } catch (e: any) {
+      toast(`Mark read failed: ${e?.message ?? e}`, 'error');
+    }
+  };
+
+  return (
+    <div class="h-full flex gap-4 min-h-0 p-3 sm:p-4 lg:p-5">
+      <aside class={`${chatId ? 'hidden lg:flex' : 'flex'} w-full lg:w-64 shrink-0 flex-col min-h-0`}>
+        <div class="flex items-center gap-2 px-2 py-1">
+          <span class="text-[14px] font-semibold text-fg flex-1 truncate">{st.data.me?.name ?? 'WhatsApp'}</span>
+          {st.data.state !== 'open' && <span class="text-[11.5px] text-fg-3">{st.data.state}…</span>}
+        </div>
+        <input
+          class="mt-3 w-full bg-white/[0.04] rounded-md px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+          placeholder="Jump to…"
+          value={filter}
+          onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
+          aria-label="Filter chats"
+        />
+        <div class="flex-1 min-h-0 overflow-y-auto pt-2">
+          {chatsRes.error && !chatsRes.data ? (
+            <LoadError error={chatsRes.error} onRetry={chatsRes.reload} />
+          ) : chatsRes.data === undefined ? (
+            <Loading label="Listing chats" />
+          ) : !chats.length ? (
+            <StateBlock title={filter ? 'No match' : 'No chats yet'}>{filter ? `Nothing matches “${filter}”.` : 'New messages show up here as they arrive.'}</StateBlock>
+          ) : (
+            chats.map((c) => {
+              const active = c.id === chatId;
+              return (
+                <button
+                  key={c.id}
+                  class={`relative w-full flex items-center gap-2.5 text-left px-3 py-1.5 rounded-md text-[13.5px] transition-colors ${active ? 'bg-white/[0.06] text-fg' : 'hover:bg-raised'}`}
+                  onClick={() => navigate(`whatsapp/${enc(c.id)}`)}
+                  title={c.lastText}
+                >
+                  {active && <span class="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red" />}
+                  {c.isGroup ? <Users size={13} class="shrink-0 text-fg-3" /> : <MessageCircle size={13} class="shrink-0 text-fg-3" />}
+                  <span class={`truncate ${c.unread ? 'text-fg font-semibold' : active ? 'text-fg' : 'text-fg-2'}`}>{c.name}</span>
+                  {!!c.unread && <span class="ml-auto font-mono text-[11px] text-fg-2">{c.unread > 99 ? '99+' : c.unread}</span>}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </aside>
+
+      <section class={`${chatId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
+        {!chatId ? (
+          <div class="flex-1 flex items-center justify-center text-[13px] text-fg-3">Pick a chat</div>
+        ) : (
+          <>
+            <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
+              <button class="lg:hidden -ml-1 p-1 rounded-md text-fg-3 hover:text-fg" aria-label="Back to chats" onClick={() => navigate('whatsapp')}>
+                <X size={15} />
+              </button>
+              <h1 class="flex-1 min-w-0 text-[16px] font-semibold text-fg truncate">{chat?.name ?? chatId}</h1>
+              {!!chat?.unread && (
+                <Btn size="xs" variant="ghost" onClick={markRead} title="Mark read">
+                  <CheckCheck size={13} /> Mark read
+                </Btn>
+              )}
+            </header>
+            <Messages res={msgRes} isGroup={!!chat?.isGroup} />
+            <Composer chatId={chatId} label={chat?.name ?? chatId} disabled={st.data.state !== 'open'} />
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Messages(props: { res: { data?: WhatsAppMessage[]; error?: string; reload?: () => void }; isGroup: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const list = props.res.data;
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  }, [list?.length]);
+  if (props.res.error && !list) return <LoadError error={props.res.error} onRetry={props.res.reload} />;
+  if (!list) return <Loading label="Loading messages" />;
+  return (
+    <div ref={ref} class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-2 flex flex-col gap-1.5">
+      {!list.length && <div class="m-auto text-[13px] text-fg-3">Only messages received since linking are shown.</div>}
+      {list.map((m) => (
+        <div key={m.id} class={`max-w-[80%] rounded-[10px] px-3 py-1.5 text-[13.5px] leading-relaxed ${m.fromMe ? 'self-end bg-white/[0.08]' : 'self-start bg-white/[0.04]'}`}>
+          {props.isGroup && !m.fromMe && <div class="text-[11.5px] font-semibold text-fg-2">{m.senderName}</div>}
+          <div class="whitespace-pre-wrap break-words text-fg">{m.text}</div>
+          <div class="text-[10.5px] text-fg-3 text-right">{relTime(new Date(m.ts).toISOString())}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Composer(props: { chatId: string; label: string; disabled: boolean }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setText(''), [props.chatId]);
+  const send = async () => {
+    const t = text.trim();
+    if (!t || busy) return;
+    setBusy(true);
+    try {
+      await api.post(`/whatsapp/chats/${enc(props.chatId)}/send`, { text: t });
+      setText('');
+    } catch (e: any) {
+      toast(`Send failed: ${e?.message ?? e}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div class="px-3 sm:px-4 pb-3 sm:pb-4">
+      <div class="flex items-end gap-2 rounded-[10px] bg-white/[0.04] focus-within:bg-white/[0.06] transition-colors">
+        <textarea
+          rows={Math.min(8, Math.max(1, text.split('\n').length))}
+          class="flex-1 bg-transparent outline-none resize-none px-3.5 py-2.5 text-[14px] leading-relaxed text-fg placeholder:text-fg-3"
+          placeholder={props.disabled ? 'Reconnecting…' : `Message ${props.label}`}
+          title="Enter to send · Shift+Enter for a new line"
+          value={text}
+          disabled={props.disabled}
+          onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+          aria-label={`Message ${props.label}`}
+        />
+        <Button variant="primary" size="xs" class="m-1.5" loading={busy} disabled={!text.trim() || props.disabled} onClick={() => void send()} title="Send (Enter)">
+          <Send size={12} />
+        </Button>
+      </div>
+    </div>
+  );
+}

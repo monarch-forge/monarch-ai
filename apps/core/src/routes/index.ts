@@ -23,6 +23,10 @@ import { register as sync } from './sync.ts';
 import { register as mcp } from './mcp.ts';
 import { register as ledger } from './ledger.ts';
 import { register as projects } from './projects.ts';
+import { register as remote } from './remote.ts';
+import { register as whatsapp } from './whatsapp.ts';
+import { register as background } from './background.ts';
+import { register as github } from './github.ts';
 
 export function registerRoutes(app: Hono): void {
   system(app);
@@ -35,4 +39,8 @@ export function registerRoutes(app: Hono): void {
   mcp(app);
   ledger(app);
   projects(app);
+  remote(app);
+  whatsapp(app);
+  background(app);
+  github(app);
 }

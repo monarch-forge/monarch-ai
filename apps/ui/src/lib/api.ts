@@ -4,7 +4,12 @@
 import { CORE_HOST, CORE_PORT, type ClientCommand, type ServerEvent } from '@monarch/shared';
 
 const envBase = (import.meta.env.VITE_CORE_URL as string | undefined) ?? '';
-export const CORE_URL = envBase || `http://${CORE_HOST}:${CORE_PORT}`;
+// served by the core's remote (phone) listener → talk to that same origin; desktop/vite → the local core
+const remoteOrigin =
+  typeof location !== 'undefined' && /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1|tauri\.localhost)$/.test(location.hostname)
+    ? location.origin
+    : '';
+export const CORE_URL = envBase || remoteOrigin || `http://${CORE_HOST}:${CORE_PORT}`;
 export const WS_URL = CORE_URL.replace(/^http/, 'ws') + '/ws';
 
 export class ApiError extends Error {

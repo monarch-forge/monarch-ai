@@ -163,6 +163,7 @@ const mailSend = defineTool({
   tag: 'MAIL',
   schema: sendSchema,
   summarize: (i) => `Send email to ${i.to}: ${i.subject || '(reply)'}`,
+  target: (i) => `mail:${[i.to, i.cc ?? ''].join(',').split(',').map((a) => (a.match(/<([^>]+)>/)?.[1] ?? a).trim().toLowerCase()).filter(Boolean).sort().join(',')}`,
   run: async (i) => {
     requireAccounts();
     const acct = resolveGoogleAccount(i.account);
@@ -205,6 +206,7 @@ const mailModify = defineTool({
     account: accountArg,
   }),
   summarize: (i) => `Mark ${i.threadIds.length} thread(s) as ${i.action}`,
+  bulkCount: (i) => i.threadIds.length,
   run: async (i) => {
     requireAccounts();
     const acct = resolveGoogleAccount(i.account);
@@ -245,6 +247,8 @@ const mailCleanup = defineTool({
     limit: z.number().int().min(1).max(BULK_HARD_CAP).optional().describe(`Max messages per account (default and cap ${n(BULK_HARD_CAP)}).`),
   }),
   summarize: (i) => `${i.dryRun === false ? 'Bulk' : 'Preview bulk'} ${i.action}: ${i.query}${i.account ? ` (${i.account})` : ''}`,
+  // shortcut: an applied query cleanup counts as bulk without estimating matches
+  bulkCount: (i) => (i.dryRun === false ? Infinity : 0),
   run: async (i, ctx) => {
     const accounts = requireAccounts();
     const dryRun = i.dryRun !== false;

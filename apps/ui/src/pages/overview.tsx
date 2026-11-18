@@ -15,6 +15,7 @@ import { CommandConsole } from '../components/overview/console.tsx';
 import { EnvPanel, SchedulePanel, VitalsPanel } from '../components/overview/left-panels.tsx';
 import { LogPanel, UplinksPanel, UsagePanel } from '../components/overview/right-panels.tsx';
 import { InboxCard, WaitingCard } from '../components/overview/today-cards.tsx';
+import { BriefCard } from '../components/overview/brief-card.tsx';
 
 const MORE_KEY = 'monarch.overview.more';
 
@@ -51,6 +52,8 @@ export default function OverviewPage(_props: { params: string[] }) {
             <CommandConsole />
           </div>
         </section>
+
+        <BriefCard />
 
         <section class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start" aria-label="Today">
           <SchedulePanel class="max-h-[320px] md:col-span-2 lg:col-span-1" />

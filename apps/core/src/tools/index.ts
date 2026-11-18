@@ -22,17 +22,20 @@ import { tools as web } from './web.ts';
 import { tools as coding } from './coding.ts';
 import { tools as mail } from './mail.ts';
 import { tools as slack } from './slack.ts';
+import { tools as whatsapp } from './whatsapp.ts';
 import { tools as memory } from './memory.ts';
 import { tools as evolve } from './evolve.ts';
 import { tools as delegate } from './delegate.ts';
 import { tools as ledger } from './ledger.ts';
 import { tools as projects } from './projects.ts';
+import { tools as background } from './background.ts';
+import { tools as github } from './github.ts';
 import { extensionToolDefs } from '../extensions/index.ts';
 import { mcpToolDefs } from '../mcp/index.ts';
 
 /** tools available to every session */
 export function assistantTools(): ToolDef[] {
-  return [...system, ...productivity, ...web, ...mail, ...slack, ...memory, ...ledger, ...projects, ...evolve, ...delegate, ...extensionToolDefs(), ...mcpToolDefs()];
+  return [...system, ...productivity, ...web, ...mail, ...slack, ...whatsapp,...memory, ...ledger, ...projects, ...github, ...background, ...evolve, ...delegate, ...extensionToolDefs(), ...mcpToolDefs()];
 }
 
 /** file/shell tools for the pi engine (claude-sdk engine uses Claude Code's own Read/Write/Edit/Bash/Grep/Glob instead) */

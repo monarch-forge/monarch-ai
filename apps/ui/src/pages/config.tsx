@@ -16,6 +16,8 @@ import { EvolutionSection } from '../components/config/evolution.tsx';
 import { VoiceSection } from '../components/config/voice.tsx';
 import { SyncSection } from '../components/config/sync.tsx';
 import { ProjectsSection } from '../components/config/projects.tsx';
+import { RemoteSection } from '../components/config/remote.tsx';
+import { Smartphone } from 'lucide-preact';
 
 const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
   { id: 'general', label: 'General', icon: UserRound, desc: 'Who you are, where you are, and how Monarch talks', page: GeneralSection, needsSettings: true },
@@ -27,6 +29,7 @@ const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: C
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'What Monarch may do without asking', page: PermissionsSection, needsSettings: true },
   { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'How Monarch grows new abilities', page: EvolutionSection, needsSettings: true },
   { id: 'sync', label: 'Sync', icon: RefreshCcw, desc: 'Keep your devices in step, end-to-end encrypted', page: SyncSection, needsSettings: true },
+  { id: 'remote', label: 'Phone access', icon: Smartphone, desc: 'Use Monarch from your phone over Tailscale or your LAN', page: RemoteSection, needsSettings: false },
 ];
 
 export default function ConfigPage(props: { params: string[] }) {

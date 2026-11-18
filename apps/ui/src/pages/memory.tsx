@@ -12,6 +12,7 @@ import { filterGraph, normalizeGraph } from '../components/graph/model.ts';
 import { demoGraph, demoNoteBody, demoRequested } from '../components/graph/demo.ts';
 import { NewNoteModal, NoteList, NoteView, openNote } from '../components/memory/note-panel.tsx';
 import { LoadError, Loading, StateBlock, useHotkeys } from '../components/mail/kit.tsx';
+import { ProfilePanel } from '../components/memory/profile-panel.tsx';
 
 const DEMO_N = demoRequested();
 
@@ -105,6 +106,9 @@ export default function MemoryPage(props: { params: string[] }) {
             </span>
           )}
           <div class="ml-auto flex items-center gap-1 pointer-events-auto bg-[#121213]/70 backdrop-blur rounded-md p-0.5">
+            <Toggle on={noteId === '~profile'} onClick={() => openNote('~profile')} title="Facts Monarch learned about you">
+              What Monarch knows
+            </Toggle>
             <Toggle on={local} onClick={() => setLocal(!local)} title="Only the open note and neighbours within 2 hops (l)" disabled={!noteId && !local}>
               Local
             </Toggle>
@@ -162,7 +166,9 @@ export default function MemoryPage(props: { params: string[] }) {
       </section>
 
       <section class={`flex w-full lg:w-[400px] xl:w-[460px] shrink-0 flex-col min-h-0 ${noteId ? 'flex-1 lg:flex-none' : 'max-h-[45%] lg:max-h-none'} bg-surface rounded-[10px] overflow-hidden`}>
-        {noteId ? (
+        {noteId === '~profile' ? (
+          <ProfilePanel />
+        ) : noteId ? (
           <NoteView id={noteId} nodes={graph.nodes} demo={demo ? demoNote : undefined} onTag={onTag} onLocate={(id) => handle.current?.focus(id)} />
         ) : (
           <NoteList demoNodes={demo ? graph.nodes : null} onNew={() => setNewOpen(true)} />

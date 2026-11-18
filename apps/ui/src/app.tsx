@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   Bell,
   Search,
+  MessageCircle,
 } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route, conn, health, phase, settings, toasts, toast, unreadNotifications } from './lib/store.ts';
@@ -33,6 +34,7 @@ import CommsPage from './pages/comms.tsx';
 import WorkshopPage from './pages/workshop.tsx';
 import MailPage from './pages/mail.tsx';
 import SlackPage from './pages/slack.tsx';
+import WhatsAppPage from './pages/whatsapp.tsx';
 import AgendaPage from './pages/agenda.tsx';
 import MemoryPage from './pages/memory.tsx';
 import SystemsPage from './pages/systems.tsx';
@@ -54,6 +56,7 @@ const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ 
   { id: 'workshop', label: 'Workshop', icon: Wrench, page: WorkshopPage },
   { id: 'mail', label: 'Mail', icon: Mail, page: MailPage },
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, page: WhatsAppPage },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
   { id: 'ledger', label: 'Ledger', icon: Wallet, page: LedgerPage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },

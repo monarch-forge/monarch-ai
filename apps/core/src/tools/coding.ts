@@ -8,6 +8,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { z } from 'zod';
 import { defineTool, type ToolContext, type ToolDef } from '../kernel.ts';
+import { repoTarget } from '../services/projects.ts';
 
 const MAX_READ_BYTES = 512 * 1024;
 const MAX_OUT = 30_000;
@@ -148,6 +149,7 @@ const fsWrite = defineTool({
     content: z.string().describe('Full file content'),
   }),
   summarize: (i) => `Write file ${i.path} (${i.content.length} chars)`,
+  target: (i, cwd) => repoTarget(abs({ cwd } as ToolContext, i.path)),
   async run(input, ctx) {
     const file = abs(ctx, input.path);
     let existed = true;
@@ -213,6 +215,7 @@ const fsEdit = defineTool({
     replace_all: z.boolean().optional().describe('Replace every occurrence'),
   }),
   summarize: (i) => `Edit file ${i.path}`,
+  target: (i, cwd) => repoTarget(abs({ cwd } as ToolContext, i.path)),
   async run(input, ctx) {
     const file = abs(ctx, input.path);
     const text = await fsp.readFile(file, 'utf8');
@@ -333,6 +336,7 @@ const shellExec = defineTool({
     timeout_sec: z.number().int().min(1).max(1800).optional().describe('Timeout in seconds, default 120'),
     cwd: z.string().optional().describe('Working directory override (relative to the session directory)'),
   }),
+  target: (i, cwd) => repoTarget(abs({ cwd } as ToolContext, i.cwd)),
   summarize: (i) => `Run shell: ${i.command.length > 160 ? `${i.command.slice(0, 159)}…` : i.command}`,
   run(input, ctx) {
     const cwd = abs(ctx, input.cwd);
@@ -340,7 +344,8 @@ const shellExec = defineTool({
     return new Promise<string>((res, rej) => {
       const child = spawn('bash', ['-lc', input.command], {
         cwd,
-        env: { ...process.env, TERM: 'dumb', NO_COLOR: '1', GIT_PAGER: 'cat', PAGER: 'cat' },
+        // no TTY here: make git/gh fail fast instead of hanging on credential/interactive prompts
+        env: { ...process.env, TERM: 'dumb', NO_COLOR: '1', GIT_PAGER: 'cat', PAGER: 'cat', GH_PAGER: 'cat', GH_PROMPT_DISABLED: '1', GIT_TERMINAL_PROMPT: '0', GH_NO_UPDATE_NOTIFIER: '1' },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
       });

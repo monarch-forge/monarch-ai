@@ -129,6 +129,15 @@ export interface RunHandle {
   done: Promise<{ sessionId: string; text: string; error?: string }>;
 }
 
+/** called after a built-in background job run (background.ts logs "what I handled") */
+// `var` + lazy init: background.ts registers during a circular import, before a `const` would be initialised
+var builtinHooks: Array<(a: Automation, result: string) => void> | undefined;
+export function onBuiltinRun(fn: (a: Automation, result: string) => void): void {
+  (builtinHooks ??= []).push(fn);
+}
+
+export const isAutomationRunning = (id: string) => running.has(id);
+
 function execute(id: string): RunHandle {
   const a = getAutomation(id);
   running.add(id);
@@ -168,6 +177,7 @@ function execute(id: string): RunHandle {
       else cur.nextRunAt = jobs.get(id)!.nextRun()?.toISOString() ?? null;
       store.save();
       changed('automations');
+      if (cur.builtin) for (const h of builtinHooks ?? []) h(cur, r.error ? `Error: ${r.error}` : r.text || '');
       if (cur.notify) notify(cur.name, result.length > 600 ? `${result.slice(0, 600)}…` : result, r.error ? 'error' : 'success');
     }
     activity('AUTO', r.error ? `"${a.name}" failed: ${r.error}` : `"${a.name}" completed`, r.error ? 'error' : 'info', r.sessionId || undefined);
@@ -190,8 +200,9 @@ export async function runAutomationNow(id: string): Promise<{ sessionId: string 
 
 /* ─────────────── CRUD ─────────────── */
 
-export function listAutomations(): Automation[] {
-  return [...store.get()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+/** user automations; built-in background jobs are excluded unless asked for */
+export function listAutomations(includeBuiltin = false): Automation[] {
+  return [...store.get()].filter((a) => includeBuiltin || !a.builtin).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 export function getAutomation(id: string): Automation {
@@ -200,7 +211,7 @@ export function getAutomation(id: string): Automation {
   return a;
 }
 
-export type AutomationInput = Partial<Pick<Automation, 'name' | 'schedule' | 'prompt' | 'enabled' | 'notify'>>;
+export type AutomationInput = Partial<Pick<Automation, 'name' | 'schedule' | 'prompt' | 'enabled' | 'notify' | 'builtin'>>;
 
 /** human-readable schedule for notifications (mirrors the UI's describeSchedule for common forms) */
 function humanSchedule(expr: string): string {
@@ -242,6 +253,7 @@ export function createAutomation(input: AutomationInput, opts: { announce?: bool
     lastStatus: null,
     lastResult: null,
     createdAt: nowIso(),
+    ...(input.builtin ? { builtin: input.builtin } : {}),
   };
   arm(a);
   store.update((arr) => {

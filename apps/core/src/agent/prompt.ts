@@ -7,6 +7,7 @@ import { skillsPromptContext } from '../extensions/index.ts';
 import { autonomyHigh } from './autonomy.ts';
 import { autoMode } from './approvals.ts';
 import { projectsBrief, workerContext } from '../services/projects.ts';
+import { getStatus as getWhatsAppStatus } from '../integrations/whatsapp/index.ts';
 import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs, smallModeForSession } from './toolset.ts';
 
 export interface PromptOptions {
@@ -27,7 +28,7 @@ export interface PromptOptions {
 export function autonomyRules(compact: boolean): string[] {
   if (compact) {
     return [
-      'When given a task, finish it fully and on your own: plan briefly, do every step with tools, verify, then report. Do not stop to ask permission for reversible steps.',
+      'When given a task, finish it fully and on your own: plan briefly, do every step with tools, verify, then report. Do not stop to ask permission for reversible steps. Report only results verified from tool output; say failures/skips first.',
       'Never defer or skip parts ("skipped… add when…", "next steps:"), never end with "shall I…" for work the user already asked for. Ask only when truly blocked, or before sending/posting/deleting/pushing to shared remotes the user did not ask for.',
     ];
   }
@@ -37,6 +38,7 @@ export function autonomyRules(compact: boolean): string[] {
     "- Don't stop to ask permission for reversible steps; don't defer or skip parts (\"skipped… add when…\", \"next steps: …\"); don't end with \"Shall I…\" for work the user already asked for.",
     '- Only stop to ask when truly blocked or before irreversible/external actions (send, post, delete, push to shared remotes) — unless the user explicitly asked for exactly those.',
     '- A short final report is fine; a partial result presented as done is not. If something could not be done, say exactly what and why.',
+    '- Report only results you verified from tool output; if anything failed or was skipped, say so first.',
   ];
 }
 
@@ -101,12 +103,13 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
     slackCount
       ? `Slack: ${slackCount} workspace(s) connected. Read channels, search, post.`
       : 'Slack: no workspace connected yet.',
+    ...(getWhatsAppStatus().state === 'unlinked' ? [] : ['WhatsApp: linked. Read unread chats, reply (whatsapp_* tools).']),
     'Memory vault: an Obsidian-style markdown vault of notes about the user, people, projects and preferences.',
     'Calendar & tasks: local tasks/reminders and calendar events (plus Google calendars when connected).',
     'Automations: scheduled prompts you can create, list and run.',
     'System: time/date, weather, host metrics, processes, desktop notifications; web search and page fetching.',
     opts.kind === 'coding'
-      ? `Workshop agent: you are a worker session with all assistant tools plus file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}. Your task may be code or anything else (inbox triage, research, planning, drafting). Work it through to the end without asking for confirmation of reversible steps: do every part of the task (no "skipped… add when…"), run/verify what you built, commit when the task says so, and finish with a clear, structured result of what was actually done.`
+      ? `Workshop agent: you are a worker session with all assistant tools plus file and shell tools, working directory ${opts.cwd ?? s.coding.defaultWorkspace}. Your task may be code or anything else (inbox triage, research, planning, drafting). Work it through to the end without asking for confirmation of reversible steps: do every part of the task (no "skipped… add when…"), run/verify what you built, commit when the task says so, open PRs with gh_pr_create (never interactive gh), and finish with a clear, structured result of what was actually done.`
       : 'Worker agents: delegate heavy or long work (code; thorough inbox/Slack triage; research; planning; long drafts) to a worker agent with agent_start (complete task + expected output; cwd only for code). Tell the user it is underway (with the Workshop link), follow it with agent_wait / agent_status, then review and summarise. Send corrections with agent_send; stop it with agent_abort. Runtime/model: the worker default from Config applies unless the user names one ("use opus") — check names with agent_models; switch an existing agent with agent_send model when asked.',
   ];
 

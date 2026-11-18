@@ -231,6 +231,13 @@ export interface ToolDef<S extends z.ZodObject<any> = z.ZodObject<any>> {
   tag?: LogTag;
   run: (input: z.infer<S>, ctx: ToolContext) => Promise<unknown> | unknown;
   /**
+   * Opt-in for outward tools: who/where the call acts on, e.g. 'mail:a@x.com' or 'repo:/path' (cwd = session dir).
+   * In Auto mode the first call to a new target asks once; approved targets then run without asking.
+   */
+  target?: (input: z.infer<S>, cwd: string) => string | undefined;
+  /** number of items the call changes; Auto mode asks first above 25 */
+  bulkCount?: (input: z.infer<S>) => number;
+  /**
    * 'always' = schema is in every prompt (core tools). Anything else (default) is deferred:
    * the model discovers it with tool search, keeping the prompt lean. See isAlwaysLoaded().
    */
