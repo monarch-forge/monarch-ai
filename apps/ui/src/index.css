@@ -400,22 +400,6 @@ textarea::placeholder {
   animation: calmFade 140ms ease both;
 }
 
-@keyframes hud-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes orbIdlePulse {
-  0%, 100% { opacity: 0.25; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(1.015); }
-}
-.orb-idle-ring {
-  animation: orbIdlePulse 6s ease-in-out infinite;
-  transform-origin: center;
-}
-.spin-transition {
-  transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
-}
 
 /* live indicator (recording, approvals waiting) */
 @keyframes hudBlink {

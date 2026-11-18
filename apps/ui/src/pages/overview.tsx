@@ -1,15 +1,15 @@
 /**
  * Overview — the cozy home. One focus: a warm greeting and the command console.
  * Below it, at most three cards with what matters today (schedule, what is waiting on the user, inbox).
- * Telemetry (status orb, weather, vitals, model usage, uplinks, assistant log) lives behind "More".
+ * Telemetry (status card, weather, vitals, model usage, uplinks, assistant log) lives behind "More".
  */
 import type { ComponentChildren } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 import { ChevronDown } from 'lucide-preact';
 import type { Briefing, UsageReport } from '@monarch/shared';
-import { conn, settings, useResource } from '../lib/store.ts';
-import { fmt } from '../components/ui.tsx';
-import { CoreOrb } from '../components/core-orb.tsx';
+import { approvals, conn, phase, settings, useResource } from '../lib/store.ts';
+import { fmt, Panel, Sparkline, Stat, Tag } from '../components/ui.tsx';
+import { focusApprovals } from '../components/approvals.tsx';
 import { RefreshHint } from '../components/mail/kit.tsx';
 import { CommandConsole } from '../components/overview/console.tsx';
 import { EnvPanel, SchedulePanel, VitalsPanel } from '../components/overview/left-panels.tsx';
@@ -70,11 +70,7 @@ export default function OverviewPage(_props: { params: string[] }) {
           </button>
           {more && (
             <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2 animate-monarch-fade">
-              <div class="md:col-span-2 flex justify-center">
-                <div class="relative w-[148px] h-[148px]">
-                  <OrbBlock usage={usage.data} />
-                </div>
-              </div>
+              <StatusCard usage={usage.data} />
               <EnvPanel />
               <UsagePanel res={usage} />
               <VitalsPanel />
@@ -110,25 +106,41 @@ function Greeting(props: { briefing?: Briefing; error?: string; hint?: Component
   );
 }
 
-function OrbBlock(props: { usage?: UsageReport }) {
+/** agent state + today's token use (replaces the old status orb) */
+function StatusCard(props: { usage?: UsageReport }) {
   const u = props.usage;
   const hourly = useMemo(() => {
-    if (!u?.points?.length) return undefined;
     const buckets = new Array<number>(24).fill(0);
     const cutoff = Date.now() - 24 * 3600_000;
-    for (const p of u.points) {
+    for (const p of u?.points ?? []) {
       const t = Date.parse(p.ts);
-      if (isNaN(t) || t < cutoff - 3600_000) continue;
-      buckets[new Date(t).getHours()] += (p.inputTokens ?? 0) + (p.outputTokens ?? 0);
+      if (isNaN(t) || t < cutoff) continue;
+      buckets[23 - Math.min(23, Math.floor((Date.now() - t) / 3600_000))] += (p.inputTokens ?? 0) + (p.outputTokens ?? 0);
     }
-    const max = Math.max(...buckets);
-    return max > 0 ? buckets.map((b) => b / max) : buckets;
+    return buckets;
   }, [u]);
-
   const total = u ? (u.totals?.inputTokens ?? 0) + (u.totals?.outputTokens ?? 0) : undefined;
+  const pending = approvals.value.length;
+  const state = conn.value !== 'open' ? 'Offline' : phase.value === 'idle' ? 'Ready' : phase.value === 'awaiting-approval' ? 'Waiting for you' : 'Working';
   return (
-    <div class="absolute inset-0">
-      <CoreOrb hourly={hourly} idleValue={total !== undefined ? fmt.num(total) : '—'} idleSub={total !== undefined ? 'tokens today' : 'ready'} />
-    </div>
+    <Panel title="Status" class="md:col-span-2" right={<Tag tone={state === 'Ready' ? 'ok' : state === 'Offline' ? 'red' : 'warn'}>{state}</Tag>}>
+      <div class="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_auto_1fr] gap-x-8 gap-y-3 items-end">
+        <Stat label="Tokens · 24h" value={total !== undefined ? fmt.num(total) : '—'} />
+        {pending > 0 ? (
+          <button type="button" class="text-left" onClick={() => focusApprovals()}>
+            <Stat label="Approvals" value={<span class="text-warning">{pending} pending</span>} />
+          </button>
+        ) : (
+          <Stat label="Approvals" value="None" />
+        )}
+        <div class="col-span-2 sm:col-span-1 min-w-0">
+          <Sparkline values={hourly} height={36} min={0} />
+          <div class="flex justify-between text-[10.5px] text-fg-3 mt-0.5">
+            <span>24h ago</span>
+            <span>now</span>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }

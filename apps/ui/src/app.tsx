@@ -44,12 +44,10 @@ import EvolvePage from './pages/evolve.tsx';
 import ConfigPage from './pages/config.tsx';
 import LedgerPage from './pages/ledger.tsx';
 import WelcomePage from './pages/welcome.tsx';
-import { ApprovalDock, focusApprovals } from './components/approvals.tsx';
+import { ApprovalDock } from './components/approvals.tsx';
 import { CommandPalette, paletteOpen } from './components/command-palette.tsx';
 import { NotificationDrawer, notificationsOpen } from './components/notifications.tsx';
 
-// the core orb dispatches this when the user clicks it while an approval is pending
-window.addEventListener('monarch:focus-approvals', () => focusApprovals());
 
 interface Route {
   id: string;
