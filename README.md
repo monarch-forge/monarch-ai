@@ -15,7 +15,7 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Auto mode.** Click **Auto** in the top bar and Monarch works through requests on its own without asking in chat. Only sending, posting and deleting show an approval card, and you approve each tool once per session. You get a notification when it needs your approval or input, fails, or finishes a long job.
 - **WhatsApp.** Link your number with a QR code in Config → Accounts (an unofficial bridge, so there is some risk of a ban). Read chats, reply and mark them read, from the WhatsApp tab or through Chat.
 - **Pull requests.** Workers open PRs with `gh` without interactive prompts. Workshop shows PRs waiting on you with their CI state, and "Review with agent" drafts a review that is only posted after you approve it.
-- **Background agent and morning brief.** Optional jobs triage mail, Slack and WhatsApp (drafts only, never sends), import transactions from bank emails into the Ledger, and build a morning brief that appears on Overview. Switch them on in Agenda → Automations.
+- **Automations and morning brief.** Schedule prompts in Planner → Agenda → Automations. Ready-made templates cover a morning briefing (also shown as a card on Home), inbox triage (drafts only, never sends), importing bank-email transactions into the Ledger, and a Slack digest. Each one is a normal automation you can edit or delete.
 - **Trust in Auto mode.** The first message to a new person or channel, the first edit in a new repo, and any change touching more than 25 items ask once. Monarch learns facts about you from your chats into an editable "What Monarch knows" page in Memory.
 - **Android app.** Each release includes `Monarch-<version>-android-arm64.apk`, a remote client for the Monarch running on your laptop. Turn on Phone access, connect both devices to Tailscale, then enter the pairing link or address in the app. Alerts that need you show as Android notifications while the app is open.
 - **Phone access.** Optional and off by default. Turn it on in Config → Phone access to use Monarch from your phone over Tailscale (recommended) or your LAN. Phones pair once with a code and can be revoked.
@@ -80,8 +80,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.15.2/monarch-ai-bin-0.15.2-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.15.2-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.15.3/monarch-ai-bin-0.15.3-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.15.3-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -106,30 +106,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.15.2_amd64.deb
+sudo apt install ./Monarch_0.15.3_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.15.2-1.x86_64.rpm
+sudo dnf install ./Monarch-0.15.3-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.15.2_amd64.AppImage && ./Monarch_0.15.2_amd64.AppImage
+chmod +x Monarch_0.15.3_amd64.AppImage && ./Monarch_0.15.3_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.15.2_aarch64.dmg` (Apple Silicon) or `Monarch_0.15.2_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.15.3_aarch64.dmg` (Apple Silicon) or `Monarch_0.15.3_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.15.2_x64-setup.exe`, or `Monarch_0.15.2_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.15.3_x64-setup.exe`, or `Monarch_0.15.3_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 

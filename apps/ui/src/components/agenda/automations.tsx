@@ -5,7 +5,6 @@ import { Play, Pencil, Plus, Trash, ArrowUpRight } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
 import { Btn } from '../ui.tsx';
-import { BackgroundSection } from './background.tsx';
 import { Button, LoadError, Loading, Modal, relTime, StateBlock, useConfirm } from '../mail/kit.tsx';
 
 const PRESETS: { id: string; label: string; schedule: string }[] = [
@@ -22,7 +21,7 @@ export const EXAMPLES: { name: string; schedule: string; prompt: string; notify:
     name: 'Morning briefing',
     schedule: '0 8 * * 1-5',
     prompt:
-      "Prepare my morning briefing: today's calendar across all accounts, tasks due today or overdue, unread important mail (summarize, don't open newsletters), Slack mentions since yesterday, and the weather. Keep it to a tight bulleted list and flag anything that needs a decision.",
+      "Prepare my morning briefing: today's calendar across all accounts, tasks due today or overdue, unread important mail (summarize, don't open newsletters), Slack mentions since yesterday, and the weather. Keep it to a tight bulleted list and flag anything that needs a decision. Also save it with brief_save so it shows on Home.",
     notify: true,
   },
   {
@@ -31,6 +30,13 @@ export const EXAMPLES: { name: string; schedule: string; prompt: string; notify:
     prompt:
       'Triage new unread mail in all my Gmail accounts since the last run. Summarize anything important in one line each, propose replies as Gmail drafts where a reply is clearly needed (never send), and create tasks for action items with due dates when mentioned.',
     notify: true,
+  },
+  {
+    name: 'Ledger import',
+    schedule: 'hourly',
+    prompt:
+      'Find bank or card transaction emails from the last 2 hours and record each with ledger_add, using sourceRef "mail:<account>:<messageId>" so duplicates are skipped. Never send, post or delete anything. Reply with one line: how many recorded or skipped.',
+    notify: false,
   },
   {
     name: 'Slack digest',
@@ -111,7 +117,6 @@ export function AutomationsPanel(props: { class?: string }) {
         </button>
       </header>
       <div class="flex-1 min-h-0 overflow-y-auto px-1.5 pb-3">
-        <BackgroundSection />
         {res.error && !res.data ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : res.data === undefined ? (

@@ -722,26 +722,9 @@ export interface Automation {
   lastStatus?: 'ok' | 'error' | null;
   lastResult?: string | null;
   createdAt: ISODate;
-  /** built-in background job (hidden from the user's automation list; managed via /api/background) */
-  builtin?: BackgroundJob;
 }
 
-/* ────────────────────────────── background agent + morning brief ────────────────────────────── */
-
-export type BackgroundJob = 'triage' | 'ledgerImport' | 'morningBrief';
-
-export interface BackgroundLogEntry {
-  at: ISODate;
-  job: BackgroundJob;
-  summary: string;
-}
-
-/** GET /api/background · PATCH /api/background {triage?, ledgerImport?, morningBrief?: boolean, briefTime?: "HH:MM"} · POST /api/background/:job/run → {sessionId} */
-export interface BackgroundStatus {
-  briefTime: string;
-  jobs: Array<Pick<Automation, 'id' | 'name' | 'schedule' | 'enabled' | 'lastRunAt' | 'nextRunAt' | 'lastStatus' | 'lastResult'> & { job: BackgroundJob; running: boolean }>;
-  log: BackgroundLogEntry[];
-}
+/* ────────────────────────────── morning brief ────────────────────────────── */
 
 export interface BriefItem {
   title: string;
@@ -757,7 +740,6 @@ export interface MorningBrief {
   messages: { mail?: number; slack?: number; whatsapp?: number; top: BriefItem[] };
   prs: BriefItem[];
   money: BriefItem[];
-  handled: BackgroundLogEntry[];
 }
 
 /* ────────────────────────────── integrations ────────────────────────────── */

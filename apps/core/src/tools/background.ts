@@ -1,4 +1,4 @@
-/** Background agent tools: brief_save (deferred) stores the structured morning brief shown on Overview. */
+/** brief_save (deferred): stores the structured morning brief shown on Home. */
 import { z } from 'zod';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import { saveBrief } from '../services/background.ts';
@@ -25,7 +25,7 @@ const briefSave = defineTool({
   summarize: () => 'Save morning brief',
   run: (i) => {
     const b = saveBrief(i as Parameters<typeof saveBrief>[0]);
-    return `Brief saved (${b.needsYou.length} needs-you, ${b.today.length} events, ${b.handled.length} handled).`;
+    return `Brief saved (${b.needsYou.length} needs-you, ${b.today.length} events).`;
   },
 });
 

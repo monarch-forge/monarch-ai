@@ -1,5 +1,5 @@
 /**
- * App shell: slim top bar (brand, 6 labeled sections + System menu, Auto, search, bell, settings, clock), routed page area, global overlays.
+ * App shell: slim top bar (brand, 5 labeled sections with tab groups, Auto, search, bell, settings, clock), routed page area, global overlays.
  * The old footer status line is gone; an offline banner appears only when the core is unreachable.
  * OWNED BY THE ORCHESTRATOR. Pages live in ./pages/*.tsx and each default-exports a component.
  */
@@ -23,7 +23,6 @@ import {
   Search,
   MessageCircle,
   Inbox,
-  ChevronDown,
 } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route, conn, health, phase, settings, toasts, toast, unreadNotifications } from './lib/store.ts';
@@ -56,7 +55,7 @@ interface Route {
   page: ComponentType<{ params: string[] }>;
 }
 
-/** every routable page; the top bar shows PRIMARY (incl. Inbox), the System menu (MORE) and a Settings gear */
+/** every routable page; the top bar shows PRIMARY (tab groups + Home) and a Settings gear */
 const ROUTES: Route[] = [
   { id: 'overview', label: 'Home', icon: LayoutGrid, page: OverviewPage },
   { id: 'chat', label: 'Chat', icon: MessageSquare, page: CommsPage },
@@ -77,10 +76,10 @@ const GROUPS: Record<string, { label: string; icon: LucideIcon; tabs: string[] }
   agents: { label: 'Chat', icon: MessageSquare, tabs: ['chat', 'workshop'] },
   inbox: { label: 'Inbox', icon: Inbox, tabs: ['mail', 'slack', 'whatsapp'] },
   planner: { label: 'Planner', icon: CalendarDays, tabs: ['agenda', 'ledger'] },
+  system: { label: 'System', icon: Activity, tabs: ['systems', 'evolve', 'memory', 'router'] },
 };
 const groupOf = (id: string) => Object.keys(GROUPS).find((g) => GROUPS[g].tabs.includes(id));
-const PRIMARY = ['overview', 'agents', 'inbox', 'planner'];
-const MORE = ['systems', 'evolve', 'memory', 'router'];
+const PRIMARY = ['overview', 'agents', 'inbox', 'planner', 'system'];
 const byId = (id: string) => ROUTES.find((r) => r.id === id)!;
 
 /** the tab of a group last opened (the nav entry returns to it) */
@@ -161,7 +160,6 @@ function TopBar(props: { active: string }) {
             </a>
           );
         })}
-        <MoreMenu active={props.active} />
       </nav>
       <div class="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" data-tauri-drag-region>
         <AutoSwitch />
@@ -205,43 +203,7 @@ function TopBar(props: { active: string }) {
   );
 }
 
-/** the "System" menu: Systems, Evolve, Memory, 9Router */
-function MoreMenu(props: { active: string }) {
-  const [open, setOpen] = useState(false);
-  const on = MORE.includes(props.active);
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    const t = setTimeout(() => window.addEventListener('click', close, { once: true }));
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('click', close);
-    };
-  }, [open]);
-  return (
-    <div class="relative shrink-0">
-      <button type="button" class="hud-nav" aria-haspopup="menu" aria-expanded={open} aria-current={on ? 'page' : undefined} onClick={() => setOpen(!open)}>
-        <span class="hidden sm:inline">{on ? byId(props.active).label : 'System'}</span>
-        <ChevronDown size={13} strokeWidth={1.8} />
-      </button>
-      {open && (
-        <div role="menu" class="fixed mt-1 min-w-[180px] rounded-lg border border-line bg-[#1c1c1e] p-1 shadow-xl animate-monarch-fade">
-          {MORE.map((id) => {
-            const r = byId(id);
-            const Icon = r.icon;
-            return (
-              <a key={id} role="menuitem" href={`#/${id}`} class={`flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] ${props.active === id ? 'bg-raised text-fg' : 'text-fg-2 hover:bg-raised hover:text-fg'}`}>
-                <Icon size={14} strokeWidth={1.6} /> {r.label}
-              </a>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** tab bar of a nav group (Chat: Chat / Workshop, Inbox: Mail / Slack / WhatsApp, Planner: Agenda / Ledger) */
+/** tab bar of a nav group (Chat, Inbox, Planner, System) */
 function GroupTabs(props: { group: string; active: string }) {
   return (
     <div class="shrink-0 flex items-center gap-1 px-3 sm:px-4 h-9 border-b border-line">

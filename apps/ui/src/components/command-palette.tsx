@@ -58,9 +58,9 @@ const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[]
   { id: 'whatsapp', label: 'Inbox · WhatsApp', icon: MessageCircle, keywords: 'inbox whatsapp chats messages phone' },
   { id: 'agenda', label: 'Planner · Agenda', icon: CalendarDays, keywords: 'calendar tasks events automations schedule' },
   { id: 'ledger', label: 'Planner · Ledger', icon: Wallet, keywords: 'ledger finance money expenses income budget transactions' },
-  { id: 'memory', label: 'Memory', icon: Network, keywords: 'vault notes graph obsidian' },
-  { id: 'evolve', label: 'Evolve', icon: Dna, keywords: 'extensions skills proposals self evolution tools reflect forge' },
-  { id: 'systems', label: 'Systems', icon: Activity, keywords: 'cpu memory processes telemetry machine' },
+  { id: 'memory', label: 'System · Memory', icon: Network, keywords: 'vault notes graph obsidian' },
+  { id: 'evolve', label: 'System · Evolve', icon: Dna, keywords: 'extensions skills proposals self evolution tools reflect forge' },
+  { id: 'systems', label: 'System · Systems', icon: Activity, keywords: 'cpu memory processes telemetry machine' },
   { id: 'config', label: 'Settings', icon: SlidersHorizontal, keywords: 'settings config providers models accounts preferences' },
   { id: 'welcome', label: 'Welcome & guides', icon: BookOpen, keywords: 'welcome guide help how to start tutorial docs onboarding' },
 ];

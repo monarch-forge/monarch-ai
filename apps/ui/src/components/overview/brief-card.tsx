@@ -1,9 +1,8 @@
-/** Morning brief card (top of Overview): latest brief saved by the background "morning brief" job. */
+/** Morning brief card (top of Home): the latest brief an automation saved with brief_save. */
 import { useState } from 'preact/hooks';
 import type { BriefItem, MorningBrief } from '@monarch/shared';
-import { ChevronDown, RefreshCw } from 'lucide-preact';
-import { api } from '../../lib/api.ts';
-import { toast, useResource } from '../../lib/store.ts';
+import { ChevronDown } from 'lucide-preact';
+import { useResource } from '../../lib/store.ts';
 
 const KEY = 'monarch.overview.brief';
 
@@ -39,7 +38,6 @@ export function BriefCard() {
       return true;
     }
   });
-  const [busy, setBusy] = useState(false);
   const b = res.data;
   const toggle = () => {
     setOpen(!open);
@@ -49,21 +47,9 @@ export function BriefCard() {
       /* ignore */
     }
   };
-  const refresh = async () => {
-    setBusy(true);
-    try {
-      await api.post('/background/morningBrief/run');
-      toast('Building a fresh brief…', 'info');
-    } catch (e: any) {
-      toast(`Refresh failed: ${e?.message ?? e}`, 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
   if (!b) return null;
   const m = b.messages;
   const counts = [m.mail != null && `${m.mail} mail`, m.slack != null && `${m.slack} Slack`, m.whatsapp != null && `${m.whatsapp} WhatsApp`].filter(Boolean).join(' · ');
-  const handled = b.handled.map((h) => ({ title: h.summary }));
   return (
     <section class="bg-surface rounded-[10px] px-4 py-3" aria-label="Morning brief">
       <header class="flex items-center gap-2">
@@ -72,11 +58,8 @@ export function BriefCard() {
           <ChevronDown size={14} strokeWidth={1.6} class={`text-fg-3 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
         <span class="ml-auto text-[12px] text-fg-3">
-          Generated {new Date(b.generatedAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })} ·{' '}
+          Generated {new Date(b.generatedAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
         </span>
-        <button type="button" class="inline-flex items-center gap-1 text-[12px] text-fg-2 hover:text-fg disabled:opacity-40" disabled={busy} onClick={() => void refresh()}>
-          <RefreshCw size={11} class={busy ? 'animate-spin' : ''} /> Refresh
-        </button>
       </header>
       {open && (
         <div class="mt-3 grid gap-4 grid-cols-1 md:grid-cols-2">
@@ -85,7 +68,6 @@ export function BriefCard() {
           <Section title={counts ? `Messages · ${counts}` : 'Messages'} items={m.top} />
           <Section title="Pull requests" items={b.prs} />
           <Section title="Money" items={b.money} />
-          <Section title="What I handled" items={handled} />
         </div>
       )}
     </section>
