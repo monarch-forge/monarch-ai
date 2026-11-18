@@ -1,5 +1,5 @@
 /**
- * App shell: slim top bar (brand, 6 labeled sections + More menu, Auto, search, bell, clock), routed page area, global overlays.
+ * App shell: slim top bar (brand, 6 labeled sections + System menu, Auto, search, bell, settings, clock), routed page area, global overlays.
  * The old footer status line is gone; an offline banner appears only when the core is unreachable.
  * OWNED BY THE ORCHESTRATOR. Pages live in ./pages/*.tsx and each default-exports a component.
  */
@@ -56,7 +56,7 @@ interface Route {
   page: ComponentType<{ params: string[] }>;
 }
 
-/** every routable page; the top bar shows PRIMARY + an Inbox entry + the MORE menu */
+/** every routable page; the top bar shows PRIMARY (incl. Inbox), the System menu (MORE) and a Settings gear */
 const ROUTES: Route[] = [
   { id: 'overview', label: 'Home', icon: LayoutGrid, page: OverviewPage },
   { id: 'chat', label: 'Chat', icon: MessageSquare, page: CommsPage },
@@ -72,18 +72,25 @@ const ROUTES: Route[] = [
   { id: 'router', label: '9Router', icon: RouteIcon, page: RouterPage },
   { id: 'config', label: 'Settings', icon: SlidersHorizontal, page: ConfigPage },
 ];
-const INBOX = ['mail', 'slack', 'whatsapp'];
-const PRIMARY = ['overview', 'chat', 'inbox', 'agenda', 'ledger', 'workshop'];
-const MORE = ['memory', 'evolve', 'systems', 'router', 'config'];
+/** nav entries that are tab groups of existing pages (each page keeps its own route and deep links) */
+const GROUPS: Record<string, { label: string; icon: LucideIcon; tabs: string[] }> = {
+  agents: { label: 'Chat', icon: MessageSquare, tabs: ['chat', 'workshop'] },
+  inbox: { label: 'Inbox', icon: Inbox, tabs: ['mail', 'slack', 'whatsapp'] },
+  planner: { label: 'Planner', icon: CalendarDays, tabs: ['agenda', 'ledger'] },
+};
+const groupOf = (id: string) => Object.keys(GROUPS).find((g) => GROUPS[g].tabs.includes(id));
+const PRIMARY = ['overview', 'agents', 'inbox', 'planner'];
+const MORE = ['systems', 'evolve', 'memory', 'router'];
 const byId = (id: string) => ROUTES.find((r) => r.id === id)!;
 
-/** the Inbox tab last opened (the nav entry returns to it) */
-function lastInbox(): string {
+/** the tab of a group last opened (the nav entry returns to it) */
+function lastTab(group: string): string {
+  const tabs = GROUPS[group].tabs;
   try {
-    const t = localStorage.getItem('monarch.inbox');
-    return t && INBOX.includes(t) ? t : 'mail';
+    const t = localStorage.getItem(`monarch.tab.${group}`);
+    return t && tabs.includes(t) ? t : tabs[0];
   } catch {
-    return 'mail';
+    return tabs[0];
   }
 }
 
@@ -108,19 +115,19 @@ export function App() {
   const hidden = current === 'welcome';
   const entry = ROUTES.find((n) => n.id === current) ?? ROUTES[0];
   const Page = hidden ? WelcomePage : entry.page;
-  const inInbox = INBOX.includes(entry.id);
+  const group = hidden ? undefined : groupOf(entry.id);
   useEffect(() => {
-    if (!inInbox) return;
+    if (!group) return;
     try {
-      localStorage.setItem('monarch.inbox', entry.id);
+      localStorage.setItem(`monarch.tab.${group}`, entry.id);
     } catch {
       /* ignore */
     }
   }, [entry.id]);
   return (
     <div class="h-full flex flex-col">
-      <TopBar active={hidden ? current : inInbox ? 'inbox' : entry.id} />
-      {inInbox && <InboxTabs active={entry.id} />}
+      <TopBar active={hidden ? current : (group ?? entry.id)} />
+      {group && <GroupTabs group={group} active={entry.id} />}
       <main class="flex-1 min-h-0 relative animate-monarch-fade" key={hidden ? current : entry.id}>
         <Page params={params} />
       </main>
@@ -144,11 +151,11 @@ function TopBar(props: { active: string }) {
       </a>
       <nav class="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none]" aria-label="Sections">
         {PRIMARY.map((id) => {
-          const r = id === 'inbox' ? { id, label: 'Inbox', icon: Inbox } : byId(id);
+          const r = GROUPS[id] ?? byId(id);
           const Icon = r.icon;
           const on = props.active === id;
           return (
-            <a key={id} href={`#/${id === 'inbox' ? lastInbox() : id}`} class="hud-nav shrink-0" aria-current={on ? 'page' : undefined}>
+            <a key={id} href={`#/${GROUPS[id] ? lastTab(id) : id}`} class="hud-nav shrink-0" aria-current={on ? 'page' : undefined}>
               <Icon size={15} strokeWidth={1.6} class="sm:hidden" />
               <span class="hidden sm:inline">{r.label}</span>
             </a>
@@ -177,6 +184,15 @@ function TopBar(props: { active: string }) {
           <Bell size={16} strokeWidth={1.6} />
           {unread > 0 && <span class="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-red text-[10px] font-medium leading-4 text-center text-fg">{unread > 9 ? '9+' : unread}</span>}
         </button>
+        <a
+          href="#/config"
+          class={`w-8 h-8 flex items-center justify-center rounded-md hover:text-fg hover:bg-raised transition-colors ${props.active === 'config' ? 'text-fg bg-raised' : 'text-fg-2'}`}
+          title="Settings"
+          aria-label="Settings"
+          aria-current={props.active === 'config' ? 'page' : undefined}
+        >
+          <SlidersHorizontal size={16} strokeWidth={1.6} />
+        </a>
         <div
           class="hidden sm:block pl-1 text-[13px] tabular-nums text-fg-2"
           title={now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -189,7 +205,7 @@ function TopBar(props: { active: string }) {
   );
 }
 
-/** the "More" menu: everything outside the daily pages */
+/** the "System" menu: Systems, Evolve, Memory, 9Router */
 function MoreMenu(props: { active: string }) {
   const [open, setOpen] = useState(false);
   const on = MORE.includes(props.active);
@@ -205,7 +221,7 @@ function MoreMenu(props: { active: string }) {
   return (
     <div class="relative shrink-0">
       <button type="button" class="hud-nav" aria-haspopup="menu" aria-expanded={open} aria-current={on ? 'page' : undefined} onClick={() => setOpen(!open)}>
-        <span class="hidden sm:inline">{on ? byId(props.active).label : 'More'}</span>
+        <span class="hidden sm:inline">{on ? byId(props.active).label : 'System'}</span>
         <ChevronDown size={13} strokeWidth={1.8} />
       </button>
       {open && (
@@ -225,11 +241,11 @@ function MoreMenu(props: { active: string }) {
   );
 }
 
-/** Mail / Slack / WhatsApp as tabs of one Inbox (each keeps its own route and deep links) */
-function InboxTabs(props: { active: string }) {
+/** tab bar of a nav group (Chat: Chat / Workshop, Inbox: Mail / Slack / WhatsApp, Planner: Agenda / Ledger) */
+function GroupTabs(props: { group: string; active: string }) {
   return (
     <div class="shrink-0 flex items-center gap-1 px-3 sm:px-4 h-9 border-b border-line">
-      {INBOX.map((id) => {
+      {GROUPS[props.group].tabs.map((id) => {
         const r = byId(id);
         const Icon = r.icon;
         const on = props.active === id;
