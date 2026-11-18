@@ -12,8 +12,6 @@ name: Android
 # with a different key cannot update it (uninstall first).
 
 on:
-  push:
-    branches: [android-app] # TEMP: test builds on this branch; removed before merging
   workflow_call:
     inputs:
       tag:
