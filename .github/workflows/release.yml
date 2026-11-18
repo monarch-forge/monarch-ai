@@ -124,3 +124,12 @@ jobs:
     uses: ./.github/workflows/arch.yml
     with:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
+
+  android:
+    name: Android app
+    needs: build
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/android.yml
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+    secrets: inherit

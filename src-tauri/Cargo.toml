@@ -22,11 +22,17 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 # Only used from Rust (our `open_external` command); no JS permission is granted for it.
 tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 # Serves the bundled UI over http://localhost:<UI_PORT> in release builds, so embedded localhost
 # services (9Router) are same-site with the app and their SameSite cookies work.
 tauri-plugin-localhost = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+# Mobile remote client: approvals / "needs you" alerts from the laptop's core as phone notifications.
+tauri-plugin-notification = "2"
 
 [profile.release]
 codegen-units = 1

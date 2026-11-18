@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Android remote client: the laptop's Monarch UI (any http origin the user paired with — a Tailscale/LAN IP the app cannot know in advance) may only show notifications. No other native access.",
+  "platforms": ["android", "iOS"],
+  "windows": ["main"],
+  "permissions": ["core:default", "notification:default"],
+  "remote": {
+    "urls": ["http://*:*"]
+  }
+}

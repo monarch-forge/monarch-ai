@@ -1,0 +1,26 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "identifier": "ai.monarch.mobile",
+  "build": {
+    "frontendDist": "../apps/mobile-shell",
+    "beforeBuildCommand": "",
+    "beforeDevCommand": ""
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Monarch",
+        "backgroundColor": "#121213",
+        "theme": "Dark",
+        "create": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "resources": null
+  }
+}

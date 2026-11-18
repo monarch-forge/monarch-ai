@@ -22,5 +22,10 @@
     "urls": [
       "http://localhost:7719"
     ]
-  }
+  },
+  "platforms": [
+    "linux",
+    "macOS",
+    "windows"
+  ]
 }

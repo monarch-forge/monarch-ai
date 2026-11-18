@@ -1,0 +1,125 @@
+name: Android
+
+# Builds the Monarch Android app (a remote client for the core running on your laptop over
+# Tailscale/LAN) as a signed APK. Called by release.yml for a tag (attached to that release),
+# or run manually on any branch (uploaded as a workflow artifact only).
+#
+# Signing secrets (repo → Settings → Secrets → Actions):
+#   ANDROID_KEYSTORE_B64       base64 of a PKCS12 keystore
+#   ANDROID_KEYSTORE_PASSWORD  its password (also used for the key)
+#   ANDROID_KEY_ALIAS          key alias inside the keystore
+# Without them the APK is signed with a throwaway key: it installs, but later builds signed
+# with a different key cannot update it (uninstall first).
+
+on:
+  push:
+    branches: [android-app] # TEMP: test builds on this branch; removed before merging
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach the APK to (leave empty to only upload an artifact)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-22.04
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android platform, build tools and NDK
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" >/dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: android
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate the Android project
+        run: |
+          npx tauri android init --ci
+          # app icons from the desktop icon (writes into gen/android; the desktop icons are not shipped from this job)
+          npx tauri icon src-tauri/icons/source-1024.png
+
+      # The laptop is reached over plain http on a Tailscale/LAN IP (Tailscale encrypts the link);
+      # Android release builds block cleartext http unless allowed.
+      - name: Allow http to the laptop
+        run: |
+          f=src-tauri/gen/android/app/build.gradle.kts
+          sed -i 's/manifestPlaceholders\["usesCleartextTraffic"\] = "false"/manifestPlaceholders["usesCleartextTraffic"] = "true"/' "$f"
+          if grep -q 'usesCleartextTraffic"\] = "false"' "$f"; then echo "::error::cleartext still disabled in $f"; exit 1; fi
+          grep -q 'usesCleartextTraffic' "$f" || { m=src-tauri/gen/android/app/src/main/AndroidManifest.xml; sed -i 's/<application/<application android:usesCleartextTraffic="true"/' "$m"; grep -q 'usesCleartextTraffic="true"' "$m"; }
+
+      - name: Build
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Sign
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          unsigned=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release-unsigned.apk' | head -1)
+          [ -n "$unsigned" ] || { echo "::error::no unsigned release APK found"; exit 1; }
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          else
+            echo "::warning::No signing secrets: using a throwaway key (this APK cannot be updated by later builds)"
+            KS_PASS=$(openssl rand -hex 16); KS_ALIAS=monarch
+            keytool -genkeypair -storetype PKCS12 -keystore "$RUNNER_TEMP/release.p12" -alias "$KS_ALIAS" \
+              -keyalg RSA -keysize 4096 -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=Monarch" >/dev/null
+          fi
+          version=$(node -p "require('./package.json').version")
+          out="Monarch-${version}-android-arm64.apk"
+          zipalign -p -f 4 "$unsigned" aligned.apk
+          apksigner sign --ks "$RUNNER_TEMP/release.p12" --ks-type PKCS12 --ks-key-alias "$KS_ALIAS" \
+            --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out "$out" aligned.apk
+          apksigner verify "$out"
+          rm -f "$RUNNER_TEMP/release.p12"
+          echo "APK=$out" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: ${{ env.APK }}
+
+      - name: Attach to release
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG" "$APK" --clobber

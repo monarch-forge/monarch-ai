@@ -109,6 +109,7 @@ function handleEvent(ev: ServerEvent) {
     case 'notification':
       notifications.value = [ev.notification, ...notifications.value].slice(0, 200);
       toast(`${ev.notification.title}${ev.notification.body ? ' — ' + ev.notification.body : ''}`, ev.notification.level);
+      if (ev.notification.level === 'warn' || ev.notification.level === 'error') void phoneNotify(ev.notification.title, ev.notification.body);
       break;
     case 'approval.request':
       approvals.value = [...approvals.value.filter((a) => a.id !== ev.request.id), ev.request];
@@ -365,4 +366,21 @@ function parseHash(): string[] {
 window.addEventListener('hashchange', () => (route.value = parseHash()));
 export function navigate(path: string): void {
   location.hash = path.startsWith('#') ? path : `#/${path.replace(/^\//, '')}`;
+}
+
+/* ─────────── Android app: alerts as phone notifications ─────────── */
+
+const inMobileApp = () => !!(window as any).__TAURI_INTERNALS__ && /Android|iPhone|iPad/i.test(navigator.userAgent);
+let notifyAllowed: Promise<boolean> | null = null;
+
+/** Only inside the Monarch Android app (Tauri notification plugin); a no-op in browsers and on desktop. */
+async function phoneNotify(title: string, body: string): Promise<void> {
+  if (!inMobileApp()) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    notifyAllowed ??= invoke<boolean>('plugin:notification|is_permission_granted').then(async (ok) => ok || (await invoke<string>('plugin:notification|request_permission')) === 'granted');
+    if (await notifyAllowed) await invoke('plugin:notification|notify', { options: { title, body } });
+  } catch {
+    /* plugin unavailable: the in-app toast already showed it */
+  }
 }

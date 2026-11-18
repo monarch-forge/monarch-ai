@@ -8,6 +8,11 @@
 //!   3. logs core stdout/stderr to ~/.monarch-ai/logs/core.log,
 //!   4. stops it (EOF → SIGTERM → SIGKILL) and reaps it on exit,
 //!   5. exposes `open_external(url)`, `core_status()` and `open_router_window(url)` to the UI.
+//!
+//! On Android/iOS (`mobile`) none of that applies: the app is a remote client (see `mobile.rs`).
+
+// The desktop shell code below is unused on mobile builds.
+#![cfg_attr(mobile, allow(dead_code, unused_imports))]
 
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -458,7 +463,6 @@ fn core_status(state: State<'_, CoreState>) -> CoreStatus {
 
 /* ───────────────────────── entry ───────────────────────── */
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Release builds serve the UI from http://localhost:UI_PORT instead of tauri://localhost, so the
 /// 9Router dashboard (http://localhost:20128) embedded in an iframe is same-site and its login cookie works.
 const UI_PORT: u16 = 7719;
@@ -482,6 +486,12 @@ fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+#[cfg(mobile)]
+mod mobile;
+#[cfg(mobile)]
+pub use mobile::run;
+
+#[cfg(desktop)]
 pub fn run() {
     let mut builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
     if !cfg!(debug_assertions) {
