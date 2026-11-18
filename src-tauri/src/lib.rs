@@ -401,6 +401,7 @@ fn open_external(app: AppHandle, url: String) -> Result<(), String> {
 /// is then never sent/stored inside the frame (WebKit also blocks third-party cookies outright),
 /// so its login can't stick. A top-level window makes 9Router first-party. Only loopback
 /// http(s) URLs are accepted; the window gets no capability, so the page has no IPC access.
+#[cfg(desktop)]
 #[tauri::command]
 async fn open_router_window(app: AppHandle, url: String) -> Result<(), String> {
     let parsed: tauri::Url = url.trim().parse().map_err(|e| format!("invalid URL: {e}"))?;
