@@ -18,23 +18,36 @@ import { SyncSection } from '../components/config/sync.tsx';
 import { ProjectsSection } from '../components/config/projects.tsx';
 import { RemoteSection } from '../components/config/remote.tsx';
 import { Smartphone } from 'lucide-preact';
+import { useEffect } from 'preact/hooks';
 
-const TABS: { id: string; label: string; icon: LucideIcon; desc: string; page: ComponentType; needsSettings: boolean }[] = [
-  { id: 'general', label: 'General', icon: UserRound, desc: 'Who you are, where you are, and how Monarch talks', page: GeneralSection, needsSettings: true },
-  { id: 'models', label: 'Models', icon: Cpu, desc: 'Which models do the thinking', page: ModelsSection, needsSettings: true },
-  { id: 'providers', label: 'Providers', icon: KeyRound, desc: 'Connect the services Monarch can use', page: ProvidersSection, needsSettings: false },
-  { id: 'voice', label: 'Voice', icon: AudioLines, desc: 'Listening and speaking', page: VoiceSection, needsSettings: true },
-  { id: 'accounts', label: 'Accounts', icon: Link2, desc: 'Google and Slack', page: AccountsSection, needsSettings: false },
-  { id: 'projects', label: 'Projects', icon: FolderGit2, desc: 'Code projects and how to build and check their repos', page: ProjectsSection, needsSettings: false },
-  { id: 'permissions', label: 'Permissions', icon: ShieldCheck, desc: 'What Monarch may do without asking', page: PermissionsSection, needsSettings: true },
-  { id: 'evolution', label: 'Evolution', icon: Dna, desc: 'How Monarch grows new abilities', page: EvolutionSection, needsSettings: true },
-  { id: 'sync', label: 'Sync', icon: RefreshCcw, desc: 'Keep your devices in step, end-to-end encrypted', page: SyncSection, needsSettings: true },
-  { id: 'remote', label: 'Phone access', icon: Smartphone, desc: 'Use Monarch from your phone over Tailscale or your LAN', page: RemoteSection, needsSettings: false },
+type Section = { id: string; label: string; icon: LucideIcon; page: ComponentType; needsSettings: boolean };
+// Old per-section ids stay valid deep links (#/config/<id>): they open their group and scroll to the section.
+const S: Record<string, Section> = {
+  general: { id: 'general', label: 'General', icon: UserRound, page: GeneralSection, needsSettings: true },
+  voice: { id: 'voice', label: 'Voice', icon: AudioLines, page: VoiceSection, needsSettings: true },
+  models: { id: 'models', label: 'Models', icon: Cpu, page: ModelsSection, needsSettings: true },
+  providers: { id: 'providers', label: 'Providers', icon: KeyRound, page: ProvidersSection, needsSettings: false },
+  permissions: { id: 'permissions', label: 'Permissions', icon: ShieldCheck, page: PermissionsSection, needsSettings: true },
+  evolution: { id: 'evolution', label: 'Evolution', icon: Dna, page: EvolutionSection, needsSettings: true },
+  accounts: { id: 'accounts', label: 'Accounts', icon: Link2, page: AccountsSection, needsSettings: false },
+  projects: { id: 'projects', label: 'Projects', icon: FolderGit2, page: ProjectsSection, needsSettings: false },
+  remote: { id: 'remote', label: 'Phone access', icon: Smartphone, page: RemoteSection, needsSettings: false },
+  sync: { id: 'sync', label: 'Sync', icon: RefreshCcw, page: SyncSection, needsSettings: true },
+};
+
+const TABS: { id: string; label: string; icon: LucideIcon; sections: Section[] }[] = [
+  { id: 'you', label: 'You', icon: UserRound, sections: [S.general, S.voice] },
+  { id: 'ai', label: 'AI', icon: Cpu, sections: [S.models, S.providers, S.permissions, S.evolution] },
+  { id: 'connections', label: 'Connections', icon: Link2, sections: [S.accounts, S.projects, S.remote] },
+  { id: 'data', label: 'Data', icon: RefreshCcw, sections: [S.sync] },
 ];
 
 export default function ConfigPage(props: { params: string[] }) {
-  const tab = TABS.find((t) => t.id === props.params[0]) ?? TABS[0];
-  const Page = tab.page;
+  const id = props.params[0];
+  const tab = TABS.find((t) => t.id === id || t.sections.some((x) => x.id === id)) ?? TABS[0];
+  useEffect(() => {
+    if (id && S[id]) requestAnimationFrame(() => document.getElementById(`cfg-${id}`)?.scrollIntoView({ block: 'start' }));
+  }, [id]);
     const s = settings.value;
 
   return (
@@ -92,19 +105,30 @@ export default function ConfigPage(props: { params: string[] }) {
                 {tab.label}
                 {conn.value !== 'open' && <Tag tone="warn">core offline</Tag>}
               </h1>
-              <p class="text-[13px] text-fg-3 mt-0.5">{tab.desc}</p>
             </header>
-            {conn.value !== 'open' && !s && tab.needsSettings ? (
-              <Panel title="Can't reach the core">
-                <ErrorLine error="The Monarch core is not reachable at the moment. Settings will load as soon as it reconnects." />
-              </Panel>
-            ) : tab.needsSettings ? (
-              <SettingsGate>
-                <Page key={tab.id} />
-              </SettingsGate>
-            ) : (
-              <Page key={tab.id} />
-            )}
+            {tab.sections.map((sec) => {
+              const Page = sec.page;
+              const SecIcon = sec.icon;
+              return (
+                <section key={sec.id} id={`cfg-${sec.id}`} class="flex flex-col gap-3 scroll-mt-4">
+                  <h2 class="flex items-center gap-2 text-[14.5px] font-semibold text-fg px-1 pt-2">
+                    <SecIcon size={15} strokeWidth={1.6} class="text-fg-3" />
+                    {sec.label}
+                  </h2>
+                  {conn.value !== 'open' && !s && sec.needsSettings ? (
+                    <Panel title="Can't reach the core">
+                      <ErrorLine error="The Monarch core is not reachable at the moment. Settings will load as soon as it reconnects." />
+                    </Panel>
+                  ) : sec.needsSettings ? (
+                    <SettingsGate>
+                      <Page />
+                    </SettingsGate>
+                  ) : (
+                    <Page />
+                  )}
+                </section>
+              );
+            })}
           </div>
         </div>
       </div>

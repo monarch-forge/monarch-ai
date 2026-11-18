@@ -1,5 +1,5 @@
 /**
- * App shell: slim top bar (brand, nav, model, search, bell, clock), routed page area, global overlays.
+ * App shell: slim top bar (brand, 6 labeled sections + More menu, Auto, search, bell, clock), routed page area, global overlays.
  * The old footer status line is gone; an offline banner appears only when the core is unreachable.
  * OWNED BY THE ORCHESTRATOR. Pages live in ./pages/*.tsx and each default-exports a component.
  */
@@ -22,11 +22,12 @@ import {
   Bell,
   Search,
   MessageCircle,
+  Inbox,
+  ChevronDown,
 } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route, conn, health, phase, settings, toasts, toast, unreadNotifications } from './lib/store.ts';
-import { useNow, fmt, Dot } from './components/ui.tsx';
-import { ModelPicker, defaultChoice, type ModelChoice } from './components/chat/model-picker.tsx';
+import { useNow, fmt } from './components/ui.tsx';
 import { api } from './lib/api.ts';
 import type { Settings } from '@monarch/shared';
 import OverviewPage from './pages/overview.tsx';
@@ -50,21 +51,43 @@ import { NotificationDrawer, notificationsOpen } from './components/notification
 // the core orb dispatches this when the user clicks it while an approval is pending
 window.addEventListener('monarch:focus-approvals', () => focusApprovals());
 
-const NAV: { id: string; label: string; icon: LucideIcon; page: ComponentType<{ params: string[] }> }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutGrid, page: OverviewPage },
+interface Route {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  page: ComponentType<{ params: string[] }>;
+}
+
+/** every routable page; the top bar shows PRIMARY + an Inbox entry + the MORE menu */
+const ROUTES: Route[] = [
+  { id: 'overview', label: 'Home', icon: LayoutGrid, page: OverviewPage },
   { id: 'chat', label: 'Chat', icon: MessageSquare, page: CommsPage },
-  { id: 'workshop', label: 'Workshop', icon: Wrench, page: WorkshopPage },
   { id: 'mail', label: 'Mail', icon: Mail, page: MailPage },
   { id: 'slack', label: 'Slack', icon: Hash, page: SlackPage },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, page: WhatsAppPage },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
   { id: 'ledger', label: 'Ledger', icon: Wallet, page: LedgerPage },
+  { id: 'workshop', label: 'Workshop', icon: Wrench, page: WorkshopPage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },
-  { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
   { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },
+  { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
   { id: 'router', label: '9Router', icon: RouteIcon, page: RouterPage },
-  { id: 'config', label: 'Config', icon: SlidersHorizontal, page: ConfigPage },
+  { id: 'config', label: 'Settings', icon: SlidersHorizontal, page: ConfigPage },
 ];
+const INBOX = ['mail', 'slack', 'whatsapp'];
+const PRIMARY = ['overview', 'chat', 'inbox', 'agenda', 'ledger', 'workshop'];
+const MORE = ['memory', 'evolve', 'systems', 'router', 'config'];
+const byId = (id: string) => ROUTES.find((r) => r.id === id)!;
+
+/** the Inbox tab last opened (the nav entry returns to it) */
+function lastInbox(): string {
+  try {
+    const t = localStorage.getItem('monarch.inbox');
+    return t && INBOX.includes(t) ? t : 'mail';
+  } catch {
+    return 'mail';
+  }
+}
 
 export function App() {
   let [current, ...params] = route.value;
@@ -85,11 +108,21 @@ export function App() {
     }
   }, []);
   const hidden = current === 'welcome';
-  const entry = NAV.find((n) => n.id === current) ?? NAV[0];
+  const entry = ROUTES.find((n) => n.id === current) ?? ROUTES[0];
   const Page = hidden ? WelcomePage : entry.page;
+  const inInbox = INBOX.includes(entry.id);
+  useEffect(() => {
+    if (!inInbox) return;
+    try {
+      localStorage.setItem('monarch.inbox', entry.id);
+    } catch {
+      /* ignore */
+    }
+  }, [entry.id]);
   return (
     <div class="h-full flex flex-col">
-      <TopBar active={hidden ? current : entry.id} />
+      <TopBar active={hidden ? current : inInbox ? 'inbox' : entry.id} />
+      {inInbox && <InboxTabs active={entry.id} />}
       <main class="flex-1 min-h-0 relative animate-monarch-fade" key={hidden ? current : entry.id}>
         <Page params={params} />
       </main>
@@ -112,20 +145,21 @@ function TopBar(props: { active: string }) {
         <span class="hidden sm:inline text-[14px] font-semibold tracking-[-0.01em]">Monarch</span>
       </a>
       <nav class="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none]" aria-label="Sections">
-        {NAV.map((n) => {
-          const Icon = n.icon;
-          const on = props.active === n.id;
+        {PRIMARY.map((id) => {
+          const r = id === 'inbox' ? { id, label: 'Inbox', icon: Inbox } : byId(id);
+          const Icon = r.icon;
+          const on = props.active === id;
           return (
-            <a key={n.id} href={`#/${n.id}`} class="hud-nav tip shrink-0" data-tip={on ? undefined : n.label} aria-label={n.label} aria-current={on ? 'page' : undefined}>
-              <Icon size={15} strokeWidth={1.6} />
-              <span class={on ? 'hidden md:inline' : 'hidden min-[1680px]:inline'}>{n.label}</span>
+            <a key={id} href={`#/${id === 'inbox' ? lastInbox() : id}`} class="hud-nav shrink-0" aria-current={on ? 'page' : undefined}>
+              <Icon size={15} strokeWidth={1.6} class="sm:hidden" />
+              <span class="hidden sm:inline">{r.label}</span>
             </a>
           );
         })}
+        <MoreMenu active={props.active} />
       </nav>
       <div class="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" data-tauri-drag-region>
         <AutoSwitch />
-        <EngineSwitch />
         <button
           type="button"
           class="hidden md:flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] text-fg-3 hover:text-fg hover:bg-raised transition-colors"
@@ -154,6 +188,60 @@ function TopBar(props: { active: string }) {
         </div>
       </div>
     </header>
+  );
+}
+
+/** the "More" menu: everything outside the daily pages */
+function MoreMenu(props: { active: string }) {
+  const [open, setOpen] = useState(false);
+  const on = MORE.includes(props.active);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const t = setTimeout(() => window.addEventListener('click', close, { once: true }));
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('click', close);
+    };
+  }, [open]);
+  return (
+    <div class="relative shrink-0">
+      <button type="button" class="hud-nav" aria-haspopup="menu" aria-expanded={open} aria-current={on ? 'page' : undefined} onClick={() => setOpen(!open)}>
+        <span class="hidden sm:inline">{on ? byId(props.active).label : 'More'}</span>
+        <ChevronDown size={13} strokeWidth={1.8} />
+      </button>
+      {open && (
+        <div role="menu" class="fixed mt-1 min-w-[180px] rounded-lg border border-line bg-[#1c1c1e] p-1 shadow-xl animate-monarch-fade">
+          {MORE.map((id) => {
+            const r = byId(id);
+            const Icon = r.icon;
+            return (
+              <a key={id} role="menuitem" href={`#/${id}`} class={`flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] ${props.active === id ? 'bg-raised text-fg' : 'text-fg-2 hover:bg-raised hover:text-fg'}`}>
+                <Icon size={14} strokeWidth={1.6} /> {r.label}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Mail / Slack / WhatsApp as tabs of one Inbox (each keeps its own route and deep links) */
+function InboxTabs(props: { active: string }) {
+  return (
+    <div class="shrink-0 flex items-center gap-1 px-3 sm:px-4 h-9 border-b border-line">
+      {INBOX.map((id) => {
+        const r = byId(id);
+        const Icon = r.icon;
+        const on = props.active === id;
+        return (
+          <a key={id} href={`#/${id}`} class={`flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[12.5px] transition-colors ${on ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2'}`} aria-current={on ? 'page' : undefined}>
+            <Icon size={13} strokeWidth={1.7} /> {r.label}
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
@@ -218,50 +306,6 @@ function AutoSwitch() {
   );
 }
 
-function EngineSwitch() {
-  const s = settings.value;
-  const h = health.value;
-  const dot = <Dot tone={conn.value === 'open' ? (phase.value === 'idle' ? 'ok' : 'red') : 'warn'} pulse={phase.value !== 'idle'} />;
-  if (!s) {
-    return (
-      <span class="hidden lg:flex items-center gap-2 text-[12px] text-fg-3 px-2">
-        {dot}
-        <span class="max-w-[220px] truncate">{h ? h.model : '—'}</span>
-      </span>
-    );
-  }
-  const onChange = async (c: ModelChoice | null) => {
-    if (!c) return;
-    let patch: Record<string, unknown>;
-    if (c.engine === 'claude-sdk') patch = { engine: 'claude-sdk', claudeSdk: { model: c.model } };
-    else {
-      const i = c.model.indexOf('/');
-      patch = { engine: 'pi', pi: { provider: c.model.slice(0, i), model: c.model.slice(i + 1) } };
-    }
-    try {
-      settings.value = await api.put<Settings>('/settings', patch);
-      toast(`Default model: ${c.engine === 'claude-sdk' ? `Claude · ${c.model}` : `pi · ${c.model}`}`, 'success');
-    } catch (e: any) {
-      toast(`Could not switch model: ${e?.message ?? e}`, 'error');
-    }
-  };
-  return (
-    <ModelPicker
-      class="hidden lg:block"
-      value={defaultChoice()}
-      onChange={(c) => void onChange(c)}
-      noDefault
-      placement="down"
-      title="Default engine and model — click to switch"
-      leading={dot}
-      buttonClass="!max-w-[230px]"
-      renderLabel={(info, c) => {
-        if ((c?.engine ?? s.engine) === 'claude-sdk') return `Claude · ${s.claudeSdk.model}`;
-        return `Pi · ${info?.name ?? s.pi.model}`;
-      }}
-    />
-  );
-}
 
 function Toasts() {
   if (!toasts.value.length) return null;

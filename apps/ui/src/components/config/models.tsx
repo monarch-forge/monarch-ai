@@ -4,7 +4,7 @@ import type { CustomModel, EngineId, ModelInfo, ProviderStatus, Settings, Thinki
 import { Plus, Trash2 } from 'lucide-preact';
 import { qs } from '../../lib/api.ts';
 import { settings, useResource } from '../../lib/store.ts';
-import { Panel, Tag, Spinner, ErrorLine } from '../ui.tsx';
+import { Panel, Tag, Spinner, ErrorLine, Disclosure } from '../ui.tsx';
 import { ModelPicker, type ModelChoice } from '../chat/model-picker.tsx';
 import { Field, INPUT, SELECT, RADIO, ToggleRow, SaveBar, saveSettings, useDraft, Kbd, Advanced } from './fields.tsx';
 
@@ -104,7 +104,7 @@ export function ModelsSection() {
             current={draft.engine}
             onPick={(e) => set({ engine: e })}
             title="Claude Agent SDK"
-            body="Claude Code's agent loop and tools. Uses your Claude subscription (or an Anthropic API key). Best for coding and long tool-heavy tasks."
+            body="Claude Code's agent loop. Best for coding and long tool-heavy tasks."
           />
           <EngineCard
             id="pi"
@@ -130,10 +130,13 @@ export function ModelsSection() {
           )
         }
       >
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
           <Field label="Model">
             <ModelSelect models={claudeModels.data} loading={claudeModels.loading} error={claudeModels.error} value={c.model} onChange={(v) => setC({ model: v })} extra={CLAUDE_ALIASES} />
           </Field>
+        </div>
+        <div class="mt-3">
+          <Advanced>
           <Field label="Effort" hint="Reasoning budget per turn.">
             <select class={SELECT} value={c.effort} onChange={(e) => setC({ effort: (e.target as HTMLSelectElement).value as Slice['claudeSdk']['effort'] })}>
               {EFFORTS.map((x) => (
@@ -143,15 +146,12 @@ export function ModelsSection() {
               ))}
             </select>
           </Field>
-        </div>
-        <div class="mt-3">
           <ToggleRow
             label="Use Claude subscription"
             hint="On: authenticate through your Claude Code login (Pro/Max). Off: use the Anthropic API key stored under Providers."
             checked={c.useSubscription}
             onChange={(v) => setC({ useSubscription: v })}
           />
-          <Advanced>
           <Field label="Claude executable" hint="Absolute path to the `claude` CLI. Leave empty to auto-detect.">
             <input class={`${INPUT} font-mono`} value={c.executablePath} onInput={(e) => setC({ executablePath: (e.target as HTMLInputElement).value })} placeholder="auto-detect" spellcheck={false} />
           </Field>
@@ -181,7 +181,7 @@ export function ModelsSection() {
       </Panel>
 
       <Panel title="Pi" active={draft.engine === 'pi'}>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Provider">
             {piProviders.length ? (
               <select class={SELECT} value={p.provider} onChange={(e) => setP({ provider: (e.target as HTMLSelectElement).value, model: '' })}>
@@ -199,15 +199,6 @@ export function ModelsSection() {
           <Field label="Model">
             <ModelSelect models={piModels.data} loading={piModels.loading} error={piModels.error} value={p.model} onChange={(v) => setP({ model: v })} />
           </Field>
-          <Field label="Thinking">
-            <select class={SELECT} value={p.thinkingLevel} onChange={(e) => setP({ thinkingLevel: (e.target as HTMLSelectElement).value as ThinkingLevel })}>
-              {THINKING.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </select>
-          </Field>
         </div>
         {piProviders.find((x) => x.id === p.provider && !x.configured) && (
           <div class="mt-3 text-[12px] text-warning">
@@ -219,22 +210,33 @@ export function ModelsSection() {
           </div>
         )}
 
-        <div class="mt-5 text-[12px] text-fg-3">
+        <Advanced>
+          <Field label="Thinking">
+            <select class={SELECT} value={p.thinkingLevel} onChange={(e) => setP({ thinkingLevel: (e.target as HTMLSelectElement).value as ThinkingLevel })}>
+              {THINKING.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </select>
+          </Field>
+        <div class="mt-1 text-[12px] text-fg-3">
           OpenAI-compatible endpoints (OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…) are added as custom providers under{' '}
           <a href="#/config/providers" class="underline underline-offset-2 text-fg-2">
             Providers → Custom provider
           </a>
           ; their models then appear in the provider list above.
         </div>
+        </Advanced>
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
 
-      <h2 class="text-[14.5px] font-semibold text-fg mt-4 px-1">Fine-tuning</h2>
-      <p class="text-[12.5px] text-fg-3 -mt-2 px-1">Helpers, small models and how long conversations are kept in memory.</p>
-      <WorkerModelPanel />
-      <SmallModelPanel />
-      <AutonomyPanel />
-      <ContextPanel />
+      <Disclosure label="Advanced" class="mt-1">
+        <WorkerModelPanel />
+        <SmallModelPanel />
+        <AutonomyPanel />
+        <ContextPanel />
+      </Disclosure>
     </div>
   );
 }

@@ -50,18 +50,18 @@ interface Item {
 }
 
 const PAGES: { id: string; label: string; icon: LucideIcon; keywords: string }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutGrid, keywords: 'home dashboard hud' },
+  { id: 'overview', label: 'Home', icon: LayoutGrid, keywords: 'home overview dashboard hud brief' },
   { id: 'chat', label: 'Chat', icon: MessageSquare, keywords: 'chat beru comms sessions conversations' },
   { id: 'workshop', label: 'Workshop', icon: Wrench, keywords: 'coding code terminal' },
-  { id: 'mail', label: 'Mail', icon: Mail, keywords: 'gmail inbox email' },
-  { id: 'slack', label: 'Slack', icon: Hash, keywords: 'channels messages' },
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, keywords: 'chats messages phone' },
+  { id: 'mail', label: 'Inbox · Mail', icon: Mail, keywords: 'gmail inbox email' },
+  { id: 'slack', label: 'Inbox · Slack', icon: Hash, keywords: 'inbox channels messages' },
+  { id: 'whatsapp', label: 'Inbox · WhatsApp', icon: MessageCircle, keywords: 'inbox whatsapp chats messages phone' },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, keywords: 'calendar tasks events automations schedule' },
   { id: 'ledger', label: 'Ledger', icon: Wallet, keywords: 'ledger finance money expenses income budget transactions' },
   { id: 'memory', label: 'Memory', icon: Network, keywords: 'vault notes graph obsidian' },
   { id: 'evolve', label: 'Evolve', icon: Dna, keywords: 'extensions skills proposals self evolution tools reflect forge' },
   { id: 'systems', label: 'Systems', icon: Activity, keywords: 'cpu memory processes telemetry machine' },
-  { id: 'config', label: 'Config', icon: SlidersHorizontal, keywords: 'settings providers models accounts preferences' },
+  { id: 'config', label: 'Settings', icon: SlidersHorizontal, keywords: 'settings config providers models accounts preferences' },
   { id: 'welcome', label: 'Welcome & guides', icon: BookOpen, keywords: 'welcome guide help how to start tutorial docs onboarding' },
 ];
 

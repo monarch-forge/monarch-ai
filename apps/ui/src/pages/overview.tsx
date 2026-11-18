@@ -1,7 +1,7 @@
 /**
- * Overview — the cozy home. One focus: a warm greeting, a small calm orb and the command console.
+ * Overview — the cozy home. One focus: a warm greeting and the command console.
  * Below it, at most three cards with what matters today (schedule, what is waiting on the user, inbox).
- * Telemetry (weather, vitals, model usage, uplinks, assistant log) lives behind "More".
+ * Telemetry (status orb, weather, vitals, model usage, uplinks, assistant log) lives behind "More".
  */
 import type { ComponentChildren } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
@@ -24,10 +24,10 @@ export default function OverviewPage(_props: { params: string[] }) {
   const usage = useResource<UsageReport>('/usage?range=24h', ['sessions'], { intervalMs: 60_000 });
   const [more, setMore] = useState(() => {
     try {
-      // open by default; stays closed only after the user closes it
-      return localStorage.getItem(MORE_KEY) !== '0';
+      // closed by default (calmer home); stays open only after the user opens it
+      return localStorage.getItem(MORE_KEY) === '1';
     } catch {
-      return true;
+      return false;
     }
   });
   const toggleMore = () => {
@@ -44,9 +44,6 @@ export default function OverviewPage(_props: { params: string[] }) {
     <div class="ov h-full overflow-y-auto overflow-x-hidden">
       <div class="mx-auto w-full max-w-[1080px] px-4 lg:px-6 pt-6 sm:pt-10 pb-24 flex flex-col gap-8">
         <section class="flex flex-col items-center gap-5" aria-label="Home">
-          <div class="relative w-[148px] h-[148px] sm:w-[176px] sm:h-[176px]">
-            <OrbBlock usage={usage.data} />
-          </div>
           <Greeting briefing={briefing.data} error={briefing.error} hint={<RefreshHint res={briefing} />} />
           <div class="w-full max-w-[720px]">
             <CommandConsole />
@@ -56,8 +53,8 @@ export default function OverviewPage(_props: { params: string[] }) {
         <BriefCard />
 
         <section class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start" aria-label="Today">
-          <SchedulePanel class="max-h-[320px] md:col-span-2 lg:col-span-1" />
           <WaitingCard res={briefing} />
+          <SchedulePanel class="max-h-[320px]" />
           <InboxCard res={briefing} />
         </section>
 
@@ -68,11 +65,16 @@ export default function OverviewPage(_props: { params: string[] }) {
             onClick={toggleMore}
             aria-expanded={more}
           >
-            {more ? 'Less' : 'More — weather, system and usage'}
+            {more ? 'Less' : 'More — status, weather, system and usage'}
             <ChevronDown size={14} strokeWidth={1.6} class={`transition-transform duration-150 ${more ? 'rotate-180' : ''}`} />
           </button>
           {more && (
             <div class="mt-4 grid gap-4 grid-cols-1 md:grid-cols-2 animate-monarch-fade">
+              <div class="md:col-span-2 flex justify-center">
+                <div class="relative w-[148px] h-[148px]">
+                  <OrbBlock usage={usage.data} />
+                </div>
+              </div>
               <EnvPanel />
               <UsagePanel res={usage} />
               <VitalsPanel />

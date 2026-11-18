@@ -3,19 +3,17 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { speak, stopSpeaking } from '../lib/voice.ts';
-import type { Automation, SessionKind } from '@monarch/shared';
-import { Search, SquarePen, X } from 'lucide-preact';
+import { Search, SquarePen } from 'lucide-preact';
 import { Tag, Spinner, ErrorLine, Btn } from '../components/ui.tsx';
-import { ChatLayout, SideLabel, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
+import { ChatLayout, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
-import { SessionRow, Segmented } from '../components/chat/session-list.tsx';
+import { SessionRow } from '../components/chat/session-list.tsx';
 import { SessionStats, engineLabel, ContextMeter, compactCommand } from '../components/chat/meta.tsx';
 import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
 import { useChatSession, useSessions, renameSession, totalTokens } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
 import { fmt } from '../components/ui.tsx';
-import { ActiveAutomations } from '../components/agenda/automations.tsx';
 
 const SUGGESTED = [
   { title: 'Brief me on my day', text: 'Give me a brief of my day: calendar, important unread email, open tasks and the weather.' },
@@ -33,51 +31,20 @@ const QUICK = [
   'Search the web for …',
 ];
 
-function useStoredKind(): [SessionKind, (k: SessionKind) => void] {
-  const [k, setK] = useState<SessionKind>(() => {
-    try {
-      return (localStorage.getItem('monarch.comms.kind') as SessionKind) === 'automation' ? 'automation' : 'chat';
-    } catch {
-      return 'chat';
-    }
-  });
-  return [
-    k,
-    (v) => {
-      setK(v);
-      try {
-        localStorage.setItem('monarch.comms.kind', v);
-      } catch {
-        /* ignore */
-      }
-    },
-  ];
-}
-
 export default function CommsPage(props: { params: string[] }) {
-  // "#/chat/automations/<id>?" = deep link to the Automations tab (Active list), e.g. from a notification
+  // "#/chat/automations/<id>?" = old deep link (core notifications); automations live in Agenda now
   const autoLink = props.params[0] === 'automations';
   const routeId = autoLink ? undefined : props.params[0];
   const isNew = routeId === 'new';
   const sessionId = routeId && !isNew ? routeId : null;
 
-  const [kind, setKind] = useStoredKind();
   const [query, setQuery] = useState('');
-  // automation selected in the Active list → filters "Recent runs" (runs are titled with the automation name)
-  const [selAuto, setSelAuto] = useState<Automation | null>(null);
-  const [flash, setFlash] = useState<string | null>(null);
   useEffect(() => {
-    if (!autoLink) return;
-    setKind('automation');
-    const id = props.params[1] || null;
-    setFlash(id);
-    if (id) setTimeout(() => setFlash((f) => (f === id ? null : f)), 4000);
-    location.replace('#/chat');
-  }, [autoLink, props.params[1]]);
+    if (autoLink) location.replace('#/agenda');
+  }, [autoLink]);
   const [detailsOpen, setDetailsOpen] = useStoredFlag('monarch.comms.details', false);
   const [inject, setInject] = useState<{ text: string; n: number } | null>(null);
-  const list = useSessions(kind);
-  const chats = useSessions('chat');
+  const list = useSessions('chat');
   const chat = useChatSession(sessionId);
   const s = settings.value;
   // model chosen in the composer for this session (null = default for new / keep current for existing)
@@ -86,17 +53,16 @@ export default function CommsPage(props: { params: string[] }) {
 
   // no id → open the most recent chat (or stay in "new" mode when there is none)
   useEffect(() => {
-    if (routeId || autoLink || !chats.sessions) return;
-    if (chats.sessions.length) location.replace(`#/chat/${encodeURIComponent(chats.sessions[0].id)}`);
+    if (routeId || autoLink || !list.sessions) return;
+    if (list.sessions.length) location.replace(`#/chat/${encodeURIComponent(list.sessions[0].id)}`);
     else location.replace('#/chat/new');
-  }, [routeId, chats.sessions]);
+  }, [routeId, list.sessions]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let all = list.sessions ?? [];
-    if (kind === 'automation' && selAuto) all = all.filter((x) => x.title === selAuto.name);
+    const all = list.sessions ?? [];
     return q ? all.filter((x) => x.title.toLowerCase().includes(q) || x.model.toLowerCase().includes(q)) : all;
-  }, [list.sessions, query, kind, selAuto]);
+  }, [list.sessions, query]);
 
   // a turn asked by voice gets its reply spoken (when spoken replies are on)
   const voiceTurn = useRef(false);
@@ -160,18 +126,7 @@ export default function CommsPage(props: { params: string[] }) {
 
   const sidebar = (
     <>
-      <div class="px-3 pt-3 flex items-center gap-2">
-        <Segmented
-          class="flex-1"
-          value={kind}
-          onChange={setKind}
-          options={[
-            { value: 'chat', label: 'Chats' },
-            { value: 'automation', label: 'Automations' },
-          ]}
-        />
-      </div>
-      <div class="px-3 pt-2 flex items-center gap-1.5">
+      <div class="px-3 pt-3 flex items-center gap-1.5">
         <label class="flex-1 min-w-0 flex items-center gap-2 rounded-[8px] px-2.5 h-8 text-fg-3 hover:bg-[var(--bg-raised,#202023)] focus-within:bg-[var(--bg-raised,#202023)] transition-colors duration-150">
           <Search size={14} strokeWidth={1.75} />
           <input
@@ -187,25 +142,6 @@ export default function CommsPage(props: { params: string[] }) {
         </button>
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto py-2">
-        {kind === 'automation' && (
-          <>
-            <SideLabel>Active</SideLabel>
-            <div class="px-1">
-              <ActiveAutomations selected={selAuto?.id ?? null} onSelect={setSelAuto} highlight={flash} />
-            </div>
-            <SideLabel
-              right={
-                selAuto && (
-                  <button class="text-[11.5px] text-fg-3 hover:text-fg truncate max-w-[140px] inline-flex items-center gap-1" onClick={() => setSelAuto(null)} title="Show all runs">
-                    {selAuto.name} <X size={11} />
-                  </button>
-                )
-              }
-            >
-              {selAuto ? 'Runs' : 'Recent runs'}
-            </SideLabel>
-          </>
-        )}
         {list.loading && !list.sessions ? (
           <div class="flex justify-center py-6">
             <Spinner />
@@ -218,11 +154,7 @@ export default function CommsPage(props: { params: string[] }) {
           <p class="px-5 py-6 text-[13px] text-fg-3 leading-relaxed">
             {query
               ? 'Nothing matches that search.'
-              : kind === 'chat'
-                ? 'No conversations yet. Say hello to get started.'
-                : selAuto
-                  ? 'This automation hasn’t run yet.'
-                  : 'No automation runs yet.'}
+              : 'No conversations yet. Say hello to get started.'}
           </p>
         ) : (
           filtered.map((x) => (

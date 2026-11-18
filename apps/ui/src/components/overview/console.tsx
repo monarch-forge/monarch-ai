@@ -7,7 +7,7 @@ import { Markdown } from '../chat/markdown.tsx';
 import { Tag } from '../ui.tsx';
 import { activeConversation, consoleConversation, consoleHistory, consoleRun, dismissConsoleRun, newConsoleConversation, runConsoleCommand } from './console-store.ts';
 
-const QUICK = ['Brief me on today', 'Triage my inbox', "What's on Slack?", 'Plan my afternoon'];
+const QUICK = ['Brief me on today', 'Triage my inbox', 'Plan my afternoon'];
 
 export function CommandConsole() {
   const [text, setText] = useState('');

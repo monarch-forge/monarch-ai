@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import type { PermissionMode } from '@monarch/shared';
 import { FolderOpen } from 'lucide-preact';
 import { settings } from '../../lib/store.ts';
-import { Panel, Tag } from '../ui.tsx';
+import { Panel, Tag, Disclosure } from '../ui.tsx';
 import { Field, INPUT, RADIO, SaveBar, saveSettings, useDraft } from './fields.tsx';
 import { DirBrowser } from './dir-browser.tsx';
 
@@ -81,6 +81,7 @@ export function PermissionsSection() {
         <div class="text-[11.5px] text-fg-3 mt-3">Pending approvals appear in the dock at the bottom of the screen. “Always for this session” remembers a tool until the session ends.</div>
       </Panel>
 
+      <Disclosure label="Advanced" class="mt-1">
       <Panel title="Locations">
         <div class="grid grid-cols-1 gap-4">
           <Field label="Memory vault" hint="Obsidian-compatible folder of markdown notes. Monarch reads and writes its long-term memory here.">
@@ -112,8 +113,9 @@ export function PermissionsSection() {
             </div>
           </Field>
         </div>
-        <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
+      </Disclosure>
+      <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
 
       <DirBrowser
         open={browse !== null}
