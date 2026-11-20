@@ -23,6 +23,7 @@ import {
   Search,
   MessageCircle,
   Inbox,
+  Building2,
 } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route, conn, health, phase, settings, toasts, toast, unreadNotifications } from './lib/store.ts';
@@ -42,6 +43,7 @@ import AgendaPage from './pages/agenda.tsx';
 import MemoryPage from './pages/memory.tsx';
 import SystemsPage from './pages/systems.tsx';
 import RouterPage from './pages/router.tsx';
+import OfficePage from './pages/office.tsx';
 import EvolvePage from './pages/evolve.tsx';
 import ConfigPage from './pages/config.tsx';
 import LedgerPage from './pages/ledger.tsx';
@@ -68,6 +70,7 @@ const ROUTES: Route[] = [
   { id: 'agenda', label: 'Agenda', icon: CalendarDays, page: AgendaPage },
   { id: 'ledger', label: 'Ledger', icon: Wallet, page: LedgerPage },
   { id: 'workshop', label: 'Workshop', icon: Wrench, page: WorkshopPage },
+  { id: 'office', label: 'Office', icon: Building2, page: OfficePage },
   { id: 'memory', label: 'Memory', icon: Network, page: MemoryPage },
   { id: 'evolve', label: 'Evolve', icon: Dna, page: EvolvePage },
   { id: 'systems', label: 'Systems', icon: Activity, page: SystemsPage },
@@ -76,7 +79,7 @@ const ROUTES: Route[] = [
 ];
 /** nav entries that are tab groups of existing pages (each page keeps its own route and deep links) */
 const GROUPS: Record<string, { label: string; icon: LucideIcon; tabs: string[] }> = {
-  agents: { label: 'Chat', icon: MessageSquare, tabs: ['chat', 'workshop'] },
+  agents: { label: 'Chat', icon: MessageSquare, tabs: ['chat', 'workshop', 'office'] },
   inbox: { label: 'Inbox', icon: Inbox, tabs: ['mail', 'slack', 'whatsapp'] },
   planner: { label: 'Planner', icon: CalendarDays, tabs: ['agenda', 'ledger'] },
   system: { label: 'System', icon: Activity, tabs: ['systems', 'evolve', 'memory', 'router'] },
@@ -263,7 +266,7 @@ function AutoSwitch() {
   const s = settings.value;
   const [busy, setBusy] = useState(false);
   if (!s) return null;
-  const on = s.permissions.mode === 'auto';
+  const on = s.permissions.mode !== 'ask'; // auto, auto-safe and auto-all are all "on"
   const toggle = async () => {
     setBusy(true);
     try {
@@ -280,11 +283,11 @@ function AutoSwitch() {
       type="button"
       disabled={busy}
       onClick={() => void toggle()}
-      title={on ? 'Auto mode on: hands-off, only send/post/delete need approval. Click to turn off.' : 'Turn on Auto mode: Monarch works on its own and notifies you only when it needs you.'}
+      title={on ? `Auto mode on (${s.permissions.mode}). Click to turn off.` : 'Turn on Auto mode: Monarch works on its own and notifies you only when it needs you.'}
       class={`flex items-center gap-1.5 h-7 px-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors ${on ? 'text-fg' : 'text-[#9e9ea4] hover:text-fg'}`}
     >
       <Zap size={13} strokeWidth={1.75} class={`sm:hidden ${on ? 'text-red' : ''}`} />
-      <span class="hidden sm:inline">Auto · {on ? 'On' : 'Off'}</span>
+      <span class="hidden sm:inline">Auto · {({ auto: 'On', 'auto-safe': 'Safe', 'auto-all': 'All' } as Record<string, string>)[s.permissions.mode] ?? 'Off'}</span>
     </button>
   );
 }
