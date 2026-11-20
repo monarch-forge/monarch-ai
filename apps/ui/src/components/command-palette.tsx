@@ -36,6 +36,7 @@ import { conn, navigate, settings, toast } from '../lib/store.ts';
 import { stopSpeaking, voiceSupport, UNSUPPORTED_SPEAK } from '../lib/voice.ts';
 import { notificationsOpen } from './notifications.tsx';
 import { sendNewChat } from './overview/console-store.ts';
+import { askOpen } from './os/ask-bar.tsx';
 
 export const paletteOpen = signal(false);
 
@@ -189,6 +190,18 @@ export function CommandPalette() {
       },
     }));
     const actions: Item[] = [
+      {
+        id: 'act:ask',
+        group: 'Actions',
+        label: 'Ask Monarch…',
+        hint: 'Ctrl Space',
+        keywords: 'ask quick prompt question spotlight',
+        icon: MessageSquarePlus,
+        run: () => {
+          close();
+          askOpen.value = true;
+        },
+      },
       {
         id: 'act:new-chat',
         group: 'Actions',

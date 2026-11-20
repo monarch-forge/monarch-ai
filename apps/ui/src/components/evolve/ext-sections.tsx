@@ -391,7 +391,7 @@ export function ExtLogs(props: { d: ExtensionDetail }) {
             </button>
           ))}
           <label class="flex items-center gap-1.5 text-[12px] text-fg-3 ml-2 cursor-pointer">
-            <input type="checkbox" class="checkbox checkbox-xs rounded-[6px] border-line" checked={follow} onChange={(e) => setFollow((e.target as HTMLInputElement).checked)} />
+            <input type="checkbox" class="checkbox checkbox-xs rounded-[var(--radius-control)] border-line" checked={follow} onChange={(e) => setFollow((e.target as HTMLInputElement).checked)} />
             follow
           </label>
         </div>

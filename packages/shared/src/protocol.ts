@@ -19,6 +19,8 @@ export type ISODate = string; // ISO-8601 timestamp
 export type ID = string;
 
 export type EngineId = 'claude-sdk' | 'pi';
+/** agent roles with their own default model: top-level Chat/Workshop sessions and agents spawned by each */
+export type AgentRole = 'chat' | 'workshop' | 'chatSub' | 'workshopSub';
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
 /**
  * ask = approve sensitive+dangerous; auto = Auto mode (agent works on its own, never asks in chat; only dangerous
@@ -295,6 +297,8 @@ export interface Settings {
     autonomy?: 'high' | 'normal';
     /** default runtime/model for worker agents (agent_start without engine/model); unset = the default engine/model */
     workerModel?: { engine: EngineId; model: string } | null;
+    /** default model per agent role; null/unset = global default (chatSub falls back to workerModel). Explicit spawner/UI choice wins. */
+    roleModels?: Partial<Record<AgentRole, { engine: EngineId; model: string } | null>>;
   };
   user: {
     name: string; // "Tony"
@@ -364,6 +368,8 @@ export interface Settings {
     reflect: 'off' | 'daily' | 'weekly';
     /** only core tools are loaded up front; the rest are discovered with tool search (keeps the context lean) */
     deferTools: boolean;
+    /** draft a skill (disabled until approved in Evolve) after the same kind of task succeeds twice; missing = on */
+    draftSkills?: boolean;
   };
 }
 
@@ -445,6 +451,8 @@ export interface SessionSummary {
   itemCount: number;
   usage: Usage;
   running: boolean;
+  /** coding workers: the plan set with plan_set, ticked with plan_step */
+  plan?: PlanStep[];
   /** set when this session was started by another session's agent (e.g. a coding agent delegated from a Comms chat) */
   parentSessionId?: ID;
   /** live context-window usage (prompt size of the latest model call) + compaction history */
@@ -492,6 +500,38 @@ export type ChatItem =
     }
   | { kind: 'error'; id: ID; ts: ISODate; message: string }
   | { kind: 'system'; id: ID; ts: ISODate; text: string };
+
+/** open-threads board of a chat session (GET /api/sessions/:id/threads; refetch on data.changed 'threads') */
+export type ThreadStatus = 'open' | 'waiting' | 'done';
+export interface ThreadLink {
+  kind: 'worker' | 'pr' | 'mail' | 'slack' | 'task' | 'url';
+  /** worker: session id; pr/url: URL; mail/slack/task: id */
+  ref: string;
+  label?: string;
+}
+export interface ChatThread {
+  id: ID;
+  title: string;
+  /** free text: "work", "personal", "repo:backend", "person:Andi" */
+  area: string;
+  status: ThreadStatus;
+  next?: string;
+  links: ThreadLink[];
+  /** a linked worker finished and the agent has not updated the thread since */
+  needsReport?: boolean;
+  /** internal dedupe key of the last worker completion reported */
+  reportedKey?: string;
+  /** internal: follow-up parked while the chat was busy */
+  pendingNudge?: string;
+  updatedAt: ISODate;
+}
+
+export interface PlanStep {
+  text: string;
+  files?: string[];
+  status: 'open' | 'done' | 'skipped';
+  note?: string;
+}
 
 export interface SessionDetail extends SessionSummary {
   items: ChatItem[];
@@ -1111,6 +1151,8 @@ export interface SkillSummary {
   updatedAt: ISODate;
   /** how often the agent read it */
   uses: number;
+  /** auto-drafted from repeated tasks; hidden from the agent until approved in Evolve */
+  draft?: boolean;
 }
 
 export interface Skill extends SkillSummary {
@@ -1225,7 +1267,8 @@ export type ServerEvent =
         | 'sync'
         | 'mcp'
         | 'ledger'
-        | 'projects';
+        | 'projects'
+        | 'threads';
     }
   /** voice pipeline state (mic level 0..1 while listening) */
   | { type: 'voice.state'; phase: 'idle' | 'listening' | 'transcribing' | 'speaking'; level?: number }
@@ -1342,6 +1385,7 @@ export type ClientCommand =
  * GET    /api/skills/:id                     -> Skill
  * PUT    /api/skills/:id {name, description, body} -> Skill
  * DELETE /api/skills/:id                     -> { ok }
+ * POST   /api/skills/:id/approve             -> Skill   (draft → live)
  * GET    /api/evolution/stats                -> EvolutionStats
  * GET    /api/evolution/timeline?limit=100   -> EvolutionEntry[]
  * GET    /api/evolution/proposals            -> EvolutionProposal[]

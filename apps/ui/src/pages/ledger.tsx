@@ -5,8 +5,8 @@ import type { LedgerAccountType, LedgerAccountView, LedgerBudget, LedgerEntry, L
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Search, Bot } from 'lucide-preact';
 import { api } from '../lib/api.ts';
 import { toast, useResource } from '../lib/store.ts';
-import { Btn, Empty, Panel, SegBar, Spinner, Stat, Tag } from '../components/ui.tsx';
-import { Modal, useConfirm } from '../components/mail/kit.tsx';
+import { Btn, DotText, EmptyState, Glyph, ListRow, Panel, Pills, Skeleton, Stat, Tag } from '../components/ui.tsx';
+import { askMonarch, Modal, useConfirm } from '../components/mail/kit.tsx';
 import { Field, INPUT, SELECT, TEXTAREA } from '../components/config/fields.tsx';
 
 const enc = encodeURIComponent;
@@ -64,17 +64,17 @@ export default function LedgerPage() {
           <div class="flex flex-wrap items-center gap-2">
             <h1 class="text-[20px] font-semibold tracking-[-0.01em] text-fg mr-2">Ledger</h1>
             <div class="flex items-center gap-1">
-              <button class="btn btn-ghost btn-xs" title="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
+              <Btn variant="ghost" size="xs" title="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
                 <ChevronLeft size={14} />
-              </button>
+              </Btn>
               <span class="text-[13px] text-fg-2 min-w-[120px] text-center">{monthLabel}</span>
-              <button class="btn btn-ghost btn-xs" title="Next month" onClick={() => setMonth(addMonths(month, 1))}>
+              <Btn variant="ghost" size="xs" title="Next month" onClick={() => setMonth(addMonths(month, 1))}>
                 <ChevronRight size={14} />
-              </button>
+              </Btn>
               {!isCurrent && (
-                <button class="btn btn-ghost btn-xs text-fg-3" onClick={() => setMonth(monthStart(new Date()))}>
+                <Btn variant="ghost" size="xs" class="text-fg-3" onClick={() => setMonth(monthStart(new Date()))}>
                   Today
-                </button>
+                </Btn>
               )}
             </div>
             <div class="ml-auto">
@@ -93,11 +93,11 @@ export default function LedgerPage() {
             title={`Transactions${entries.data ? ` · ${entries.data.length}` : ''}`}
             right={
               <div class="flex items-center gap-2">
-                <label class="flex items-center gap-1.5 h-7 px-2 rounded-md bg-[#121213] border border-line">
+                <label class="flex items-center gap-1.5 h-7 px-2 rounded-[var(--radius-control)] bg-[#121213] border border-line">
                   <Search size={11} class="text-fg-3" />
                   <input class="bg-transparent outline-none text-[12px] w-24 sm:w-40" placeholder="Search" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
                 </label>
-                <select class="select select-xs bg-[#121213] border-line rounded-md text-[12px]" value={type} onChange={(e) => setType((e.target as HTMLSelectElement).value as any)}>
+                <select class="select select-xs bg-[#121213] border-line rounded-[var(--radius-control)] text-[12px]" value={type} onChange={(e) => setType((e.target as HTMLSelectElement).value as any)}>
                   <option value="">All</option>
                   <option value="expense">Expenses</option>
                   <option value="income">Income</option>
@@ -107,13 +107,27 @@ export default function LedgerPage() {
             }
           >
             {entries.loading && !entries.data ? (
-              <div class="p-6 flex justify-center">
-                <Spinner />
-              </div>
+              <Skeleton lines={6} class="p-4" />
             ) : !shown.length ? (
-              <Empty>{entries.data?.length ? 'No entries match.' : `Nothing recorded for ${monthLabel}. Add an entry, or ask Chat to record transactions from your email.`}</Empty>
+              entries.data?.length ? (
+                <EmptyState title="No entries match" hint="Try another search or type filter." actions={<Btn onClick={() => { setQ(''); setType(''); }}>Clear filters</Btn>} />
+              ) : (
+                <EmptyState
+                  icon={<Bot size={18} strokeWidth={1.5} />}
+                  title={`Nothing recorded for ${monthLabel}`}
+                  hint="Add an entry by hand, or let Monarch pull transactions out of your email receipts."
+                  actions={
+                    <>
+                      <Btn variant="primary" onClick={() => setEditing('new')}>
+                        <Plus size={13} /> Add entry
+                      </Btn>
+                      <Btn onClick={() => askMonarch(`Import my transactions for ${monthLabel} from my email (receipts, bank and card notifications) into the ledger. Skip duplicates.`)}>Import from email</Btn>
+                    </>
+                  }
+                />
+              )
             ) : (
-              <ul class="divide-y divide-line">
+              <ul class="flex flex-col gap-0.5 p-1.5">
                 {shown.map((e) => (
                   <EntryRow key={e.id} e={e} onEdit={() => setEditing(e)} onDelete={() => void remove(e)} />
                 ))}
@@ -168,7 +182,7 @@ function Collapsible(props: { id: string; title: string; right?: ComponentChildr
 
 function Totals(props: { summary?: LedgerSummary }) {
   const t = props.summary?.totals ?? [];
-  if (!props.summary) return <div class="h-[68px]" />;
+  if (!props.summary) return <Skeleton h={68} class="rounded-[var(--radius-card)]" />;
   if (!t.length)
     return (
       <div class="hud-panel px-4 py-3 grid grid-cols-3 gap-4">
@@ -181,9 +195,9 @@ function Totals(props: { summary?: LedgerSummary }) {
     <div class="flex flex-col gap-2">
       {t.map((x) => (
         <div key={x.currency} class="hud-panel px-4 py-3 grid grid-cols-3 gap-4">
-          <Stat label={`Income · ${x.currency}`} value={<span class="text-success">{money(x.income, x.currency)}</span>} />
-          <Stat label="Expenses" value={money(x.expense, x.currency)} sub={x.transfer ? `${money(x.transfer, x.currency)} transferred` : undefined} />
-          <Stat label="Net" value={<span class={x.net < 0 ? 'text-red' : 'text-fg'}>{money(x.net, x.currency)}</span>} />
+          <Stat label={`Income · ${x.currency}`} value={<DotText class="text-success">{money(x.income, x.currency)}</DotText>} />
+          <Stat label="Expenses" value={<DotText>{money(x.expense, x.currency)}</DotText>} sub={x.transfer ? `${money(x.transfer, x.currency)} transferred` : undefined} />
+          <Stat label="Net" value={<DotText class={x.net < 0 ? 'text-red' : 'text-fg'}>{money(x.net, x.currency)}</DotText>} />
         </div>
       ))}
     </div>
@@ -194,48 +208,59 @@ function EntryRow(props: { e: LedgerEntry; onEdit: () => void; onDelete: () => v
   const e = props.e;
   const d = /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? new Date(`${e.date}T00:00:00`) : new Date(e.date);
   return (
-    <li class="group flex items-center gap-3 px-3.5 py-2.5 hover:bg-white/[0.02]">
-      <div class="w-10 shrink-0 text-center">
-        <div class="text-[15px] text-fg leading-none">{d.getDate()}</div>
-        <div class="text-[10px] text-fg-3 uppercase mt-0.5">{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-1.5 min-w-0">
-          <span class="text-[13px] text-fg truncate" title={e.notes || e.description}>
-            {e.description}
+    <li>
+      <ListRow
+        class="px-3.5"
+        lead={
+          <span class="block w-10 text-center">
+            <DotText class="block text-[15px] text-fg leading-none">{d.getDate()}</DotText>
+            <span class="block text-[10px] text-fg-3 uppercase mt-0.5">{d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
           </span>
-          {e.source === 'agent' && (
-            <span title={`Recorded by the agent${e.sourceRef ? ` · ${e.sourceRef}` : ''}`} class="text-fg-3 shrink-0">
-              <Bot size={11} />
+        }
+        title={
+          <span class="flex items-center gap-1.5 min-w-0 text-[13px]">
+            <span class="truncate" title={e.notes || e.description}>
+              {e.description}
             </span>
-          )}
-        </div>
-        <div class="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11.5px] text-fg-3">
-          {e.category && <Tag>{e.category}</Tag>}
-          {e.account && (
-            <span>
-              {e.account}
-              {e.toAccount ? ` → ${e.toAccount}` : ''}
+            {e.source === 'agent' && (
+              <span title={`Recorded by the agent${e.sourceRef ? ` · ${e.sourceRef}` : ''}`} class="text-fg-3 shrink-0">
+                <Bot size={11} />
+              </span>
+            )}
+          </span>
+        }
+        sub={
+          <span class="flex flex-wrap items-center gap-1.5 text-[11.5px]">
+            {e.category && <Tag>{e.category}</Tag>}
+            {e.account && (
+              <span>
+                {e.account}
+                {e.toAccount ? ` → ${e.toAccount}` : ''}
+              </span>
+            )}
+            {e.merchant && e.merchant !== e.description && <span>· {e.merchant}</span>}
+            {e.tags.map((t) => (
+              <span key={t}>#{t}</span>
+            ))}
+          </span>
+        }
+        trail={
+          <>
+            <span class={`text-[13.5px] tabular-nums ${e.type === 'income' ? 'text-success' : e.type === 'transfer' ? 'text-fg-2' : 'text-fg'}`}>
+              {SIGN[e.type]}
+              {money(e.amount, e.currency)}
             </span>
-          )}
-          {e.merchant && e.merchant !== e.description && <span>· {e.merchant}</span>}
-          {e.tags.map((t) => (
-            <span key={t}>#{t}</span>
-          ))}
-        </div>
-      </div>
-      <div class={`text-[13.5px] tabular-nums shrink-0 ${e.type === 'income' ? 'text-success' : e.type === 'transfer' ? 'text-fg-2' : 'text-fg'}`}>
-        {SIGN[e.type]}
-        {money(e.amount, e.currency)}
-      </div>
-      <div class="flex gap-0.5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
-        <button class="btn btn-ghost btn-xs px-1.5" title="Edit" onClick={props.onEdit}>
-          <Pencil size={11} />
-        </button>
-        <button class="btn btn-ghost btn-xs px-1.5 hover:text-red" title="Delete" onClick={props.onDelete}>
-          <Trash2 size={11} />
-        </button>
-      </div>
+            <span class="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+              <Btn variant="ghost" size="xs" class="px-1.5" title="Edit" onClick={props.onEdit}>
+                <Pencil size={11} />
+              </Btn>
+              <Btn variant="ghost" size="xs" class="px-1.5 hover:text-red" title="Delete" onClick={props.onDelete}>
+                <Trash2 size={11} />
+              </Btn>
+            </span>
+          </>
+        }
+      />
     </li>
   );
 }
@@ -289,9 +314,9 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
       title="Monthly budgets"
       right={
         !adding && (
-          <button class="btn btn-ghost btn-xs text-fg-3 hover:text-fg" onClick={() => setAdding(true)}>
+          <Btn variant="ghost" size="xs" class="text-fg-3 hover:text-fg" onClick={() => setAdding(true)}>
             <Plus size={11} /> Add
-          </button>
+          </Btn>
         )
       }
     >
@@ -319,23 +344,37 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
         </form>
       )}
       {!list.length && !adding ? (
-        <div class="text-[12.5px] text-fg-3">No budgets yet.</div>
+        <EmptyState
+          class="!py-4"
+          title="No budgets yet"
+          hint="Set a monthly limit per category and watch it fill up."
+          actions={
+            <Btn size="xs" onClick={() => setAdding(true)}>
+              <Plus size={11} /> Add budget
+            </Btn>
+          }
+        />
       ) : (
-        <ul class="flex flex-col gap-3">
+        <ul class="flex flex-col gap-0.5 -mx-3">
           {list.map((b) => {
             const pct = b.limit ? (b.spent / b.limit) * 100 : 0;
             return (
-              <li key={`${b.category}-${b.currency}`} class="group">
-                <div class="flex items-baseline justify-between gap-2 text-[12.5px]">
-                  <span class="text-fg-2 truncate">{b.category}</span>
-                  <span class="tabular-nums text-fg-3">
-                    <span class={pct > 100 ? 'text-red' : 'text-fg'}>{money(b.spent, b.currency)}</span> / {money(b.limit, b.currency)}
-                  </span>
-                  <button class="opacity-0 group-hover:opacity-100 text-fg-3 hover:text-red" title="Remove budget" onClick={() => void save({ category: b.category, currency: b.currency, limit: 0 })}>
-                    <Trash2 size={10} />
-                  </button>
-                </div>
-                <SegBar value={pct} segments={20} tone={pct > 100 ? 'red' : pct > 80 ? 'warn' : 'default'} class="mt-1" />
+              <li key={`${b.category}-${b.currency}`}>
+                <ListRow
+                  class="py-2"
+                  title={<span class="text-[12.5px] text-fg-2">{b.category}</span>}
+                  sub={<Glyph value={Math.min(100, pct) / 10} of={10} tone={pct > 100 ? 'red' : pct > 80 ? 'warn' : 'fg'} class="mt-1" title={`${Math.round(pct)}% used`} />}
+                  trail={
+                    <>
+                      <span class="tabular-nums text-[12.5px]">
+                        <span class={pct > 100 ? 'text-red' : 'text-fg'}>{money(b.spent, b.currency)}</span> / {money(b.limit, b.currency)}
+                      </span>
+                      <Btn variant="ghost" size="xs" class="px-1 h-5 min-h-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red" title="Remove budget" aria-label={`Remove ${b.category} budget`} onClick={() => void save({ category: b.category, currency: b.currency, limit: 0 })}>
+                        <Trash2 size={10} />
+                      </Btn>
+                    </>
+                  }
+                />
               </li>
             );
           })}
@@ -416,18 +455,13 @@ function EntryModal(props: { entry: LedgerEntry | null; meta?: LedgerMeta; onClo
           void submit();
         }}
       >
-        <div class="flex gap-1 p-0.5 rounded-md bg-[#121213] border border-line self-start">
-          {(['expense', 'income', 'transfer'] as LedgerType[]).map((t) => (
-            <button
-              type="button"
-              key={t}
-              class={`px-3 h-7 rounded text-[12.5px] capitalize ${f.type === t ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2'}`}
-              onClick={() => setF({ ...f, type: t })}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <Pills
+          class="self-start"
+          size="md"
+          value={f.type}
+          onChange={(t) => setF({ ...f, type: t })}
+          options={(['expense', 'income', 'transfer'] as LedgerType[]).map((t) => ({ value: t, label: <span class="capitalize">{t}</span> }))}
+        />
         <div class="grid grid-cols-[1fr_96px] gap-2">
           <Field label="Amount">
             <input class={INPUT} type="number" min="0" step="any" value={f.amount} onInput={set('amount')} autoFocus required />
@@ -533,24 +567,25 @@ function Charts(props: { month: Date; currency?: string }) {
       right={
         <div class="flex items-center gap-2">
           {currencies.length > 1 && (
-            <select class="select select-xs bg-[#121213] border-line rounded-md text-[12px]" value={currency} onChange={(e) => setCur((e.target as HTMLSelectElement).value)}>
+            <select class="select select-xs bg-[#121213] border-line rounded-[var(--radius-control)] text-[12px]" value={currency} onChange={(e) => setCur((e.target as HTMLSelectElement).value)}>
               {currencies.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
           )}
-          <div class="flex gap-0.5 p-0.5 rounded-md bg-[#121213] border border-line">
-            {(['daily', 'monthly'] as const).map((v) => (
-              <button key={v} class={`px-2 h-6 rounded text-[11.5px] ${view === v ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2'}`} onClick={() => setView(v)}>
-                {v === 'daily' ? 'This month' : '6 months'}
-              </button>
-            ))}
-          </div>
+          <Pills
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'daily', label: 'This month' },
+              { value: 'monthly', label: '6 months' },
+            ]}
+          />
         </div>
       }
     >
       {!points.length || points.every((p) => !p.income && !p.expense) ? (
-        <div class="h-[180px] grid place-items-center text-[12.5px] text-fg-3">{series.loading && !series.data ? <Spinner /> : 'No income or spending in this period.'}</div>
+        <div class="h-[180px] grid place-items-center text-[12.5px] text-fg-3">{series.loading && !series.data ? <Skeleton h={160} class="w-full" /> : 'No income or spending in this period.'}</div>
       ) : (
         <BarChart points={points} currency={currency!} daily={view === 'daily'} />
       )}
@@ -626,7 +661,7 @@ function BarChart(props: { points: LedgerSeriesPoint[]; currency: string; daily:
         </svg>
         {hp && (
           <div
-            class="absolute pointer-events-none z-10 rounded-md border border-line bg-[#262629] px-2.5 py-1.5 text-[11.5px] shadow-lg whitespace-nowrap"
+            class="absolute pointer-events-none z-10 rounded-[var(--radius-control)] border border-line bg-[#262629] px-2.5 py-1.5 text-[11.5px] shadow-lg whitespace-nowrap"
             style={{ left: `${Math.min(width - 150, Math.max(0, pad.l + slot * hover! + slot / 2 - 70))}px`, top: '0px' }}
           >
             <div class="text-fg-2 mb-0.5">{new Date(`${hp.key}T00:00:00`).toLocaleDateString(undefined, props.daily ? { weekday: 'short', day: 'numeric', month: 'short' } : { month: 'long', year: 'numeric' })}</div>
@@ -662,55 +697,79 @@ function Accounts(props: { meta?: LedgerMeta }) {
     <Panel
       title="Accounts"
       right={
-        <button class="btn btn-ghost btn-xs text-fg-3 hover:text-fg" onClick={() => setEditing('new')}>
+        <Btn variant="ghost" size="xs" class="text-fg-3 hover:text-fg" onClick={() => setEditing('new')}>
           <Plus size={11} /> Add
-        </button>
+        </Btn>
       }
     >
-      {!shown.length ? (
-        <div class="text-[12.5px] text-fg-3">No accounts yet. Add your bank accounts and cards to track balances, card limits and due dates.</div>
+      {list.data === undefined && list.loading ? (
+        <Skeleton lines={3} />
+      ) : !shown.length ? (
+        <EmptyState
+          class="!py-4"
+          title="No accounts yet"
+          hint="Add your bank accounts and cards to track balances, card limits and due dates."
+          actions={
+            <Btn size="xs" onClick={() => setEditing('new')}>
+              <Plus size={11} /> Add account
+            </Btn>
+          }
+        />
       ) : (
-        <ul class="flex flex-col gap-3">
+        <ul class="flex flex-col gap-0.5 -mx-3">
           {shown.map((a) => (
-            <li key={a.id} class="group cursor-pointer" onClick={() => setEditing(a)}>
-              <div class="flex items-baseline gap-2 text-[12.5px]">
-                <span class="text-fg truncate">{a.name}</span>
-                <span class="text-[11px] text-fg-3">{ACCOUNT_LABEL[a.type]}</span>
-                <span class={`ml-auto tabular-nums ${a.balance < 0 ? 'text-fg' : 'text-fg'}`}>
-                  {a.type === 'credit' ? (
-                    <>
-                      <span class="text-fg-3 text-[11px] mr-1">owed</span>
-                      {money(a.owed ?? 0, a.currency)}
-                    </>
-                  ) : (
-                    money(a.balance, a.currency)
-                  )}
-                </span>
-                <Pencil size={10} class="text-fg-3 opacity-0 group-hover:opacity-100 shrink-0" />
-              </div>
-              {a.type === 'credit' && (
-                <div class="mt-1">
-                  {a.creditLimit ? (
-                    <SegBar value={((a.owed ?? 0) / a.creditLimit) * 100} segments={20} tone={(a.owed ?? 0) / a.creditLimit > 0.9 ? 'red' : (a.owed ?? 0) / a.creditLimit > 0.7 ? 'warn' : 'default'} />
-                  ) : null}
-                  <div class="flex flex-wrap gap-x-3 mt-1 text-[11px] text-fg-3">
-                    {a.creditLimit ? <span>{money(a.available ?? 0, a.currency)} available</span> : null}
-                    {a.nextDue && (a.amountDue ?? 0) > 0 ? (
-                      untilEndOf(a.nextDue) < 0 ? (
-                        <span class="text-red">
-                          {money(a.amountDue!, a.currency)} overdue since {shortDate(a.nextDue)}
-                        </span>
+            <li key={a.id}>
+              <ListRow
+                top
+                class="py-2"
+                onClick={() => setEditing(a)}
+                title={
+                  <span class="flex items-baseline gap-2 text-[12.5px]">
+                    <span class="truncate">{a.name}</span>
+                    <span class="text-[11px] text-fg-3">{ACCOUNT_LABEL[a.type]}</span>
+                  </span>
+                }
+                sub={
+                  a.type === 'credit' ? (
+                      <div class="mt-1">
+                        {a.creditLimit ? (
+                          <Glyph value={Math.min(1, (a.owed ?? 0) / a.creditLimit) * 10} of={10} tone={(a.owed ?? 0) / a.creditLimit > 0.9 ? 'red' : (a.owed ?? 0) / a.creditLimit > 0.7 ? 'warn' : 'fg'} title={`${Math.round(((a.owed ?? 0) / a.creditLimit) * 100)}% of limit used`} />
+                        ) : null}
+                        <div class="flex flex-wrap gap-x-3 mt-1 text-[11px] text-fg-3">
+                          {a.creditLimit ? <span>{money(a.available ?? 0, a.currency)} available</span> : null}
+                          {a.nextDue && (a.amountDue ?? 0) > 0 ? (
+                            untilEndOf(a.nextDue) < 0 ? (
+                              <span class="text-red">
+                                {money(a.amountDue!, a.currency)} overdue since {shortDate(a.nextDue)}
+                              </span>
+                            ) : (
+                              <span class={untilEndOf(a.nextDue) < 3 * 86400e3 ? 'text-warning' : ''}>
+                                {money(a.amountDue!, a.currency)} due {shortDate(a.nextDue)}
+                              </span>
+                            )
+                          ) : a.nextDue ? (
+                            <span>Statement paid · next closes {shortDate(a.nextStatement)}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                  ) : undefined
+                }
+                trail={
+                  <>
+                    <span class="tabular-nums text-[12.5px] text-fg">
+                      {a.type === 'credit' ? (
+                        <>
+                          <span class="text-fg-3 text-[11px] mr-1">owed</span>
+                          {money(a.owed ?? 0, a.currency)}
+                        </>
                       ) : (
-                        <span class={untilEndOf(a.nextDue) < 3 * 86400e3 ? 'text-warning' : ''}>
-                          {money(a.amountDue!, a.currency)} due {shortDate(a.nextDue)}
-                        </span>
-                      )
-                    ) : a.nextDue ? (
-                      <span>Statement paid · next closes {shortDate(a.nextStatement)}</span>
-                    ) : null}
-                  </div>
-                </div>
-              )}
+                        money(a.balance, a.currency)
+                      )}
+                    </span>
+                    <Pencil size={10} class="text-fg-3 opacity-0 group-hover:opacity-100 shrink-0" />
+                  </>
+                }
+              />
             </li>
           ))}
         </ul>

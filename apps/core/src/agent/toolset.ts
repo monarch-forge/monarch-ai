@@ -15,13 +15,16 @@ import { assistantTools, codingTools } from '../tools/index.ts';
 export const extraTools: ToolDef[] = [];
 
 /** tools for the claude-sdk engine (it brings its own file/shell tools) */
-export function sdkToolDefs(): ToolDef[] {
-  return dedupe([...assistantTools(), ...extraTools]);
+export function sdkToolDefs(kind?: SessionKind): ToolDef[] {
+  return dedupe(forKind([...assistantTools(), ...extraTools], kind));
 }
+
+/** the threads board exists only in Chat sessions */
+const forKind = (list: ToolDef[], kind?: SessionKind) => (!kind || kind === 'chat' ? list : list.filter((t) => t.group !== 'threads'));
 
 /** tools for the pi engine: assistant tools + (coding sessions) Monarch's own coding tools */
 export function piToolDefs(kind: SessionKind): ToolDef[] {
-  const base = [...assistantTools(), ...extraTools];
+  const base = forKind([...assistantTools(), ...extraTools], kind);
   return dedupe(kind === 'coding' ? [...base, ...codingTools()] : base);
 }
 

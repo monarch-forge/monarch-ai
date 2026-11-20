@@ -6,7 +6,7 @@ import { Panel, Tag } from '../ui.tsx';
 import { Field, SELECT, SaveBar, ToggleRow, saveSettings, useDraft } from './fields.tsx';
 
 type Evo = Settings['evolution'];
-const DEFAULTS: Evo = { enabled: true, autoEnable: true, reflect: 'off', deferTools: true };
+const DEFAULTS: Evo = { enabled: true, autoEnable: true, reflect: 'off', deferTools: true, draftSkills: true };
 
 export function EvolutionSection() {
   const s = settings.value!;
@@ -33,9 +33,16 @@ export function EvolutionSection() {
           />
           <ToggleRow
             label="Enable new extensions immediately"
-            hint="Off: extensions Monarch writes wait, disabled, until you review them in Evolve. Skills are always live."
+            hint="Off: extensions Monarch writes wait, disabled, until you review them in Evolve. Skills Monarch writes itself are live; auto-drafted ones wait for review."
             checked={draft.autoEnable}
             onChange={(v) => set({ autoEnable: v })}
+            disabled={!draft.enabled}
+          />
+          <ToggleRow
+            label="Draft skills from repeated tasks"
+            hint="When the same kind of task succeeds twice, Monarch drafts a reusable skill in the background (one small model call). Drafts wait in Evolve → Skills until you approve them."
+            checked={draft.draftSkills !== false}
+            onChange={(v) => set({ draftSkills: v })}
             disabled={!draft.enabled}
           />
           <ToggleRow

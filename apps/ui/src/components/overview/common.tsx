@@ -1,7 +1,7 @@
 /** Shared bits for the overview HUD panels. OWNED BY UI-A. */
 import type { ComponentChildren } from 'preact';
 import { conn, type Resource } from '../../lib/store.ts';
-import { Spinner } from '../ui.tsx';
+import { Skeleton, Spinner } from '../ui.tsx';
 
 /** centred muted state used inside panels (offline / loading / error / empty) */
 export function PanelNote(props: { label: string; sub?: ComponentChildren; tone?: 'muted' | 'red'; spinner?: boolean; action?: ComponentChildren }) {
@@ -24,13 +24,13 @@ export function Offline() {
 /**
  * Render resource data, or the right muted state. Stale data is kept on screen while offline.
  */
-export function Gate<T>(props: { res: Resource<T>; children: (data: T) => ComponentChildren; errorAction?: ComponentChildren }) {
+export function Gate<T>(props: { res: Resource<T>; children: (data: T) => ComponentChildren; errorAction?: ComponentChildren; empty?: ComponentChildren; skeletonLines?: number }) {
   const { data, error, loading } = props.res;
   if (data !== undefined && data !== null) return <>{props.children(data)}</>;
   if (conn.value !== 'open') return <Offline />;
   if (error) return <PanelNote label="Couldn't load this" sub={error} action={props.errorAction ?? <RetryLink onClick={() => void props.res.reload()} />} />;
-  if (loading) return <PanelNote label="Loading…" spinner />;
-  return <PanelNote label="Nothing here yet" />;
+  if (loading) return <Skeleton lines={props.skeletonLines ?? 3} class="py-2" />;
+  return <>{props.empty ?? <PanelNote label="Nothing here yet" />}</>;
 }
 
 export function RetryLink(props: { onClick: () => void; label?: string }) {

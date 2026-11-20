@@ -2,7 +2,7 @@
 import type { ComponentChildren } from 'preact';
 import { Cpu, Link2, FolderGit2, Zap, ArrowRight } from 'lucide-preact';
 import { navigate } from '../lib/store.ts';
-import { Btn, Disclosure, PageHeader, Panel } from '../components/ui.tsx';
+import { Btn, Disclosure, DotText, PageHeader, Panel } from '../components/ui.tsx';
 
 const STEPS: { icon: typeof Cpu; title: string; body: string; actions: [string, string][] }[] = [
   {
@@ -78,7 +78,7 @@ const GUIDES: [string, ComponentChildren[]][] = [
 export default function WelcomePage(_props: { params: string[] }) {
   return (
     <div class="h-full overflow-y-auto">
-      <div class="mx-auto max-w-[960px] px-6 py-8 flex flex-col gap-6">
+      <div class="mx-auto max-w-[960px] px-4 sm:px-6 py-8 flex flex-col gap-7">
         <PageHeader
           title="Welcome to Monarch"
           description="Your personal workspace for work and life: chat with one agent that manages mail, Slack, calendar, tasks, money and code for you."
@@ -88,10 +88,12 @@ export default function WelcomePage(_props: { params: string[] }) {
         <Panel title="Get started">
           <ol class="flex flex-col divide-y divide-line">
             {STEPS.map((s, i) => (
-              <li key={s.title} class="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                <s.icon size={16} class="mt-0.5 shrink-0 text-fg-3" />
+              <li key={s.title} class="flex items-start gap-3.5 py-4 first:pt-0 last:pb-0">
+                <span class="w-8 h-8 shrink-0 rounded-[var(--radius-control)] bg-raised grid place-items-center text-fg-3">
+                  <s.icon size={15} strokeWidth={1.6} />
+                </span>
                 <div class="min-w-0 flex-1">
-                  <div class="text-[13.5px] font-medium text-fg">{i + 1}. {s.title}</div>
+                  <div class="text-[13.5px] font-medium text-fg flex items-baseline gap-2"><DotText class="text-fg-3 text-[12px]">{String(i + 1).padStart(2, '0')}</DotText>{s.title}</div>
                   <p class="mt-0.5 text-[12.5px] text-fg-2 leading-relaxed">{s.body}</p>
                 </div>
                 <div class="flex shrink-0 flex-wrap justify-end gap-1.5">

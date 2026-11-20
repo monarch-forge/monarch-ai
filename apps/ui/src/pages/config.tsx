@@ -5,7 +5,7 @@ import type { ComponentType } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
 import { UserRound, Cpu, KeyRound, Link2, ShieldCheck, Dna, AudioLines, RefreshCcw, FolderGit2 } from 'lucide-preact';
 import { conn, health, navigate, settings } from '../lib/store.ts';
-import { Panel, Tag, ErrorLine } from '../components/ui.tsx';
+import { Panel, Tag, ErrorLine, PageHeader } from '../components/ui.tsx';
 import { SettingsGate } from '../components/config/fields.tsx';
 import { GeneralSection } from '../components/config/general.tsx';
 import { ModelsSection } from '../components/config/models.tsx';
@@ -57,7 +57,7 @@ export default function ConfigPage(props: { params: string[] }) {
           class="flex lg:flex-col gap-0.5 overflow-x-auto [scrollbar-width:none] lg:overflow-visible shrink-0 -mx-1 px-1 lg:mx-0 lg:px-0"
           aria-label="Settings sections"
         >
-          <div class="hidden lg:block px-3 pb-3 text-[18px] font-semibold text-fg">Settings</div>
+          <div class="hidden lg:block px-3 pb-4 text-[20px] font-semibold tracking-[-0.01em] text-fg">Settings</div>
           {TABS.map((t, i) => {
             const Icon = t.icon;
             const on = t.id === tab.id;
@@ -65,7 +65,7 @@ export default function ConfigPage(props: { params: string[] }) {
               <a
                 key={t.id}
                 href={`#/config/${t.id}`}
-                class={`relative flex items-center gap-2.5 shrink-0 rounded-[6px] px-3 py-2 text-[13.5px] transition-colors duration-150 ${
+                class={`relative flex items-center gap-2.5 shrink-0 rounded-[var(--radius-control)] px-3 py-2.5 text-[13.5px] transition-colors duration-150 ${
                   on ? 'bg-raised text-fg' : 'text-fg-2 hover:bg-raised/60 hover:text-fg'
                 }`}
                 aria-current={on ? 'page' : undefined}
@@ -99,19 +99,14 @@ export default function ConfigPage(props: { params: string[] }) {
         </nav>
 
         <div class="lg:min-h-0 lg:overflow-y-auto">
-          <div class="max-w-[760px] flex flex-col gap-4 pb-10">
-            <header class="pt-1 pb-1">
-              <h1 class="text-[20px] font-semibold text-fg flex items-center gap-3">
-                {tab.label}
-                {conn.value !== 'open' && <Tag tone="warn">core offline</Tag>}
-              </h1>
-            </header>
+          <div class="max-w-[760px] flex flex-col gap-7 pb-12">
+            <PageHeader class="pt-1 pb-2" title={tab.label} right={conn.value !== 'open' ? <Tag tone="warn">core offline</Tag> : undefined} />
             {tab.sections.map((sec) => {
               const Page = sec.page;
               const SecIcon = sec.icon;
               return (
                 <section key={sec.id} id={`cfg-${sec.id}`} class="flex flex-col gap-3 scroll-mt-4">
-                  <h2 class="flex items-center gap-2 text-[14.5px] font-semibold text-fg px-1 pt-2">
+                  <h2 class="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.08em] text-fg-3 px-1">
                     <SecIcon size={15} strokeWidth={1.6} class="text-fg-3" />
                     {sec.label}
                   </h2>

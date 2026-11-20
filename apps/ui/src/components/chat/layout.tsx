@@ -1,10 +1,11 @@
 /**
  * Calm chat shell shared by Chat and Workshop: a slim session sidebar (drawer on narrow screens), a quiet header,
- * the transcript as the hero, and an optional "details" column that is hidden by default.
+ * the transcript as the hero, an optional always-on right rail (Chat: threads) and an optional "details" column hidden by default.
  */
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { PanelLeft, PanelRight, X } from 'lucide-preact';
+import { PanelLeft, PanelRight, X, ListTodo } from 'lucide-preact';
+import { Drawer } from '../ui.tsx';
 
 /** boolean persisted per viewer (localStorage, best effort) */
 export function useStoredFlag(key: string, initial = false): [boolean, (v: boolean) => void] {
@@ -40,8 +41,12 @@ export function ChatLayout(props: {
   actions?: ComponentChildren;
   /** content of the details column; omit to hide the toggle */
   details?: ComponentChildren;
-  detailsOpen: boolean;
-  onDetails: (open: boolean) => void;
+  detailsOpen?: boolean;
+  onDetails?: (open: boolean) => void;
+  /** always-visible right column on wide windows (>= 1100px); a header button opens it in a drawer below */
+  rail?: ComponentChildren;
+  /** drawer title / toggle label for `rail` */
+  railTitle?: string;
   /** a route change (e.g. session id) closes the mobile sidebar */
   routeKey?: string | null;
   children: ComponentChildren;
@@ -51,20 +56,23 @@ export function ChatLayout(props: {
   // the remembered "details open" applies to the wide column only; below xl it's a transient drawer
   const wide = useMedia('(min-width: 1280px)');
   const [drawer, setDrawer] = useState(false);
-  const open = wide ? props.detailsOpen : drawer;
-  const setOpen = (v: boolean) => (wide ? props.onDetails(v) : setDrawer(v));
+  const open = wide ? !!props.detailsOpen : drawer;
+  const setOpen = (v: boolean) => (wide ? props.onDetails?.(v) : setDrawer(v));
+  const railWide = useMedia('(min-width: 1100px)');
+  const [railOpen, setRailOpen] = useState(false);
+  useEffect(() => setRailOpen(false), [props.routeKey, railWide]);
 
   return (
     <div class="h-full flex min-h-0 relative">
       {/* sidebar: column on md+, drawer below */}
-      {side && <div class="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setSide(false)} />}
+      {side && <div class="sm:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setSide(false)} />}
       <aside
         class={`flex-col min-h-0 bg-[var(--bg-surface)] w-[264px] shrink-0 ${
-          side ? 'flex fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[300px] shadow-[0_12px_32px_rgb(0_0_0/.45)]' : 'hidden md:flex md:m-3 md:mr-0 md:rounded-[14px]'
+          side ? 'flex fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[300px] shadow-[0_12px_32px_rgb(0_0_0/.45)]' : 'hidden sm:flex sm:m-3 sm:mr-0 sm:rounded-[var(--radius-card)]'
         }`}
       >
         {side && (
-          <div class="md:hidden flex items-center h-12 pl-4 pr-2 shrink-0">
+          <div class="sm:hidden flex items-center h-12 pl-4 pr-2 shrink-0">
             <span class="text-[13px] font-semibold text-fg">Sessions</span>
             <button class={`${ICON_BTN} ml-auto`} onClick={() => setSide(false)} aria-label="Close sessions">
               <X size={16} strokeWidth={1.75} />
@@ -77,11 +85,16 @@ export function ChatLayout(props: {
       {/* main */}
       <main class="flex-1 min-w-0 flex flex-col min-h-0">
         <header class="h-14 shrink-0 flex items-center gap-2 px-3 md:px-6">
-          <button class={`${ICON_BTN} md:hidden -ml-1`} onClick={() => setSide(true)} aria-label="Show sessions" title="Sessions">
+          <button class={`${ICON_BTN} sm:hidden -ml-1`} onClick={() => setSide(true)} aria-label="Show sessions" title="Sessions">
             <PanelLeft size={17} strokeWidth={1.75} />
           </button>
           <div class="flex-1 min-w-0 flex items-center gap-2">{props.title}</div>
           {props.actions}
+          {props.rail !== undefined && !railWide && (
+            <button class={ICON_BTN} onClick={() => setRailOpen(true)} title={props.railTitle ?? 'Threads'} aria-label={props.railTitle ?? 'Threads'}>
+              <ListTodo size={17} strokeWidth={1.75} />
+            </button>
+          )}
           {props.details !== undefined && (
             <button
               class={`${ICON_BTN} ${open ? 'text-fg bg-[var(--bg-raised,#202023)]' : ''}`}
@@ -95,6 +108,18 @@ export function ChatLayout(props: {
         </header>
         <div class="flex-1 min-h-0 flex flex-col">{props.children}</div>
       </main>
+
+      {/* rail: column from 1100px, right drawer below */}
+      {props.rail !== undefined &&
+        (railWide ? (
+          <aside class="w-[300px] shrink-0 m-3 ml-0 rounded-[var(--radius-card)] bg-[var(--bg-surface)] flex flex-col min-h-0">
+            <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-6">{props.rail}</div>
+          </aside>
+        ) : (
+          <Drawer open={railOpen} onClose={() => setRailOpen(false)} side="right" title={props.railTitle ?? 'Threads'}>
+            <div class="px-4 pb-5 flex flex-col gap-6">{props.rail}</div>
+          </Drawer>
+        ))}
 
       {/* details: column on xl, drawer below */}
       {props.details !== undefined && open && (
@@ -123,7 +148,12 @@ function useMedia(q: string): boolean {
     const mq = matchMedia(q);
     const on = () => setM(mq.matches);
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    // some webviews/emulators skip MediaQueryList change events on resize
+    window.addEventListener('resize', on);
+    return () => {
+      mq.removeEventListener('change', on);
+      window.removeEventListener('resize', on);
+    };
   }, [q]);
   return m;
 }

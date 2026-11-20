@@ -8,8 +8,8 @@ import type { GoogleAccount, MailThread, MailThreadSummary } from '@monarch/shar
 import { Inbox, Star, Send, FileText, Mail as MailIcon, Search, PenSquare, Archive as ArchiveIcon, CircleDot, RefreshCw } from 'lucide-preact';
 import { api, qs } from '../lib/api.ts';
 import { navigate, toast, useResource } from '../lib/store.ts';
-import { Btn } from '../components/ui.tsx';
-import { AccountMark, displayName, LoadError, Loading, RefreshHint, StateBlock, shortStamp, useHotkeys } from '../components/mail/kit.tsx';
+import { Btn, ListRow } from '../components/ui.tsx';
+import { AccountMark, askMonarch, displayName, LoadError, Loading, RefreshHint, StateBlock, shortStamp, useHotkeys } from '../components/mail/kit.tsx';
 import { ThreadReader, type MailAction } from '../components/mail/reader.tsx';
 import { ComposeModal } from '../components/mail/composer.tsx';
 
@@ -166,13 +166,16 @@ export default function MailPage(props: { params: string[] }) {
   if (!accounts.length) {
     return (
       <div class="h-full flex items-center justify-center p-4">
-        <StateBlock icon={<MailIcon size={30} strokeWidth={1.25} />} title="No mail connected yet">
-          <div>Connect a Google account and Monarch can read, sort, search and draft mail with you — here and from chat.</div>
-          <div class="mt-5">
+        <StateBlock
+          icon={<MailIcon size={18} strokeWidth={1.5} />}
+          title="No mail connected yet"
+          actions={
             <Btn variant="primary" onClick={() => navigate('config/accounts')}>
-              Connect an account
+              Connect Gmail
             </Btn>
-          </div>
+          }
+        >
+          Connect a Google account and Monarch can read, sort, search and draft mail with you — here and from chat.
         </StateBlock>
       </div>
     );
@@ -182,7 +185,7 @@ export default function MailPage(props: { params: string[] }) {
   const labelName = LABELS.find((l) => l.id === labelId)?.name ?? 'Inbox';
   const unreadCount = threads.filter((t) => t.unread).length;
   const navRow = (active: boolean) =>
-    `relative w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-md text-[13.5px] transition-colors ${
+    `relative w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-[var(--radius-control)] text-[13.5px] transition-colors ${
       active ? 'bg-white/[0.05] text-fg' : 'text-fg-2 hover:bg-raised hover:text-fg'
     }`;
 
@@ -230,11 +233,11 @@ export default function MailPage(props: { params: string[] }) {
       </aside>
 
       {/* ── thread list ── */}
-      <section class={`${threadId ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 w-full lg:w-[360px] xl:w-[400px] shrink-0 bg-surface rounded-[10px] overflow-hidden`}>
+      <section class={`${threadId ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 w-full lg:w-[360px] xl:w-[400px] shrink-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
         {/* narrow-screen mailbox switcher */}
         <div class="lg:hidden flex items-center gap-2 px-3 pt-3">
           <select
-            class="flex-1 min-w-0 bg-subtle rounded-md text-[13px] text-fg px-2 py-1.5 outline-none"
+            class="flex-1 min-w-0 bg-subtle rounded-[var(--radius-control)] text-[13px] text-fg px-2 py-1.5 outline-none"
             value={view}
             onChange={(e) => navigate(`mail/${enc((e.target as HTMLSelectElement).value)}`)}
             aria-label="Mailbox"
@@ -247,7 +250,7 @@ export default function MailPage(props: { params: string[] }) {
             ))}
           </select>
           <select
-            class="bg-subtle rounded-md text-[13px] text-fg px-2 py-1.5 outline-none"
+            class="bg-subtle rounded-[var(--radius-control)] text-[13px] text-fg px-2 py-1.5 outline-none"
             value={labelId}
             onChange={(e) => setLabelId((e.target as HTMLSelectElement).value)}
             aria-label="Folder"
@@ -266,9 +269,9 @@ export default function MailPage(props: { params: string[] }) {
           <h1 class="text-[16px] font-semibold text-fg truncate">{labelName}</h1>
           <span class="text-[12.5px] text-fg-3 truncate">{viewAccount ? viewAccount.label || viewAccount.email : 'all inboxes'}</span>
           <RefreshHint res={listRes} class="self-center" />
-          <button class="ml-auto p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
+          <Btn variant="ghost" size="xs" class="ml-auto btn-square" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
             <RefreshCw size={13} class={listRes.loading ? 'animate-spin' : ''} />
-          </button>
+          </Btn>
         </div>
         <form
           class="px-3 pb-2"
@@ -281,7 +284,7 @@ export default function MailPage(props: { params: string[] }) {
             <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="w-full bg-white/[0.04] rounded-md pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+              class="w-full bg-white/[0.04] rounded-[var(--radius-control)] pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
               placeholder="Search mail"
               title="Gmail search syntax works: from:pepper is:unread newer_than:7d"
               value={qInput}
@@ -299,16 +302,18 @@ export default function MailPage(props: { params: string[] }) {
           {q && (
             <div class="flex items-center gap-2 mt-2 px-1 text-[12px] text-fg-3">
               Results for <span class="text-fg-2 truncate">“{q}”</span>
-              <button
+              <Btn
                 type="button"
-                class="ml-auto hover:text-fg"
+                variant="ghost"
+                size="xs"
+                class="ml-auto"
                 onClick={() => {
                   setQ('');
                   setQInput('');
                 }}
               >
                 Clear
-              </button>
+              </Btn>
             </div>
           )}
         </form>
@@ -318,38 +323,56 @@ export default function MailPage(props: { params: string[] }) {
           ) : listRes.data === undefined ? (
             <Loading label="Fetching mail" />
           ) : !threads.length ? (
-            <StateBlock title={q ? 'Nothing matches that search' : 'All clear'}>{q ? 'Try fewer or broader words.' : `${labelName} is empty. Enjoy the quiet.`}</StateBlock>
+            <StateBlock
+              icon={q ? <Search size={18} strokeWidth={1.5} /> : <Inbox size={18} strokeWidth={1.5} />}
+              title={q ? 'Nothing matches that search' : 'All clear'}
+              actions={
+                q ? (
+                  <Btn onClick={() => { setQ(''); setQInput(''); }}>Clear search</Btn>
+                ) : (
+                  <>
+                    <Btn onClick={() => void listRes.reload()}>Check again</Btn>
+                    <Btn variant="ghost" onClick={() => askMonarch('Summarise what needs my attention in my email today.')}>Ask Monarch</Btn>
+                  </>
+                )
+              }
+            >
+              {q ? 'Try fewer or broader words.' : `${labelName} is empty. Enjoy the quiet.`}
+            </StateBlock>
           ) : (
             threads.map((t, i) => {
               const active = t.id === threadId;
               const starred = t.labels?.includes('STARRED');
               return (
-                <button
+                <ListRow
                   key={`${t.accountId}:${t.id}`}
-                  data-idx={i}
-                  role="option"
-                  aria-selected={active}
-                  class={`relative w-full text-left px-3 py-3 rounded-md transition-colors ${
-                    active ? 'bg-white/[0.06]' : i === cursor ? 'bg-white/[0.035]' : 'hover:bg-raised'
-                  }`}
+                  attrs={{ 'data-idx': i, role: 'option', 'aria-selected': active }}
+                  active={active}
+                  focused={i === cursor}
+                  marker
+                  class="py-3"
                   onClick={() => {
                     setCursor(i);
                     openThread(t);
                   }}
-                >
-                  {active && <span class="absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-red" />}
-                  <div class="flex items-center gap-2">
-                    {view === 'all' && <AccountMark id={t.accountId} size={6} title={accounts.find((a) => a.id === t.accountId)?.email} />}
-                    <span class={`truncate text-[13.5px] ${t.unread ? 'text-fg font-semibold' : 'text-fg-2'}`}>{displayName(t.from) || '(unknown)'}</span>
-                    {t.messageCount > 1 && <span class="font-mono text-[11px] text-fg-3">{t.messageCount}</span>}
-                    {starred && <Star size={11} class="text-warning/80 shrink-0" fill="currentColor" />}
-                    <span class={`ml-auto shrink-0 font-mono text-[11px] ${t.unread ? 'text-fg-2' : 'text-fg-3'}`} title={t.date}>
-                      {shortStamp(t.date)}
+                  title={
+                    <span class="flex items-center gap-2">
+                      {view === 'all' && <AccountMark id={t.accountId} size={6} title={accounts.find((a) => a.id === t.accountId)?.email} />}
+                      <span class={`truncate ${t.unread ? 'text-fg font-semibold' : 'text-fg-2'}`}>{displayName(t.from) || '(unknown)'}</span>
+                      {t.messageCount > 1 && <span class="font-mono text-[11px] text-fg-3">{t.messageCount}</span>}
+                      {starred && <Star size={11} class="text-warning/80 shrink-0" fill="currentColor" />}
+                      <span class={`ml-auto shrink-0 font-mono text-[11px] ${t.unread ? 'text-fg-2' : 'text-fg-3'}`} title={t.date}>
+                        {shortStamp(t.date)}
+                      </span>
                     </span>
-                  </div>
-                  <div class={`truncate text-[13px] mt-0.5 ${t.unread ? 'text-fg font-medium' : 'text-fg-2'}`}>{t.subject || '(no subject)'}</div>
-                  <div class="truncate text-[12.5px] text-fg-3 mt-0.5">{t.snippet}</div>
-                </button>
+                  }
+                  sub={
+                    <>
+                      <span class={`block truncate text-[13px] ${t.unread ? 'text-fg font-medium' : 'text-fg-2'}`}>{t.subject || '(no subject)'}</span>
+                      <span class="block truncate text-[12.5px] text-fg-3 mt-0.5">{t.snippet}</span>
+                    </>
+                  }
+                />
               );
             })
           )}
@@ -357,7 +380,7 @@ export default function MailPage(props: { params: string[] }) {
       </section>
 
       {/* ── reader ── */}
-      <section class={`${threadId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
+      <section class={`${threadId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
         {threadId && threadAcct ? (
           <ThreadReader
             accountId={threadAcct}

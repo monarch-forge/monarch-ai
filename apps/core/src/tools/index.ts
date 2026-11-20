@@ -30,17 +30,19 @@ import { tools as ledger } from './ledger.ts';
 import { tools as projects } from './projects.ts';
 import { tools as background } from './background.ts';
 import { tools as github } from './github.ts';
+import { tools as threads } from './threads.ts';
+import { tools as plan } from './plan.ts';
 import { extensionToolDefs } from '../extensions/index.ts';
 import { mcpToolDefs } from '../mcp/index.ts';
 
 /** tools available to every session */
 export function assistantTools(): ToolDef[] {
-  return [...system, ...productivity, ...web, ...mail, ...slack, ...whatsapp,...memory, ...ledger, ...projects, ...github, ...background, ...evolve, ...delegate, ...extensionToolDefs(), ...mcpToolDefs()];
+  return [...system, ...productivity, ...web, ...mail, ...slack, ...whatsapp,...memory, ...ledger, ...projects, ...github, ...background, ...evolve, ...delegate, ...threads,...extensionToolDefs(), ...mcpToolDefs()];
 }
 
 /** file/shell tools for the pi engine (claude-sdk engine uses Claude Code's own Read/Write/Edit/Bash/Grep/Glob instead) */
 export function codingTools(): ToolDef[] {
-  return coding;
+  return [...coding, ...plan];
 }
 
 export function findTool(name: string): ToolDef | undefined {

@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'preact/hooks';
 import { ExternalLink } from 'lucide-preact';
+import { Skeleton } from '../components/ui.tsx';
 
 /** 9Router base URL; override with localStorage['monarch.router.url'] (loopback only in the desktop app). */
 const ROUTER_URL = (() => {
@@ -60,8 +61,8 @@ export default function RouterPage(_props: { params: string[] }) {
 
   if (loading) {
     return (
-      <div class="h-full flex items-center justify-center gap-2 text-[13px] text-fg-3">
-        <span class="loading loading-spinner loading-xs" /> Connecting to 9Router…
+      <div class="h-full p-4" aria-label="Connecting to 9Router">
+        <Skeleton h={9999} class="!h-full w-full opacity-60" />
       </div>
     );
   }
@@ -76,7 +77,7 @@ export default function RouterPage(_props: { params: string[] }) {
           </div>
           <button
             onClick={checkRouter}
-            class="mt-5 px-3.5 py-1.5 rounded-md text-[13px] bg-subtle text-fg hover:bg-white/[0.1] transition-colors"
+            class="mt-5 px-3.5 py-1.5 rounded-[var(--radius-control)] text-[13px] bg-subtle text-fg hover:bg-white/[0.1] transition-colors"
           >
             Try again
           </button>
@@ -96,7 +97,7 @@ export default function RouterPage(_props: { params: string[] }) {
           {IN_TAURI && (
             <button
               onClick={() => void openRouterWindow().then(setOpenError)}
-              class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
+              class="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-control)] text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
               title="Pop 9Router out into its own window"
             >
               <ExternalLink size={13} /> Open in window

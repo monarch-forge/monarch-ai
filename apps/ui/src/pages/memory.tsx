@@ -7,6 +7,7 @@ import { useMemo, useRef, useState } from 'preact/hooks';
 import type { MemoryGraph, MemoryNote } from '@monarch/shared';
 import { Search, Network } from 'lucide-preact';
 import { useResource } from '../lib/store.ts';
+import { Skeleton } from '../components/ui.tsx';
 import { GraphCanvas, type GraphCanvasHandle } from '../components/graph/graph-view.tsx';
 import { filterGraph, normalizeGraph } from '../components/graph/model.ts';
 import { demoGraph, demoNoteBody, demoRequested } from '../components/graph/demo.ts';
@@ -82,7 +83,7 @@ export default function MemoryPage(props: { params: string[] }) {
             <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="w-full bg-[#121213]/80 backdrop-blur rounded-md pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-[#121213]"
+              class="w-full bg-[#121213]/80 backdrop-blur rounded-[var(--radius-control)] pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-[#121213]"
               placeholder="Find in graph"
               title="Highlight matching notes; #tag works too. Enter to focus, Shift+Enter to open."
               value={search}
@@ -105,7 +106,7 @@ export default function MemoryPage(props: { params: string[] }) {
               {matches.length} match{matches.length === 1 ? '' : 'es'}
             </span>
           )}
-          <div class="ml-auto flex items-center gap-1 pointer-events-auto bg-[#121213]/70 backdrop-blur rounded-md p-0.5">
+          <div class="ml-auto flex items-center gap-1 pointer-events-auto bg-[#121213]/70 backdrop-blur rounded-[var(--radius-control)] p-0.5">
             <Toggle on={noteId === '~profile'} onClick={() => openNote('~profile')} title="Facts Monarch learned about you">
               What Monarch knows
             </Toggle>
@@ -132,8 +133,8 @@ export default function MemoryPage(props: { params: string[] }) {
               <LoadError error={res.error} onRetry={res.reload} />
             </div>
           ) : !hasData ? (
-            <div class="absolute inset-0 flex items-center justify-center">
-              <Loading label="Mapping your notes" />
+            <div class="absolute inset-0 p-6">
+              <Skeleton h={9999} class="!h-full w-full opacity-60" />
             </div>
           ) : !graph.nodes.length ? (
             <div class="absolute inset-0 flex items-center justify-center">
@@ -156,7 +157,7 @@ export default function MemoryPage(props: { params: string[] }) {
                 handle={(h) => (handle.current = h)}
               />
               {localUnavailable && (
-                <div class="absolute top-14 left-3 text-[12px] text-fg-3 bg-[#121213]/80 rounded-md px-2.5 py-1">
+                <div class="absolute top-14 left-3 text-[12px] text-fg-3 bg-[#121213]/80 rounded-[var(--radius-control)] px-2.5 py-1">
                   {noteId ? 'That note isn’t in the graph, so here’s everything' : 'Open a note to see its neighbourhood'}
                 </div>
               )}

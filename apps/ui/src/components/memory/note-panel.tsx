@@ -7,7 +7,7 @@ import type { MemoryNote, MemoryNoteSummary } from '@monarch/shared';
 import { ArrowLeft, Crosshair, FilePlus, Pencil, Search, Sparkles, Trash, Link2 } from 'lucide-preact';
 import { api, ApiError, openExternal, qs } from '../../lib/api.ts';
 import { navigate, toast, useResource } from '../../lib/store.ts';
-import { Btn, Tag } from '../ui.tsx';
+import { Btn, EmptyState, Skeleton, Tag } from '../ui.tsx';
 import { askMonarch, Button, LoadError, Loading, Modal, relTime, StateBlock, useConfirm } from '../mail/kit.tsx';
 import { plainExcerpt, renderMarkdown } from './md.ts';
 import { resolveLink, type GNode } from '../graph/model.ts';
@@ -81,7 +81,7 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
         <label class="relative flex-1">
           <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
           <input
-            class="w-full bg-white/[0.04] rounded-md pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+            class="w-full bg-white/[0.04] rounded-[var(--radius-control)] pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
             placeholder="Search notes"
             title="↑↓ to move, Enter to open"
             value={q}
@@ -99,11 +99,27 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
         {res.error && !notes.length ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : res.loading && !res.data && !props.demoNodes ? (
-          <Loading label="Reading vault" />
+          <Skeleton lines={6} class="px-3 py-3" />
         ) : !notes.length ? (
-          <StateBlock title={debounced ? 'No matches' : 'No notes yet'}>
-            {debounced ? `Nothing matches “${debounced}”.` : 'Create a note, or ask Monarch to remember something — it writes notes here as it learns.'}
-          </StateBlock>
+          debounced ? (
+            <StateBlock title="No matches">{`Nothing matches “${debounced}”.`}</StateBlock>
+          ) : (
+            <EmptyState
+              icon={<FilePlus size={18} strokeWidth={1.5} />}
+              title="No notes yet"
+              hint="Write a note, or tell Monarch about yourself. It writes notes here as it learns."
+              actions={
+                <>
+                  <Btn variant="primary" size="sm" onClick={props.onNew}>
+                    <FilePlus size={13} /> Write your first note
+                  </Btn>
+                  <Btn size="sm" onClick={() => askMonarch('Interview me briefly about myself (work, routines, preferences) and save what you learn to my memory.')}>
+                    <Sparkles size={13} /> Tell Monarch about yourself
+                  </Btn>
+                </>
+              }
+            />
+          )
         ) : (
           notes.map((n, i) => (
             <button
@@ -111,7 +127,7 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
               data-idx={i}
               role="option"
               aria-selected={i === cursor}
-              class={`w-full text-left px-3 py-3 rounded-md transition-colors ${i === cursor ? 'bg-white/[0.04]' : ''}`}
+              class={`w-full text-left px-3 py-3 rounded-[var(--radius-control)] transition-colors ${i === cursor ? 'bg-white/[0.04]' : ''}`}
               onClick={() => openNote(n.id)}
               onMouseEnter={() => setCursor(i)}
             >
@@ -228,7 +244,7 @@ export function NoteView(props: {
 
   const header = (
     <div class="flex items-center gap-0.5 px-3 pt-3 pb-1">
-      <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" onClick={() => navigate('memory')} title="All notes (Esc)" aria-label="Back to all notes">
+      <button class="p-1.5 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle" onClick={() => navigate('memory')} title="All notes (Esc)" aria-label="Back to all notes">
         <ArrowLeft size={14} />
       </button>
       <span class="text-[12px] text-fg-3 truncate flex-1 px-1" title={props.id}>
@@ -236,11 +252,11 @@ export function NoteView(props: {
       </span>
       {note && !editing && (
         <>
-          <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" title="Locate in graph" aria-label="Locate in graph" onClick={() => props.onLocate(props.id)}>
+          <button class="p-1.5 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle" title="Locate in graph" aria-label="Locate in graph" onClick={() => props.onLocate(props.id)}>
             <Crosshair size={13} />
           </button>
           <button
-            class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle"
+            class="p-1.5 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle"
             title="Ask Monarch to enrich & link this note"
             aria-label="Ask Monarch about this note"
             onClick={() =>
@@ -251,10 +267,10 @@ export function NoteView(props: {
           >
             <Sparkles size={13} />
           </button>
-          <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" title="Edit (e)" aria-label="Edit note" onClick={() => startEdit()}>
+          <button class="p-1.5 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle" title="Edit (e)" aria-label="Edit note" onClick={() => startEdit()}>
             <Pencil size={13} />
           </button>
-          <button class="p-1.5 rounded-md text-fg-3 hover:text-red hover:bg-subtle" title="Delete" aria-label="Delete note" onClick={remove}>
+          <button class="p-1.5 rounded-[var(--radius-control)] text-fg-3 hover:text-red hover:bg-subtle" title="Delete" aria-label="Delete note" onClick={remove}>
             <Trash size={13} />
           </button>
         </>
@@ -347,7 +363,7 @@ export function NoteView(props: {
         ) : !note && res.error ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : !note ? (
-          <Loading label="Opening note" />
+          <Skeleton lines={8} class="max-w-[68ch] mx-auto px-5 sm:px-6 pt-4" />
         ) : (
           <article class="max-w-[68ch] mx-auto px-5 sm:px-6 pt-2 pb-10">
             <h1 class="text-[21px] text-fg font-semibold tracking-[-0.01em] leading-snug">{note.title || props.id}</h1>
@@ -401,7 +417,7 @@ function LinkList(props: { title: string; ids: string[]; titleOf: (id: string) =
             const ghost = props.ghost?.(id) ?? false;
             return (
               <li key={id}>
-                <button class="group w-full flex items-center gap-2.5 text-left px-2 py-1.5 rounded-md text-[13px] hover:bg-raised transition-colors" onClick={() => openNote(id)}>
+                <button class="group w-full flex items-center gap-2.5 text-left px-2 py-1.5 rounded-[var(--radius-control)] text-[13px] hover:bg-raised transition-colors" onClick={() => openNote(id)}>
                   <span class={`inline-block w-1.5 h-1.5 shrink-0 ${ghost ? 'border border-fg-3' : 'bg-fg-2'} rounded-full`} />
                   <span class={`truncate ${ghost ? 'text-fg-3' : 'text-fg-2'}`}>{props.titleOf(id)}</span>
                   <span class="ml-auto text-[11px] text-fg-3 truncate max-w-[45%] opacity-0 group-hover:opacity-100">{id}</span>

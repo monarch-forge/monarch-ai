@@ -6,7 +6,7 @@
  *   initEvolution() / shutdownEvolution()   start/stop (index.ts)
  */
 export { extensionToolDefs, fullToolName } from './tooldefs.ts';
-export { listSkills, getSkill, readSkill, writeSkill, deleteSkill, skillsPromptContext, skillIdFrom } from './skills.ts';
+export { listSkills, getSkill, readSkill, writeSkill, approveSkill, deleteSkill, skillsPromptContext, skillIdFrom } from './skills.ts';
 export {
   listExtensions,
   extensionSummary,

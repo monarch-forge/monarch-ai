@@ -18,6 +18,7 @@ import { emptyUsage, addUsage, autoCompactPercent, type SessionRecord } from '..
 import { deferToolsEnabled, errorText, shortDesc, loadsUpFront, piToolDefs, runToolDef, smallModeFor, toolJsonSchema, toolSearchReport, toolSummary } from '../toolset.ts';
 import { parseLooseObject, parseTextToolCalls, textToolResultsMessage, type TextToolCall } from '../text-tools.ts';
 import { codingAgentsBrief } from '../../tools/delegate.ts';
+import { withThreadsNote } from '../threads.ts';
 import { piModels, resolvePiModel } from '../pi-models.ts';
 import type { Engine, TurnContext, TurnResult } from './types.ts';
 import { autonomyHigh, CONTINUE_NUDGE, earlyStopReason, MAX_AUTO_CONTINUE, noteTokenSaver } from '../autonomy.ts';
@@ -540,6 +541,7 @@ async function compactPi(ctx: TurnContext, model: Model<Api>, trigger: 'auto' | 
   rec.engineState.piMessages = next;
   rec.engineState.piUsageFrom = next.length; // kept assistant messages carry pre-compaction usage
   rec.engineState.codingAgentsNote = undefined; // re-announce the coding agents after a compaction
+  rec.engineState.threadsNote = undefined; // …and the threads board
   if (inPlace && cached) {
     // mid-turn (out of room): swap the live transcript, keep the leading system message
     const lead = cached.agent.state.messages[0];
@@ -698,7 +700,7 @@ export const piEngine: Engine = {
     if (ctx.signal.aborted) onAbort();
     else ctx.signal.addEventListener('abort', onAbort, { once: true });
     try {
-      await agent.prompt(await withAgentsNote(rec, ctx.text));
+      await agent.prompt(withThreadsNote(rec, await withAgentsNote(rec, ctx.text)));
       await drainTextCalls(entry, rec, turn, model);
       // stray-output guard: the turn ended with a bare tool-call fragment as text → retry once
       if (turn.fragment !== undefined && !turn.error && !ctx.signal.aborted) {

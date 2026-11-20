@@ -8,7 +8,7 @@ import { useMemo, useState } from 'preact/hooks';
 import { ChevronDown } from 'lucide-preact';
 import type { Briefing, UsageReport } from '@monarch/shared';
 import { approvals, conn, phase, settings, useResource } from '../lib/store.ts';
-import { fmt, Panel, Sparkline, Stat, Tag } from '../components/ui.tsx';
+import { DotText, fmt, Panel, Sparkline, Stat, Tag, useNow } from '../components/ui.tsx';
 import { focusApprovals } from '../components/approvals.tsx';
 import { RefreshHint } from '../components/mail/kit.tsx';
 import { CommandConsole } from '../components/overview/console.tsx';
@@ -91,6 +91,7 @@ function partOfDay(d = new Date()): string {
 
 function Greeting(props: { briefing?: Briefing; error?: string; hint?: ComponentChildren }) {
   const s = settings.value;
+  const now = useNow(30_000);
   const honorific = s?.user.honorific?.trim() || 'sir';
   const greeting = props.briefing?.greeting ?? `Good ${partOfDay()}, ${honorific}.`;
   const headline =
@@ -98,6 +99,9 @@ function Greeting(props: { briefing?: Briefing; error?: string; hint?: Component
     (conn.value === 'open' ? (props.error ? 'Everything is running. Your briefing will be back shortly.' : 'Putting your day together…') : conn.value === 'connecting' ? 'Waking up…' : 'Monarch is offline for the moment.');
   return (
     <header class="relative text-center max-w-[640px]">
+      <DotText class="block mb-3 text-[13px] text-fg-3 tracking-[0.2em]" title={now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
+        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </DotText>
       <h1 class="text-[clamp(24px,3vw,30px)] font-medium tracking-[-0.015em] text-fg leading-tight">{greeting}</h1>
       <p class="mt-2 text-[14px] text-fg-2 leading-relaxed">{headline}</p>
       {/* out of flow so the refresh marker never shifts the layout */}
@@ -125,7 +129,7 @@ function StatusCard(props: { usage?: UsageReport }) {
   return (
     <Panel title="Status" class="md:col-span-2" right={<Tag tone={state === 'Ready' ? 'ok' : state === 'Offline' ? 'red' : 'warn'}>{state}</Tag>}>
       <div class="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_auto_1fr] gap-x-8 gap-y-3 items-end">
-        <Stat label="Tokens · 24h" value={total !== undefined ? fmt.num(total) : '—'} />
+        <Stat label="Tokens · 24h" value={<DotText>{total !== undefined ? fmt.num(total) : '—'}</DotText>} />
         {pending > 0 ? (
           <button type="button" class="text-left" onClick={() => focusApprovals()}>
             <Stat label="Approvals" value={<span class="text-warning">{pending} pending</span>} />

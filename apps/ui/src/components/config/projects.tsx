@@ -5,7 +5,7 @@ import type { ProjectView, RepoProfile } from '@monarch/shared';
 import { FolderGit2, FolderOpen, RefreshCw, Trash2, ChevronRight } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Btn, Empty, Panel, Spinner, Tag } from '../ui.tsx';
+import { Btn, EmptyState, Panel, Skeleton, Spinner, Tag } from '../ui.tsx';
 import { useConfirm } from '../mail/kit.tsx';
 import { INPUT } from './fields.tsx';
 import { DirBrowser } from './dir-browser.tsx';
@@ -65,15 +65,22 @@ export function ProjectsSection() {
           refresh by themselves when a repo's commit changes. Nothing is written into your repos.
         </p>
         {list.loading && !list.data ? (
-          <div class="py-6 flex justify-center">
-            <Spinner />
-          </div>
+          <Skeleton lines={3} class="py-2" />
         ) : !list.data?.length ? (
-          <Empty>No projects yet.</Empty>
+          <EmptyState
+            icon={<FolderGit2 size={18} strokeWidth={1.5} />}
+            title="No projects yet"
+            hint="Point Monarch at a folder with your repos. It learns how to build, test and run each one."
+            actions={
+              <Btn variant="primary" size="sm" onClick={() => setPicking(true)}>
+                <FolderOpen size={13} /> Add folder
+              </Btn>
+            }
+          />
         ) : (
           <div class="flex flex-col gap-4">
             {list.data.map((p) => (
-              <div key={p.id} class="border border-line rounded-md">
+              <div key={p.id} class="border border-line rounded-[var(--radius-control)]">
                 <div class="flex items-center gap-2 px-3 py-2 border-b border-line">
                   <FolderGit2 size={14} class="text-fg-3" />
                   <span class="text-[13px] text-fg">{p.name}</span>

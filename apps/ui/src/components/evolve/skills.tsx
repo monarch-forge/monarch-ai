@@ -1,7 +1,7 @@
 /** Evolve → Skills: learned procedures (markdown). List + viewer/editor. Route: #/evolve/skills/:id? ("new"). */
 import { useMemo, useState } from 'preact/hooks';
 import type { Skill, SkillSummary } from '@monarch/shared';
-import { ArrowLeft, Eye, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-preact';
+import { ArrowLeft, Check, Eye, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { navigate, toast, useResource } from '../../lib/store.ts';
 import { Btn, Panel, Tag } from '../ui.tsx';
@@ -15,7 +15,7 @@ export function SkillsTab(props: { id?: string }) {
   const items = useMemo(() => {
     const t = q.trim().toLowerCase();
     const all = list.data ?? [];
-    return (t ? all.filter((s) => `${s.name} ${s.id} ${s.description}`.toLowerCase().includes(t)) : all).slice().sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name));
+    return (t ? all.filter((s) => `${s.name} ${s.id} ${s.description}`.toLowerCase().includes(t)) : all).slice().sort((a, b) => Number(!!b.draft) - Number(!!a.draft) || b.uses - a.uses || a.name.localeCompare(b.name));
   }, [list.data, q]);
   const selected = props.id;
 
@@ -56,7 +56,7 @@ export function SkillsTab(props: { id?: string }) {
                           <span class="block text-[13px] text-fg truncate">{s.name}</span>
                           <span class="block text-[11.5px] text-fg-3 truncate mt-0.5">{s.description}</span>
                           <span class="flex items-center gap-3 mt-1.5 text-[12px] text-fg-3">
-                            <span>{s.origin}</span>
+                            {s.draft ? <span class="text-red">draft · review</span> : <span>{s.origin}</span>}
                             <span>{s.uses} use{s.uses === 1 ? '' : 's'}</span>
                             <span class="ml-auto normal-case">{ago(s.updatedAt)}</span>
                           </span>
@@ -121,6 +121,20 @@ function SkillDetail(props: { id: string }) {
     }
   };
 
+  const approve = async () => {
+    if (!s) return;
+    setBusy(true);
+    try {
+      await api.post(`/skills/${encodeURIComponent(s.id)}/approve`, {});
+      toast('Skill approved — Monarch can use it now', 'success');
+      void res.reload();
+    } catch (e) {
+      toast(`Approve failed: ${errMsg(e)}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (s && editing) return <SkillEditorPanel skill={s} onDone={() => (setEditing(false), void res.reload())} />;
 
   return (
@@ -132,6 +146,7 @@ function SkillDetail(props: { id: string }) {
       right={
         s && (
           <>
+            {s.draft && <Tag tone="warn">draft</Tag>}
             <OriginTag origin={s.origin} />
             <Tag tone="plain">{s.uses} uses</Tag>
           </>
@@ -151,14 +166,20 @@ function SkillDetail(props: { id: string }) {
                 <div class="font-mono text-[10px] text-fg-3 mt-1">updated {stamp(s.updatedAt)}</div>
               </div>
               <div class="flex gap-1.5">
+                {s.draft && (
+                  <Btn size="xs" variant="primary" onClick={() => void approve()} loading={busy} title="Approve: Monarch starts using this skill">
+                    {!busy && <Check size={11} />} Approve
+                  </Btn>
+                )}
                 <Btn size="xs" onClick={() => setEditing(true)}>
                   <Pencil size={11} /> Edit
                 </Btn>
-                <Btn size="xs" variant="ghost" class="hover:text-red!" onClick={() => void remove()} loading={busy} aria-label="Delete skill" title="Delete skill">
+                <Btn size="xs" variant="ghost" class="hover:text-red!" onClick={() => void remove()} loading={busy} aria-label={s.draft ? 'Discard draft' : 'Delete skill'} title={s.draft ? 'Discard draft' : 'Delete skill'}>
                   {!busy && <Trash2 size={11} />}
                 </Btn>
               </div>
             </div>
+            {s.draft && <div class="px-4 py-2 border-b border-line text-[12px] text-fg-2">Drafted by Monarch from a task you repeated. It stays hidden from the agent until you approve it — edit it first if needed, or discard it.</div>}
             <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4">
               <div class="max-w-[78ch]">{s.body.trim() ? <Markdown text={s.body} /> : <EvoNote label="Empty skill" />}</div>
             </div>

@@ -10,9 +10,11 @@ import { getSettings } from '../settings.ts';
 import { recordUsage } from '../services/usage.ts';
 import { spawn } from 'node:child_process';
 import { getRepoProfile, repoTarget } from '../services/projects.ts';
+import { planGateMessage } from './plan.ts';
 import { autoMode, needsApproval, rejectSessionApprovals, requestApproval, respondApproval, clearSessionAllowances, type ApprovalScope } from './approvals.ts';
 import { findTool } from '../tools/index.ts';
 import { maybeLearn } from './profile-learn.ts';
+import { maybeDraftSkill } from './skill-learn.ts';
 import { resolve } from 'node:path';
 import {
   addUsage,
@@ -29,11 +31,13 @@ import {
   type SessionRecord,
 } from './sessions.ts';
 import { buildSystemPrompt } from './prompt.ts';
+import { flushNudge, onWorkerFinished } from './threads.ts';
 import { clip, errorText } from './toolset.ts';
 import type { ApprovalAsk, Engine, EngineEvent, TurnContext, TurnResult } from './engines/types.ts';
 import { claudeSdkEngine } from './engines/claude-sdk.ts';
 import { piEngine } from './engines/pi.ts';
 import { resolvePiModel } from './pi-models.ts';
+import { resolveRoleModel, roleOf } from './roles.ts';
 
 type AssistantItem = Extract<ChatItem, { kind: 'assistant' }>;
 type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
@@ -427,6 +431,8 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
   bus.broadcast({ type: 'chat.done', sessionId: rec.id, usage, durationMs, error });
   broadcastSession(rec);
   if (!error) maybeLearn(rec);
+  // coding turns that edited files draft only after their check passes (runCheck)
+  if (!error && !aborted && !(rec.kind === 'coding' && [...turn.tools.values()].some((t) => EDIT_TOOLS.test(t.name)))) maybeDraftSkill(rec);
 
   const tag = rec.kind === 'coding' ? 'CODE' : 'AGT';
   const tokens = usage.inputTokens + usage.outputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
@@ -453,15 +459,17 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
 
   const text = turn.texts.length ? turn.texts[turn.texts.length - 1] : '';
   const moreQueued = !aborted && !!q?.length;
-  if (!moreQueued && !aborted && !error && rec.kind === 'coding' && [...turn.tools.values()].some((t) => EDIT_TOOLS.test(t.name))) {
+  if (!moreQueued && !aborted && !error && rec.kind === 'coding' && ([...turn.tools.values()].some((t) => EDIT_TOOLS.test(t.name)) || (planGateMessage(rec.plan) !== null && (rec.engineState.checkRounds ?? 0) < MAX_CHECK_ROUNDS))) {
     checking.add(rec.id);
     void runCheck(rec, text).finally(() => checking.delete(rec.id));
     return { text, error };
   }
   if (!moreQueued) {
     resolveIdle(rec.id, { text, error });
+    if (rec.kind === 'chat' && !aborted) setImmediate(() => !active.has(rec.id) && flushNudge(rec, sendToSession));
     if (!rec.parentSessionId && rec.kind !== 'automation' && autoMode()) attentionNotify(rec, text, error, aborted, Date.now() - turn.startedAt, turn.tools.size);
     if (rec.parentSessionId) {
+      threadFollowUp(rec, text, error, aborted);
       const parent = getSession(rec.parentSessionId);
       notify(
         error && !aborted ? 'Coding agent failed' : aborted ? 'Coding agent stopped' : 'Coding agent finished',
@@ -473,6 +481,15 @@ function finishTurn(turn: ActiveTurn, result: TurnResult): TurnOutcome {
     }
   }
   return { text, error };
+}
+
+/** a worker linked to a thread on its parent chat's board finished: mark it and nudge the idle parent once */
+function threadFollowUp(rec: SessionRecord, text: string, error: string | undefined, aborted: boolean): void {
+  try {
+    onWorkerFinished(rec, text, error, aborted, { getSession, isRunning: (id) => active.has(id), send: sendToSession, save: saveSession });
+  } catch (e) {
+    console.error('[agent] thread follow-up failed', e);
+  }
 }
 
 /* ─────────────── check before done (coding workers) ─────────────── */
@@ -494,6 +511,14 @@ function resolveIdle(id: string, o: TurnOutcome): void {
  * result). Fail → feed the output back as a follow-up turn, up to MAX_CHECK_ROUNDS times, then report honestly.
  */
 async function runCheck(rec: SessionRecord, text: string): Promise<void> {
+  // plan gate first: open steps get a follow-up (same round budget as the check)
+  const gate = planGateMessage(rec.plan);
+  if (gate && (rec.engineState.checkRounds ?? 0) < MAX_CHECK_ROUNDS) {
+    rec.engineState.checkRounds = (rec.engineState.checkRounds ?? 0) + 1;
+    appendUser(rec, gate);
+    void startTurn(rec, gate);
+    return;
+  }
   const cwd = effectiveCwd(rec);
   const prof = await getRepoProfile(cwd).catch(() => null);
   const finish = (note?: string) => {
@@ -501,12 +526,13 @@ async function runCheck(rec: SessionRecord, text: string): Promise<void> {
     const out = { text: note ? `${text}\n\n[${note}]` : text };
     resolveIdle(rec.id, out);
     if (!rec.parentSessionId && autoMode()) attentionNotify(rec, out.text, undefined, false, 0, 0);
+    if (rec.parentSessionId) threadFollowUp(rec, out.text, undefined, false);
     if (rec.parentSessionId) notify('Coding agent finished', `${clip(rec.title, 60)}${note ? ` — ${clip(note, 80)}` : ''}`, 'info', `#/workshop/${encodeURIComponent(rec.id)}`, { desktop: false });
   };
-  if (!prof?.check) return finish();
+  if (!prof?.check) return maybeDraftSkill(rec), finish();
   pushItem(rec, { kind: 'system', id: newId(), ts: nowIso(), text: `Running check: ${prof.check}` });
   const r = await runShell(prof.check, prof.path, 10 * 60_000);
-  if (r.code === 0) return finish(`Check passed: ${prof.check}`);
+  if (r.code === 0) return maybeDraftSkill(rec), finish(`Check passed: ${prof.check}`);
   const rounds = rec.engineState.checkRounds ?? 0;
   const tail = r.output.length > 4000 ? `…${r.output.slice(-4000)}` : r.output;
   // exit 126/127 = command missing / not runnable: an environment problem, not something to loop on
@@ -575,8 +601,10 @@ function defaultModel(engine: EngineId): string {
 function newSession(opts: { kind?: SessionKind; engine?: EngineId; model?: string; cwd?: string; title?: string; parentSessionId?: string }): SessionRecord {
   const s = getSettings();
   const kind: SessionKind = opts.kind ?? 'chat';
-  const engine: EngineId = opts.engine === 'pi' || opts.engine === 'claude-sdk' ? opts.engine : s.engine;
-  let model = opts.model?.trim() || defaultModel(engine);
+  const parentKind = opts.parentSessionId ? (getSession(opts.parentSessionId)?.kind ?? 'chat') : undefined;
+  const pick = resolveRoleModel(s, roleOf(kind, parentKind), { engine: opts.engine, model: opts.model });
+  const engine: EngineId = pick.engine === 'pi' || pick.engine === 'claude-sdk' ? pick.engine : s.engine;
+  let model = pick.model?.trim() || defaultModel(engine);
   let piProvider: string | undefined;
   if (engine === 'pi') {
     piProvider = s.pi.provider;

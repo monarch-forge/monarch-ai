@@ -81,14 +81,14 @@ export function ThreadReader(props: {
         <IconBtn title={starred ? 'Unstar (s)' : 'Star (s)'} onClick={() => props.onAction(starred ? 'unstar' : 'star')} icon={<Star size={14} fill={starred ? 'currentColor' : 'none'} />} active={starred} />
         <span class="flex-1" />
         <button
-          class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
+          class="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-control)] text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
           title="Ask Monarch to summarize this thread"
           onClick={() => askMonarch(`Summarize the email thread ${props.threadId} in my ${who}. List the key points, decisions, and any action items or deadlines for me.`)}
         >
           <Sparkles size={12} /> Summarize
         </button>
         <button
-          class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
+          class="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-control)] text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
           title="Ask Monarch to draft a reply (saved as a Gmail draft)"
           onClick={() =>
             askMonarch(`Read the email thread ${props.threadId} in my ${who} and draft a reply in my voice. Save it as a Gmail draft (do not send it) and show me the text.`)
@@ -96,7 +96,7 @@ export function ThreadReader(props: {
         >
           <PenLine size={12} /> Draft reply
         </button>
-        <button class="ml-1 p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Close (Esc)" aria-label="Close thread" onClick={props.onClose}>
+        <button class="ml-1 p-1.5 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Close (Esc)" aria-label="Close thread" onClick={props.onClose}>
           <X size={14} />
         </button>
       </div>
@@ -151,7 +151,7 @@ export function ThreadReader(props: {
 
 function IconBtn(props: { title: string; onClick: () => void; icon: preact.ComponentChildren; active?: boolean }) {
   return (
-    <button class={`p-1.5 rounded-md hover:bg-subtle transition-colors ${props.active ? 'text-fg' : 'text-fg-3 hover:text-fg'}`} title={props.title} aria-label={props.title} onClick={props.onClick}>
+    <button class={`p-1.5 rounded-[var(--radius-control)] hover:bg-subtle transition-colors ${props.active ? 'text-fg' : 'text-fg-3 hover:text-fg'}`} title={props.title} aria-label={props.title} onClick={props.onClick}>
       {props.icon}
     </button>
   );
@@ -171,7 +171,7 @@ function MessageCard(props: { m: MailMessage; defaultOpen: boolean; me: string }
 
   if (!open) {
     return (
-      <button class="text-left rounded-[10px] px-4 py-3 bg-white/[0.02] hover:bg-white/[0.04] transition-colors flex items-baseline gap-3" onClick={() => setOpen(true)}>
+      <button class="text-left rounded-[var(--radius-control)] px-4 py-3 bg-white/[0.02] hover:bg-white/[0.04] transition-colors flex items-baseline gap-3" onClick={() => setOpen(true)}>
         <span class="text-[13.5px] text-fg-2 shrink-0 max-w-[40%] truncate">{fromMe ? 'me' : displayName(m.from)}</span>
         <span class="text-[13px] text-fg-3 truncate flex-1">{(m.text ?? '').replace(/\s+/g, ' ').slice(0, 160)}</span>
         <span class="font-mono text-[11px] text-fg-3 shrink-0">{shortStamp(m.date)}</span>
@@ -179,7 +179,7 @@ function MessageCard(props: { m: MailMessage; defaultOpen: boolean; me: string }
     );
   }
   return (
-    <article class="rounded-[10px] bg-surface">
+    <article class="rounded-[var(--radius-card)] bg-surface">
       <header class="flex items-start gap-3 px-5 pt-4 pb-2 cursor-pointer" onClick={() => setOpen(false)}>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline gap-2">
@@ -198,7 +198,7 @@ function MessageCard(props: { m: MailMessage; defaultOpen: boolean; me: string }
       {m.html && (
         <div class="flex items-center gap-1 px-5 pt-1">
           <button
-            class={`text-[11.5px] px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors ${html ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2 hover:bg-subtle'}`}
+            class={`text-[11.5px] px-2 py-0.5 rounded-[var(--radius-control)] inline-flex items-center gap-1 transition-colors ${html ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2 hover:bg-subtle'}`}
             onClick={() => setHtml(!html)}
             aria-pressed={html}
           >
@@ -206,7 +206,7 @@ function MessageCard(props: { m: MailMessage; defaultOpen: boolean; me: string }
           </button>
           {html && (
             <button
-              class={`text-[11.5px] px-2 py-0.5 rounded-md inline-flex items-center gap-1 transition-colors ${images ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2 hover:bg-subtle'}`}
+              class={`text-[11.5px] px-2 py-0.5 rounded-[var(--radius-control)] inline-flex items-center gap-1 transition-colors ${images ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2 hover:bg-subtle'}`}
               onClick={() => setImages(!images)}
               aria-pressed={images}
               title="Remote images can reveal that you opened the mail"
@@ -222,7 +222,7 @@ function MessageCard(props: { m: MailMessage; defaultOpen: boolean; me: string }
             sandbox=""
             srcDoc={wrapHtml(m.html, images)}
             title={`HTML body of message from ${displayName(m.from)}`}
-            class="w-full h-[60vh] bg-white rounded-md resize-y"
+            class="w-full h-[60vh] bg-white rounded-[var(--radius-control)] resize-y"
             referrerpolicy="no-referrer"
           />
         ) : (

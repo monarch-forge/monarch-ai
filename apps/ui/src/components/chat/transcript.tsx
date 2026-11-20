@@ -1,5 +1,5 @@
 /**
- * Calm chat log: user messages as soft bubbles on the right, replies as plain reading text, tools as quiet lines. Auto-scrolls while pinned to the bottom;
+ * Calm chat log: user messages as soft bubbles on the right, replies as plain reading text, each tool group as one quiet summary line. Auto-scrolls while pinned to the bottom;
  * shows "jump to latest" when the user scrolled up.
  */
 import type { ComponentChildren } from 'preact';
@@ -7,25 +7,28 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChatItem } from '@monarch/shared';
 import { ArrowDown, ChevronRight, AlertTriangle, Copy } from 'lucide-preact';
 import { settings } from '../../lib/store.ts';
-import { fmt } from '../ui.tsx';
+import { fmt, Glyph, useNow } from '../ui.tsx';
 import { Markdown, copyText } from './markdown.tsx';
-import { ToolCard, toolFamily } from './tool-card.tsx';
+import { ToolCard, toolFamily, toolHeadline } from './tool-card.tsx';
 
 type Assistant = Extract<ChatItem, { kind: 'assistant' }>;
 
-function Thinking(props: { text: string; live: boolean }) {
-  const [open, setOpen] = useState<boolean | null>(null);
-  const isOpen = open ?? false;
-  const words = props.text.trim().split(/\s+/).length;
+function Thinking(props: { text: string; live: boolean; ts?: string; endTs?: string }) {
+  const [pinned, setPinned] = useState(false);
+  const [peek, setPeek] = useState(false);
+  const isOpen = pinned || peek;
+  const now = useNow(props.live ? 1000 : 3_600_000);
+  const end = props.live ? now.getTime() : props.endTs ? Date.parse(props.endTs) : NaN;
+  const secs = props.ts ? Math.round((end - Date.parse(props.ts)) / 1000) : NaN;
+  const dur = Number.isFinite(secs) && secs >= 0 ? `${secs}s` : '';
   return (
-    <div class="mb-2">
-      <button class="flex items-center gap-1.5 text-[12.5px] text-fg-3 hover:text-fg-2" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen}>
-        <ChevronRight size={13} strokeWidth={1.75} class={`transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
-        {props.live ? <span class="hud-blink">Thinking…</span> : 'Thought it through'}
-        <span class="text-[11px]">· {words} words</span>
+    <div class="mb-2" onMouseEnter={() => setPeek(true)} onMouseLeave={() => setPeek(false)}>
+      <button class="flex items-center gap-1 text-[11.5px] text-fg-3 hover:text-fg-2 transition-colors" onClick={() => setPinned(!pinned)} aria-expanded={isOpen}>
+        {props.live ? <span class="hud-blink">Thinking{dur ? ` · ${dur}` : '…'}</span> : dur ? `Thought for ${dur}` : 'Thought'}
+        <ChevronRight size={12} strokeWidth={1.75} class={`transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
       </button>
       {isOpen && (
-        <div class="mt-2 ml-1.5 pl-3 border-l-2 border-[var(--bg-subtle)] text-[13px] leading-relaxed text-fg-3 whitespace-pre-wrap max-h-72 overflow-auto">{props.text}</div>
+        <div class="mt-1.5 ml-1 pl-3 border-l-2 border-[var(--bg-subtle)] text-[13px] leading-relaxed text-fg-3 whitespace-pre-wrap max-h-72 overflow-auto">{props.text}</div>
       )}
     </div>
   );
@@ -41,12 +44,12 @@ function Dots() {
   );
 }
 
-function AssistantBody(props: { item: Assistant }) {
+function AssistantBody(props: { item: Assistant; endTs?: string }) {
   const { item } = props;
   const waiting = item.streaming && !item.text && !item.thinking;
   return (
     <div class="group min-w-0">
-      {item.thinking && <Thinking text={item.thinking} live={!!item.streaming && !item.text} />}
+      {item.thinking && <Thinking text={item.thinking} live={!!item.streaming && !item.text} ts={item.ts} endTs={props.endTs} />}
       {waiting ? (
         <div class="h-6 flex items-center">
           <Dots />
@@ -72,6 +75,50 @@ type Block =
   | { type: 'item'; item: ChatItem }
   | { type: 'tools'; items: Extract<ChatItem, { kind: 'tool' }>[]; id: string; ts: string };
 
+type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
+
+/** "Ran, read, gmail search" — distinct verbs of a tool group (max 3), or "Used N tools" */
+export function toolGroupSummary(items: ToolItem[]): string {
+  const verbs: string[] = [];
+  for (const t of items) {
+    const v = toolHeadline(t.name, t.input, 'ok').verb.toLowerCase();
+    if (v && !verbs.includes(v)) verbs.push(v);
+  }
+  if (!verbs.length || verbs.length > 3) return `Used ${items.length} tool${items.length === 1 ? '' : 's'}`;
+  const txt = verbs.join(', ');
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
+/** one quiet line per tool group; errors, denials, approvals (and edits when asked) always stay visible as cards */
+function ToolGroup(props: { items: ToolItem[]; sessionId?: string | null; expandEdits?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const isEdit = (t: ToolItem) => toolFamily(t.name) === 'edit' || toolFamily(t.name) === 'write';
+  const sticky = (t: ToolItem) => t.status === 'error' || t.status === 'denied' || t.status === 'pending-approval' || (!!props.expandEdits && isEdit(t));
+  const running = props.items.some((t) => t.status === 'running');
+  const n = props.items.length;
+  const card = (t: ToolItem) => (
+    <ToolCard key={t.id} item={t} sessionId={props.sessionId} defaultOpen={props.expandEdits && isEdit(t) && t.status !== 'error'} />
+  );
+  return (
+    <div class="flex flex-col gap-0.5 -my-2">
+      <button
+        class="self-start flex items-center gap-2 rounded-[var(--radius-control)] px-1.5 -mx-1.5 py-1 text-[12px] text-fg-3 hover:text-fg-2 hover:bg-white/[0.03] transition-colors duration-150"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        {running ? <Glyph value={3} of={5} live /> : <span aria-hidden="true">·</span>}
+        <span class="truncate">{toolGroupSummary(props.items)}</span>
+        <span aria-hidden="true">·</span>
+        <span class="tabular-nums shrink-0">
+          {n} tool{n === 1 ? '' : 's'}
+        </span>
+        <ChevronRight size={12} strokeWidth={1.75} class={`shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open ? props.items.map(card) : props.items.filter(sticky).map(card)}
+    </div>
+  );
+}
+
 function toBlocks(items: ChatItem[]): Block[] {
   const out: Block[] = [];
   for (const it of items) {
@@ -82,6 +129,10 @@ function toBlocks(items: ChatItem[]): Block[] {
     } else out.push({ type: 'item', item: it });
   }
   return out;
+}
+
+function blockTs(b: Block | undefined): string | undefined {
+  return b ? (b.type === 'tools' ? b.ts : b.item.ts) : undefined;
 }
 
 export function Transcript(props: {
@@ -143,21 +194,8 @@ export function Transcript(props: {
           props.empty
         ) : (
           <div class="px-4 md:px-6 pt-2 pb-8 flex flex-col gap-6 max-w-[760px] mx-auto">
-            {blocks.map((b) => {
-              if (b.type === 'tools') {
-                return (
-                  <div key={b.id} class="flex flex-col gap-0.5 -my-2">
-                    {b.items.map((t) => (
-                      <ToolCard
-                        key={t.id}
-                        item={t}
-                        sessionId={props.sessionId}
-                        defaultOpen={props.expandEdits && (toolFamily(t.name) === 'edit' || toolFamily(t.name) === 'write') && t.status !== 'error'}
-                      />
-                    ))}
-                  </div>
-                );
-              }
+            {blocks.map((b, bi) => {
+              if (b.type === 'tools') return <ToolGroup key={b.id} items={b.items} sessionId={props.sessionId} expandEdits={props.expandEdits} />;
               const it = b.item;
               switch (it.kind) {
                 case 'user':
@@ -174,7 +212,7 @@ export function Transcript(props: {
                     </div>
                   );
                 case 'assistant':
-                  return <AssistantBody key={it.id} item={it} />;
+                  return <AssistantBody key={it.id} item={it} endTs={blockTs(blocks[bi + 1])} />;
                 case 'error':
                   return (
                     <div key={it.id} class="flex items-start gap-2.5 rounded-[10px] bg-red/[0.07] px-4 py-3 text-[13px] text-fg-2">
@@ -184,10 +222,8 @@ export function Transcript(props: {
                   );
                 case 'system':
                   return (
-                    <div key={it.id} class="flex items-center gap-3 text-[12px] text-fg-3">
-                      <span class="h-px flex-1 bg-[var(--bg-subtle)]" />
-                      <span class="max-w-[80%] text-center whitespace-pre-wrap break-words">{it.text}</span>
-                      <span class="h-px flex-1 bg-[var(--bg-subtle)]" />
+                    <div key={it.id} class="-my-2 truncate text-center text-[11.5px] text-fg-3" title={it.text}>
+                      {it.text.replace(/\s+/g, ' ')}
                     </div>
                   );
               }

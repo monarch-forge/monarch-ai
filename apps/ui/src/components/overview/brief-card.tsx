@@ -51,7 +51,7 @@ export function BriefCard() {
   const m = b.messages;
   const counts = [m.mail != null && `${m.mail} mail`, m.slack != null && `${m.slack} Slack`, m.whatsapp != null && `${m.whatsapp} WhatsApp`].filter(Boolean).join(' · ');
   return (
-    <section class="bg-surface rounded-[10px] px-4 py-3" aria-label="Morning brief">
+    <section class="bg-surface rounded-[var(--radius-card)] px-5 py-4" aria-label="Morning brief">
       <header class="flex items-center gap-2">
         <button type="button" class="flex items-center gap-1.5 text-[14px] font-semibold text-fg" onClick={toggle} aria-expanded={open}>
           Morning brief

@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   coding: { defaultWorkspace: homedir(), workspaces: [] },
   memory: { vaultDir: paths.vault },
   sync: { enabled: false, provider: 'github', host: 'github.com', account: '', repo: '', remoteUrl: '', branch: 'main', deviceName: '', autoSync: 'off' },
-  evolution: { enabled: true, autoEnable: true, reflect: 'off', deferTools: true },
+  evolution: { enabled: true, autoEnable: true, reflect: 'off', deferTools: true, draftSkills: true },
   agent: { autoCompactPercent: 75, smallModelMode: 'auto', autonomy: 'high' },
 };
 

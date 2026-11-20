@@ -3,14 +3,15 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { speak, stopSpeaking } from '../lib/voice.ts';
-import { Search, SquarePen } from 'lucide-preact';
-import { Tag, Spinner, ErrorLine, Btn } from '../components/ui.tsx';
-import { ChatLayout, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
+import { Search, SquarePen, MessageCircle } from 'lucide-preact';
+import { Tag, ErrorLine, Btn, Skeleton, Disclosure, EmptyState } from '../components/ui.tsx';
+import { ChatLayout, LiveBadge, Suggestions, ICON_BTN } from '../components/chat/layout.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
 import { SessionRow } from '../components/chat/session-list.tsx';
 import { SessionStats, engineLabel, ContextMeter, compactCommand } from '../components/chat/meta.tsx';
 import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.tsx';
+import { ThreadsPanel } from '../components/chat/threads-panel.tsx';
 import { useChatSession, useSessions, renameSession, totalTokens } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
 import { fmt } from '../components/ui.tsx';
@@ -42,7 +43,6 @@ export default function CommsPage(props: { params: string[] }) {
   useEffect(() => {
     if (autoLink) location.replace('#/agenda');
   }, [autoLink]);
-  const [detailsOpen, setDetailsOpen] = useStoredFlag('monarch.comms.details', false);
   const [inject, setInject] = useState<{ text: string; n: number } | null>(null);
   const list = useSessions('chat');
   const chat = useChatSession(sessionId);
@@ -60,7 +60,7 @@ export default function CommsPage(props: { params: string[] }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const all = list.sessions ?? [];
+    const all = (list.sessions ?? []).filter((x) => !x.parentSessionId); // child sub-sessions live under their parent
     return q ? all.filter((x) => x.title.toLowerCase().includes(q) || x.model.toLowerCase().includes(q)) : all;
   }, [list.sessions, query]);
 
@@ -143,9 +143,7 @@ export default function CommsPage(props: { params: string[] }) {
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto py-2">
         {list.loading && !list.sessions ? (
-          <div class="flex justify-center py-6">
-            <Spinner />
-          </div>
+          <Skeleton lines={5} class="px-4 py-3" />
         ) : list.error && !list.sessions ? (
           <div class="px-4">
             <ErrorLine error={conn.value === 'open' ? list.error : 'Core offline'} />
@@ -171,10 +169,15 @@ export default function CommsPage(props: { params: string[] }) {
     </>
   );
 
-  const details = (
+  const rail = (
     <>
       {session?.id ? (
-        <SessionStats session={session} lastTurn={chat.lastTurn} />
+        <>
+          <ThreadsPanel sessionId={session.id} />
+          <Disclosure label="Session" class="">
+            <SessionStats session={session} lastTurn={chat.lastTurn} />
+          </Disclosure>
+        </>
       ) : (
         <p class="text-[13px] text-fg-3 leading-relaxed">
           New conversations use <span class="text-fg-2">{engineLabel(s)}</span>. You can change the default in{' '}
@@ -184,21 +187,18 @@ export default function CommsPage(props: { params: string[] }) {
           .
         </p>
       )}
-      <div>
-        <div class="text-[12px] text-fg-3 mb-1.5">Quick prompts</div>
-        <div class="flex flex-col -mx-2">
+      <Disclosure label="Quick prompts" class="" bodyClass="flex flex-col -mx-2 pt-2">
           {QUICK.map((q) => (
             <button
               key={q}
-              class="text-left text-[13px] text-fg-2 hover:text-fg hover:bg-[var(--bg-raised,#202023)] rounded-[6px] px-2 py-1.5 disabled:opacity-40 transition-colors duration-150"
+              class="text-left text-[13px] text-fg-2 hover:text-fg hover:bg-[var(--bg-raised,#202023)] rounded-[var(--radius-control)] px-2 py-1.5 disabled:opacity-40 transition-colors duration-150"
               onClick={() => quick(q)}
               disabled={chat.running || conn.value !== 'open'}
             >
               {q}
             </button>
           ))}
-        </div>
-      </div>
+      </Disclosure>
     </>
   );
 
@@ -206,9 +206,8 @@ export default function CommsPage(props: { params: string[] }) {
     <ChatLayout
       sidebar={sidebar}
       routeKey={routeId}
-      detailsOpen={detailsOpen}
-      onDetails={setDetailsOpen}
-      details={details}
+      rail={rail}
+      railTitle="Threads"
       title={
         <>
           <h1 class="truncate text-[15px] font-semibold text-fg">{title}</h1>
@@ -218,8 +217,11 @@ export default function CommsPage(props: { params: string[] }) {
       }
     >
       {chat.loading && !session ? (
-        <div class="flex-1 flex items-center justify-center">
-          <Spinner />
+        <div class="flex-1 px-4 md:px-6 pt-4 w-full max-w-[760px] mx-auto flex flex-col gap-8">
+          <Skeleton h={40} class="self-end w-[45%] rounded-[16px]" />
+          <Skeleton lines={4} />
+          <Skeleton h={40} class="self-end w-[35%] rounded-[16px]" />
+          <Skeleton lines={3} />
         </div>
       ) : chat.error && !session ? (
         <div class="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
@@ -241,7 +243,7 @@ export default function CommsPage(props: { params: string[] }) {
           items={session?.items ?? []}
           sessionId={chat.sessionId}
           running={chat.running}
-          empty={<EmptyState name={s?.user.name} honorific={s?.user.honorific} assistant={s?.assistant.name} onPick={(t) => void send(t)} />}
+          empty={<ChatEmpty name={s?.user.name} honorific={s?.user.honorific} assistant={s?.assistant.name} onPick={(t) => void send(t)} />}
         />
       )}
       <Composer
@@ -274,21 +276,26 @@ export default function CommsPage(props: { params: string[] }) {
   );
 }
 
-function EmptyState(props: { name?: string; honorific?: string; assistant?: string; onPick: (t: string) => void }) {
+function ChatEmpty(props: { name?: string; honorific?: string; assistant?: string; onPick: (t: string) => void }) {
   const hour = new Date().getHours();
   const part = hour < 5 ? 'evening' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
   const who = props.honorific || props.name || '';
   return (
-    <div class="min-h-full flex flex-col items-center justify-center px-6 py-10 text-center">
-      <span class="w-2.5 h-2.5 rounded-full bg-red mb-6" aria-hidden="true" />
-      <h2 class="text-[22px] text-fg font-semibold tracking-tight">
-        Good {part}
-        {who ? <>, {who}</> : null}.
-      </h2>
-      <p class="text-[14px] text-fg-3 mt-2">What can {props.assistant || 'Monarch'} help you with?</p>
-      <div class="mt-8">
-        <Suggestions items={SUGGESTED.map((p) => p.title)} onPick={(t) => props.onPick(SUGGESTED.find((p) => p.title === t)!.text)} disabled={conn.value !== 'open'} />
-      </div>
-    </div>
+    <EmptyState
+      class="min-h-full"
+      icon={<MessageCircle size={18} strokeWidth={1.5} />}
+      title={
+        <span class="text-[20px] font-semibold tracking-tight">
+          Good {part}
+          {who ? <>, {who}</> : null}.
+        </span>
+      }
+      hint={`What can ${props.assistant || 'Monarch'} help you with?`}
+      actions={
+        <div class="mt-4">
+          <Suggestions items={SUGGESTED.map((p) => p.title)} onPick={(t) => props.onPick(SUGGESTED.find((p) => p.title === t)!.text)} disabled={conn.value !== 'open'} />
+        </div>
+      }
+    />
   );
 }

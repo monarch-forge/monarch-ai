@@ -88,6 +88,11 @@ export function register(app: Hono): void {
     if (!r) throw new HttpError(404, 'Session not found');
     return c.json(toDetail(r));
   });
+  app.get('/api/sessions/:id/threads', (c) => {
+    const r = getSession(c.req.param('id'));
+    if (!r) throw new HttpError(404, 'Session not found');
+    return c.json(r.engineState.threads ?? []);
+  });
   app.patch('/api/sessions/:id', async (c) => {
     const b = await body(c);
     if (typeof b.title !== 'string' || !b.title.trim()) throw new HttpError(400, 'title is required');

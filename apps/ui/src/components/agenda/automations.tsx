@@ -4,7 +4,7 @@ import type { Automation } from '@monarch/shared';
 import { Play, Pencil, Plus, Trash, ArrowUpRight } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Btn } from '../ui.tsx';
+import { Btn, Skeleton } from '../ui.tsx';
 import { Button, LoadError, Loading, Modal, relTime, StateBlock, useConfirm } from '../mail/kit.tsx';
 
 const PRESETS: { id: string; label: string; schedule: string }[] = [
@@ -103,12 +103,12 @@ export function AutomationsPanel(props: { class?: string }) {
   };
 
   return (
-    <section class={`flex flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden ${props.class ?? ''}`}>
+    <section class={`flex flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden ${props.class ?? ''}`}>
       <header class="flex items-baseline gap-2 px-4 pt-4 pb-2">
         <h2 class="text-[14.5px] font-semibold text-fg">Automations</h2>
         {list.length > 0 && <span class="text-[12px] text-fg-3">{list.filter((a) => a.enabled).length} running on a schedule</span>}
         <button
-          class="ml-auto self-center p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
+          class="ml-auto self-center p-1 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
           title="New automation"
           aria-label="New automation"
           onClick={() => setEdit({ notify: true, enabled: true, schedule: '0 8 * * 1-5' })}
@@ -120,21 +120,22 @@ export function AutomationsPanel(props: { class?: string }) {
         {res.error && !res.data ? (
           <LoadError error={res.error} onRetry={res.reload} />
         ) : res.data === undefined ? (
-          <Loading label="Loading automations" />
+          <Loading label="Loading automations" rows={3} />
         ) : !list.length ? (
-          <StateBlock title="Nothing scheduled">
-            <div>Let Monarch do things on a schedule. Start from an example:</div>
-            <div class="flex flex-wrap justify-center gap-1.5 mt-3">
-              {EXAMPLES.map((x) => (
-                <Btn key={x.name} size="xs" variant="ghost" onClick={() => setEdit({ ...x, enabled: true })}>
-                  {x.name}
-                </Btn>
-              ))}
-            </div>
+          <StateBlock
+            icon={<Play size={18} strokeWidth={1.5} />}
+            title="Nothing scheduled"
+            actions={EXAMPLES.map((x) => (
+              <Btn key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
+                <Plus size={12} /> {x.name}
+              </Btn>
+            ))}
+          >
+            Let Monarch do things on a schedule. Start from a template:
           </StateBlock>
         ) : (
           list.map((a) => (
-            <div key={a.id} class={`group px-2.5 py-2.5 rounded-md hover:bg-raised transition-colors ${a.enabled ? '' : 'opacity-60'}`}>
+            <div key={a.id} class={`group px-2.5 py-2.5 rounded-[var(--radius-control)] hover:bg-raised transition-colors ${a.enabled ? '' : 'opacity-60'}`}>
               <div class="flex items-center gap-2">
                 <span
                   class={`w-1.5 h-1.5 rounded-full shrink-0 ${a.lastStatus === 'error' ? 'bg-red' : a.enabled ? 'bg-success/80' : 'border border-fg-3'}`}
@@ -144,10 +145,10 @@ export function AutomationsPanel(props: { class?: string }) {
                   {a.name}
                 </button>
                 <span class="ml-auto flex items-center gap-1">
-                  <button class="p-1 rounded-md text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100 focus:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
+                  <button class="p-1 rounded-[var(--radius-control)] text-fg-3 hover:text-fg opacity-0 group-hover:opacity-100 focus:opacity-100" title="Edit" aria-label={`Edit ${a.name}`} onClick={() => setEdit(a)}>
                     <Pencil size={12} />
                   </button>
-                  <button class="p-1 rounded-md text-fg-3 hover:text-fg disabled:opacity-40 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>
+                  <button class="p-1 rounded-[var(--radius-control)] text-fg-3 hover:text-fg disabled:opacity-40 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Run now" aria-label={`Run ${a.name} now`} disabled={running[a.id]} onClick={() => void run(a)}>
                     {running[a.id] ? <span class="loading loading-spinner loading-xs" /> : <Play size={12} />}
                   </button>
                   <input
@@ -282,7 +283,7 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
             <label class="flex flex-col gap-1.5">
               <span class={lab}>Schedule</span>
               <select
-                class="select select-sm w-full bg-white/[0.04] border-line text-[13px] rounded-md"
+                class="select select-sm w-full bg-white/[0.04] border-line text-[13px] rounded-[var(--radius-control)]"
                 value={preset}
                 onChange={(e) => {
                   const id = (e.target as HTMLSelectElement).value;
@@ -395,9 +396,18 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
       {res.error && !res.data ? (
         <LoadError error={res.error} onRetry={res.reload} />
       ) : res.data === undefined ? (
-        <div class="px-3 pb-2 text-[12px] text-fg-3">Loading…</div>
+        <Skeleton lines={2} class="px-3 pb-2.5" />
       ) : !list.length ? (
-        <div class="px-3 pb-2.5 text-[12px] text-fg-3 leading-snug">Nothing scheduled yet. Ask Monarch (“remind me every morning…”) or add one with +.</div>
+        <div class="px-3 pb-2.5 text-[12px] text-fg-3 leading-snug">
+          Nothing scheduled yet. Ask Monarch (“remind me every morning…”) or start from a template:
+          <div class="flex flex-wrap gap-1.5 mt-2">
+            {EXAMPLES.map((x) => (
+              <Btn key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
+                <Plus size={11} /> {x.name}
+              </Btn>
+            ))}
+          </div>
+        </div>
       ) : (
         <div class="max-h-[40vh] overflow-y-auto pb-1">
           {list.map((a) => {
@@ -406,7 +416,7 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
               <div
                 key={a.id}
                 data-automation={a.id}
-                class={`relative group mx-1 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${sel ? 'bg-white/[0.05]' : props.highlight === a.id ? 'bg-white/[0.03]' : 'hover:bg-raised'} ${a.enabled ? '' : 'opacity-60'}`}
+                class={`relative group mx-1 px-2.5 py-1.5 rounded-[var(--radius-control)] cursor-pointer transition-colors ${sel ? 'bg-white/[0.05]' : props.highlight === a.id ? 'bg-white/[0.03]' : 'hover:bg-raised'} ${a.enabled ? '' : 'opacity-60'}`}
                 onClick={() => props.onSelect(sel ? null : a)}
                 title={sel ? 'Show all runs' : 'Show runs of this automation'}
               >

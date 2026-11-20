@@ -4,7 +4,7 @@ import type { EvolutionStats } from '@monarch/shared';
 import { Hammer, RefreshCcw, CornerDownLeft } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { conn, settings, toast, type Resource } from '../../lib/store.ts';
-import { Btn, Spinner } from '../ui.tsx';
+import { Btn, DotText, Skeleton, Spinner } from '../ui.tsx';
 import { ago, errMsg, isMissing, openSession } from './common.tsx';
 
 export function EvolveHeader(props: { stats: Resource<EvolutionStats> }) {
@@ -43,20 +43,20 @@ export function EvolveHeader(props: { stats: Resource<EvolutionStats> }) {
               </span>
             )}
           </h1>
-          <p class="text-[13.5px] text-fg-2 mt-1 leading-relaxed">
+          <div class="text-[13.5px] text-fg-2 mt-1 leading-relaxed">
             {missing ? (
               'The evolution service is not available right now.'
             ) : st ? (
               <>
-                Monarch has {st.extensions.active} active extension{st.extensions.active === 1 ? '' : 's'} and {st.skills} skill{st.skills === 1 ? '' : 's'}, with{' '}
-                {st.changes7d} change{st.changes7d === 1 ? '' : 's'} this week. {st.lastReflectionAt ? `Last reflected ${ago(st.lastReflectionAt)}.` : 'No reflection yet.'}
+                Monarch has <DotText class="text-fg">{st.extensions.active}</DotText> active extension{st.extensions.active === 1 ? '' : 's'} and <DotText class="text-fg">{st.skills}</DotText> skill{st.skills === 1 ? '' : 's'}, with{' '}
+                <DotText class="text-fg">{st.changes7d}</DotText> change{st.changes7d === 1 ? '' : 's'} this week. {st.lastReflectionAt ? `Last reflected ${ago(st.lastReflectionAt)}.` : 'No reflection yet.'}
               </>
             ) : props.stats.loading ? (
-              <Spinner />
+              <Skeleton lines={1} class="w-[60%] inline-flex" />
             ) : (
               '—'
             )}
-          </p>
+          </div>
           <div class="flex flex-wrap gap-2 mt-3">
             {attention.length ? (
               attention.map((a) => (

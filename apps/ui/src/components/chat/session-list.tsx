@@ -49,7 +49,7 @@ export function SessionRow(props: { s: SessionSummary; active: boolean; href: st
     }
   };
 
-  const rowBase = `relative flex items-center gap-2 mx-2 px-3 py-2.5 rounded-[8px] transition-colors duration-150 ${
+  const rowBase = `relative flex items-center gap-2 mx-2 px-3 py-2.5 rounded-[var(--radius-control)] transition-colors duration-150 ${
     props.active ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'
   }`;
   const bar = props.active ? <span class="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-red" /> : null;

@@ -5,9 +5,13 @@ import type { Settings } from '@monarch/shared';
 import { api } from '../../lib/api.ts';
 import { settings, toast } from '../../lib/store.ts';
 
-export const INPUT = 'input input-sm h-9 w-full bg-[#121213] border-line text-[13.5px] rounded-[6px] focus-within:outline-none focus-within:border-fg-3 transition-colors ';
-export const SELECT = 'select select-sm h-9 w-full bg-[#121213] border-line text-[13.5px] rounded-[6px] focus:border-fg-3 ';
-export const TEXTAREA = 'textarea textarea-sm w-full bg-[#121213] border-line text-[13.5px] rounded-[6px] leading-relaxed focus:border-fg-3 ';
+export const INPUT = 'input input-sm h-9 w-full bg-[#121213] border-line text-[13.5px] rounded-[var(--radius-control)] focus-within:outline-none focus-within:border-fg-3 transition-colors ';
+export const SELECT = 'select select-sm h-9 w-full bg-[#121213] border-line text-[13.5px] rounded-[var(--radius-control)] focus:border-fg-3 ';
+export const TEXTAREA = 'textarea textarea-sm w-full bg-[#121213] border-line text-[13.5px] rounded-[var(--radius-control)] leading-relaxed focus:border-fg-3 ';
+/** shared compact button classes, matching <Btn> (use <Btn> for new code) */
+export const BTN = 'btn btn-xs rounded-[var(--radius-control)] font-medium text-[12px] shadow-none transition-colors duration-150';
+export const BTN_OUT = `${BTN} btn-ghost bg-raised border-transparent text-fg-2 hover:bg-subtle hover:text-fg`;
+export const SEL_XS = 'select select-xs bg-[#121213] border-line rounded-[var(--radius-control)] text-[12px]';
 export const TOGGLE = 'toggle toggle-sm rounded-full border-line bg-subtle text-fg-2 checked:bg-red checked:border-red checked:text-fg';
 export const RADIO = 'radio radio-sm border-line checked:bg-red checked:border-red checked:text-fg';
 
@@ -78,10 +82,10 @@ export function SaveBar(props: { dirty: boolean; saving?: boolean; onSave: () =>
   return (
     <div class="flex items-center gap-2 pt-4 mt-5">
       <span class="text-[12px] text-fg-3 flex-1">{props.note ?? (props.dirty ? <span class="text-warning">You have unsaved changes</span> : 'All changes saved')}</span>
-      <button class="btn btn-sm btn-ghost rounded-[6px] font-normal text-[12.5px] text-fg-2" disabled={!props.dirty || props.saving} onClick={props.onReset}>
+      <button class="btn btn-sm btn-ghost rounded-[var(--radius-control)] font-normal text-[12.5px] text-fg-2" disabled={!props.dirty || props.saving} onClick={props.onReset}>
         Revert
       </button>
-      <button class="btn btn-sm btn-primary rounded-[6px] font-medium text-[12.5px] px-4" disabled={!props.dirty || props.saving} onClick={props.onSave}>
+      <button class="btn btn-sm btn-primary rounded-[var(--radius-control)] font-medium text-[12.5px] px-4" disabled={!props.dirty || props.saving} onClick={props.onSave}>
         {props.saving && <span class="loading loading-spinner loading-xs" />}
         Save
       </button>

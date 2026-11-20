@@ -65,6 +65,7 @@ function parse(id: string, raw: string): Skill {
     origin: meta.origin === 'agent' ? 'agent' : 'user',
     updatedAt: meta.updatedAt || nowIso(),
     uses: Number(meta.uses) || 0,
+    ...(meta.status === 'draft' ? { draft: true } : {}),
     body: body.replace(/^\s*\n/, ''),
   };
 }
@@ -79,6 +80,7 @@ function serialize(s: Skill): string {
     `origin: ${s.origin}`,
     `uses: ${s.uses}`,
     `updatedAt: ${s.updatedAt}`,
+    ...(s.draft ? ['status: draft'] : []),
     '---',
     '',
     s.body.trimEnd(),
@@ -119,6 +121,7 @@ export function getSkill(id: string): Skill {
 /** read for use by the agent (counts a use) */
 export function readSkill(id: string): Skill {
   const s = getSkill(id);
+  if (s.draft) throw new HttpError(404, `skill "${s.id}" is a draft awaiting review`);
   s.uses += 1;
   save(s); // keeps updatedAt: it tracks content changes, not reads
   changed('skills');
@@ -129,6 +132,7 @@ export function writeSkill(
   id: string,
   input: { name?: string; description?: string; body?: string },
   origin: Skill['origin'],
+  opts: { draft?: boolean } = {},
 ): { skill: Skill; created: boolean } {
   const sid = checkId(id);
   const prev = existsSync(file(sid)) ? parse(sid, readFileSync(file(sid), 'utf8')) : null;
@@ -146,11 +150,22 @@ export function writeSkill(
     origin: prev?.origin ?? origin,
     uses: prev?.uses ?? 0,
     updatedAt: nowIso(),
+    ...((prev ? prev.draft : opts.draft) ? { draft: true } : {}),
     body,
   };
   save(skill);
   changed('skills');
   return { skill, created: !prev };
+}
+
+/** draft → live: joins the skills index the agent sees */
+export function approveSkill(id: string): Skill {
+  const s = getSkill(id);
+  delete s.draft;
+  s.updatedAt = nowIso();
+  save(s);
+  changed('skills');
+  return s;
 }
 
 export function deleteSkill(id: string): Skill {
@@ -162,7 +177,7 @@ export function deleteSkill(id: string): Skill {
 
 /** compact markdown list for the system prompt; '' when there are no skills */
 export function skillsPromptContext(): string {
-  const list = listSkills().sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name));
+  const list = listSkills().filter((s) => !s.draft).sort((a, b) => b.uses - a.uses || a.name.localeCompare(b.name));
   if (!list.length) return '';
   const lines: string[] = [];
   let size = 0;

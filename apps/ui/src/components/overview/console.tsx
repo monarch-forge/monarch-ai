@@ -74,7 +74,7 @@ export function CommandConsole() {
 
   return (
     <div class="flex flex-col gap-2.5 w-full">
-      <div class={`flex items-stretch gap-1 p-1.5 rounded-[14px] border bg-surface transition-colors duration-150 focus-within:border-line ${isListening ? 'border-red/50' : 'border-transparent'}`}>
+      <div class={`flex items-stretch gap-1 p-1.5 rounded-[var(--radius-card)] border bg-surface transition-colors duration-150 focus-within:border-line ${isListening ? 'border-red/50' : 'border-transparent'}`}>
         {isListening && (
           <span class="flex items-center pl-3 select-none" aria-hidden="true">
             <span class="inline-block w-1.5 h-1.5 rounded-full bg-red hud-blink" />
@@ -99,7 +99,7 @@ export function CommandConsole() {
         {conv && (
           <button
             type="button"
-            class="flex items-center gap-1.5 px-2.5 rounded-md text-[12.5px] text-fg-2 hover:text-fg hover:bg-raised transition-colors"
+            class="flex items-center gap-1.5 px-2.5 rounded-[var(--radius-control)] text-[12.5px] text-fg-2 hover:text-fg hover:bg-raised transition-colors"
             onClick={() => {
               newConsoleConversation();
               inputRef.current?.focus();
@@ -113,7 +113,7 @@ export function CommandConsole() {
         <div class={voiceSupport.listen ? 'flex' : 'tooltip tooltip-top flex'} data-tip={voiceSupport.listen ? undefined : UNSUPPORTED_LISTEN}>
           <button
             type="button"
-            class={`w-10 flex items-center justify-center rounded-md transition-colors ${
+            class={`w-10 flex items-center justify-center rounded-[var(--radius-control)] transition-colors ${
               !voiceSupport.listen ? 'text-fg-3/60 hover:text-fg-2' : isListening ? 'text-red bg-red/10' : 'text-fg-2 hover:text-fg hover:bg-raised'
             }`}
             onClick={onMic}
@@ -126,7 +126,7 @@ export function CommandConsole() {
         </div>
         <button
           type="button"
-          class={`flex items-center gap-2 px-3.5 rounded-[10px] text-[13px] font-medium transition-colors duration-150 ${
+          class={`flex items-center gap-2 px-3.5 rounded-[var(--radius-control)] text-[13px] font-medium transition-colors duration-150 ${
             text.trim() ? 'bg-red text-fg hover:bg-red-hover' : 'bg-raised text-fg-3'
           }`}
           onClick={() => submit(text)}
@@ -170,7 +170,7 @@ function ReplyPreview() {
     run.status === 'sending' ? 'Sending' : run.status === 'thinking' ? 'Thinking' : run.status === 'tool' ? 'Tool' : run.status === 'streaming' ? 'Responding' : run.status === 'done' ? 'Done' : 'Error';
   const reply = run.reply.trim();
   return (
-    <div class="rounded-[10px] bg-surface flex flex-col min-h-0 animate-monarch-fade" role="region" aria-label="Assistant reply" aria-live="polite">
+    <div class="rounded-[var(--radius-card)] bg-surface flex flex-col min-h-0 animate-monarch-fade" role="region" aria-label="Assistant reply" aria-live="polite">
       <div class="flex items-center gap-2 px-4 pt-3 pb-1">
         {(run.turn ?? 1) > 1 && <span class="text-[11px] text-fg-3" title="Turn in this conversation">#{run.turn}</span>}
         <span class="flex-1 min-w-0 truncate text-[12px] text-fg-2" title={run.prompt}>

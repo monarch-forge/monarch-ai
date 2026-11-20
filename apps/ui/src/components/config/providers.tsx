@@ -4,12 +4,10 @@ import type { CustomModel, OAuthFlowState, ProviderStatus } from '@monarch/share
 import { ChevronRight, Activity, KeyRound, LogIn, LogOut, RefreshCw, Link2, Search, Plus, Check, Trash2 } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { oauthFlows, settings, toast, useResource } from '../../lib/store.ts';
-import { Panel, Tag, Spinner, ErrorLine, Empty } from '../ui.tsx';
+import { Panel, Tag, Spinner, ErrorLine, Empty, Skeleton, Btn } from '../ui.tsx';
 import { INPUT, Kbd } from './fields.tsx';
 import { OAuthFlowView } from './oauth-flow.tsx';
 
-const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
-const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
 
 export function ProvidersSection() {
   const res = useResource<ProviderStatus[]>('/providers', ['providers']);
@@ -84,7 +82,7 @@ export function ProvidersSection() {
           <>
             {res.data && <span class="text-[12px] text-fg-3">{configured} ready</span>}
             <select
-              class="select select-xs h-7 bg-transparent border-line rounded-[6px] text-[12px] w-[120px]"
+              class="select select-xs h-7 bg-transparent border-line rounded-[var(--radius-control)] text-[12px] w-[120px]"
               value={engineFilter}
               onChange={(e) => setEngineFilter((e.target as HTMLSelectElement).value as typeof engineFilter)}
               aria-label="Filter by engine"
@@ -100,9 +98,7 @@ export function ProvidersSection() {
         }
       >
         {res.loading && !res.data ? (
-          <div class="flex justify-center py-8">
-            <Spinner />
-          </div>
+          <Skeleton lines={3} class="py-2" />
         ) : res.error && !res.data ? (
           <ErrorLine error={res.error} />
         ) : connected.length === 0 ? (
@@ -115,9 +111,9 @@ export function ProvidersSection() {
       <Panel
         title="Add a provider"
         right={
-          <button class={BTN_OUT} onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
+          <Btn size="xs" onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
             {adding ? <span class="loading loading-spinner loading-xs" /> : <Plus size={12} />} Custom provider
-          </button>
+          </Btn>
         }
       >
         {!browsing ? (
@@ -125,9 +121,9 @@ export function ProvidersSection() {
             <p class="text-[13px] text-fg-2 flex-1 min-w-[220px]">
               {catalog.length} more providers are available, from Anthropic and OpenAI to local servers.
             </p>
-            <button class={BTN_OUT} onClick={() => setBrowsing(true)}>
+            <Btn size="xs" onClick={() => setBrowsing(true)}>
               <Search size={12} /> Browse providers
-            </button>
+            </Btn>
           </div>
         ) : (
           <div class="flex flex-col gap-3">
@@ -281,13 +277,13 @@ function ProviderDetail(props: { p: ProviderStatus; onChanged: (p?: ProviderStat
               onInput={(e) => setKey((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => e.key === 'Enter' && void saveKey()}
             />
-            <button class={`${BTN} btn-primary h-8`} disabled={!key.trim() || busy === 'key'} onClick={() => void saveKey()}>
+            <Btn size="sm" variant="primary" disabled={!key.trim() || busy === 'key'} onClick={() => void saveKey()}>
               {busy === 'key' && <span class="loading loading-spinner loading-xs" />}Save
-            </button>
+            </Btn>
             {p.source === 'stored-key' && (
-              <button class={`${BTN_OUT} h-8`} disabled={busy === 'clear'} onClick={() => void clearKey()}>
+              <Btn size="sm" disabled={busy === 'clear'} onClick={() => void clearKey()}>
                 Clear
-              </button>
+              </Btn>
             )}
           </div>
           <div class="text-[11px] text-fg-3 mt-1">Stored encrypted by the core; never sent back to the UI.</div>
@@ -301,17 +297,17 @@ function ProviderDetail(props: { p: ProviderStatus; onChanged: (p?: ProviderStat
             {p.source === 'oauth' ? (
               <>
                 <span class="text-[12.5px] text-fg-2">Logged in{p.account ? ` as ${p.account}` : ''}.</span>
-                <button class={BTN_OUT} disabled={busy === 'logout'} onClick={() => void logout()}>
+                <Btn size="xs" disabled={busy === 'logout'} onClick={() => void logout()}>
                   <LogOut size={11} /> Logout
-                </button>
-                <button class={BTN_OUT} disabled={busy === 'login' || !!flow} onClick={() => void login()}>
+                </Btn>
+                <Btn size="xs" disabled={busy === 'login' || !!flow} onClick={() => void login()}>
                   Re-login
-                </button>
+                </Btn>
               </>
             ) : (
-              <button class={`${BTN} btn-primary`} disabled={busy === 'login' || (!!flow && flow.status !== 'error')} onClick={() => void login()}>
+              <Btn size="xs" variant="primary" disabled={busy === 'login' || (!!flow && flow.status !== 'error')} onClick={() => void login()}>
                 {busy === 'login' ? <span class="loading loading-spinner loading-xs" /> : <LogIn size={11} />} Login with {p.name}
-              </button>
+              </Btn>
             )}
           </div>
           {flow && (
@@ -357,17 +353,17 @@ function RemoveCustom(props: { p: ProviderStatus; onRemoved: () => void }) {
       {armed ? (
         <>
           <span class="text-[12px] text-fg-2">Remove {props.p.name}, its models and its stored key?</span>
-          <button class={`${BTN} btn-error h-7`} disabled={busy} onClick={() => void remove()}>
+          <Btn size="xs" variant="danger" disabled={busy} onClick={() => void remove()}>
             {busy && <span class="loading loading-spinner loading-xs" />}Remove
-          </button>
-          <button class={`${BTN_OUT} h-7`} onClick={() => setArmed(false)}>
+          </Btn>
+          <Btn size="xs" onClick={() => setArmed(false)}>
             Cancel
-          </button>
+          </Btn>
         </>
       ) : (
-        <button class={`${BTN_OUT} h-7 hover:!text-red hover:!border-red/60`} onClick={() => setArmed(true)}>
+        <Btn size="xs" class="hover:!text-red hover:!border-red/60" onClick={() => setArmed(true)}>
           <Trash2 size={11} /> Remove provider
-        </button>
+        </Btn>
       )}
     </div>
   );
@@ -455,12 +451,12 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
         </div>
       </div>
       <div class="flex gap-2 items-center">
-        <button class={`${BTN} btn-primary h-8`} disabled={!dirty || busy === 'save'} onClick={() => void save()}>
+        <Btn size="sm" variant="primary" disabled={!dirty || busy === 'save'} onClick={() => void save()}>
           {busy === 'save' && <span class="loading loading-spinner loading-xs" />}Save
-        </button>
-        <button class={`${BTN_OUT} h-8`} disabled={!clean || busy === 'discover'} onClick={() => void discover()} title="List the models this endpoint serves (uses the API key below)">
+        </Btn>
+        <Btn size="sm" disabled={!clean || busy === 'discover'} onClick={() => void discover()} title="List the models this endpoint serves (uses the API key below)">
           {busy === 'discover' ? <span class="loading loading-spinner loading-xs" /> : <Search size={11} />} Discover models
-        </button>
+        </Btn>
         <span class="text-[11px] text-fg-3">
           Provider id <span class="font-mono text-fg-2">{p.id}</span> · usually ends in <span class="font-mono">/v1</span>
         </span>
@@ -472,9 +468,9 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
             <span class=" text-[12px] text-fg-3">{found.length} available</span>
             {found.length > 8 && <input class={`${INPUT} input-xs font-mono max-w-[220px]`} placeholder="Filter…" value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />}
             {shown.some((m) => !have.has(m.id)) && shown.length <= 50 && (
-              <button class={`${BTN_OUT} ml-auto`} disabled={busy === 'models'} onClick={() => add(shown.map((m) => m.id))}>
+              <Btn size="xs" class="ml-auto" disabled={busy === 'models'} onClick={() => add(shown.map((m) => m.id))}>
                 <Plus size={11} /> Add all{filter ? ' shown' : ''}
-              </button>
+              </Btn>
             )}
             <button class="text-fg-3 hover:text-fg-2 ml-auto" title="Close" onClick={() => setFound(null)}>
               ×
@@ -491,9 +487,9 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
                     <Check size={11} /> Added
                   </span>
                 ) : (
-                  <button class={`${BTN_OUT} ml-auto`} disabled={busy === 'models'} onClick={() => add([m.id])}>
+                  <Btn size="xs" class="ml-auto" disabled={busy === 'models'} onClick={() => add([m.id])}>
                     <Plus size={11} /> Add
-                  </button>
+                  </Btn>
                 )}
               </div>
             ))}
@@ -544,8 +540,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
                 }
               }}
             />
-            <button
-              class={BTN_OUT}
+            <Btn size="xs"
               disabled={!manual.trim() || busy === 'models'}
               onClick={() => {
                 add([manual]);
@@ -553,7 +548,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
               }}
             >
               <Plus size={11} /> Add
-            </button>
+            </Btn>
           </div>
         </div>
       </div>

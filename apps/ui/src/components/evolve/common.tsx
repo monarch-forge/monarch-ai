@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact';
 import type { ExtensionOrigin, ExtensionPermission, ExtensionStatus, ToolRisk } from '@monarch/shared';
 import { Dna } from 'lucide-preact';
 import { conn, navigate, type Resource } from '../../lib/store.ts';
-import { Spinner, Tag } from '../ui.tsx';
+import { Skeleton, Spinner, Tag } from '../ui.tsx';
 import { RetryLink } from '../overview/common.tsx';
 
 /** true when the error means the endpoint does not exist (yet) */
@@ -36,7 +36,7 @@ export function EvoGate<T>(props: { res: Resource<T>; children: (data: T) => Com
   if (conn.value !== 'open') return <EvoNote label={conn.value === 'connecting' ? 'Linking core' : 'Core offline'} spinner={conn.value === 'connecting'} />;
   if (isMissing(error)) return <EvoNote icon label="Evolution service unavailable" sub="This core build does not expose the self-evolution API yet." action={<RetryLink onClick={() => void props.res.reload()} />} />;
   if (error) return <EvoNote label="Unavailable" sub={error} action={<RetryLink onClick={() => void props.res.reload()} />} />;
-  if (loading) return <EvoNote label={props.loadingLabel ?? 'Loading'} spinner />;
+  if (loading) return <Skeleton lines={4} class="p-4" />;
   return <EvoNote label="No data" />;
 }
 
@@ -136,7 +136,7 @@ export function errMsg(e: unknown): string {
 
 /** chunky mono textarea used for source / JSON / markdown editing */
 export const CODE_AREA =
-  'w-full bg-[#121213] border border-line rounded-[6px] font-mono text-[12px] leading-[1.6] text-fg p-3 resize-y focus:border-fg-3 [tab-size:2]';
+  'w-full bg-[#121213] border border-line rounded-[var(--radius-control)] font-mono text-[12px] leading-[1.6] text-fg p-3 resize-y focus:border-fg-3 [tab-size:2]';
 
 /** insert two spaces on Tab inside a textarea instead of moving focus (Esc then Tab still leaves) */
 export function tabIndentHandler(e: KeyboardEvent, onValue: (v: string) => void): void {

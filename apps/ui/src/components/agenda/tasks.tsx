@@ -1,11 +1,11 @@
 /** Tasks panel: quick-add, grouped list (Overdue / Today / Upcoming / No date / Done), inline editor. */
 import { useMemo, useRef, useState } from 'preact/hooks';
 import type { Task } from '@monarch/shared';
-import { Bell, ChevronDown, ChevronRight, Plus, Trash } from 'lucide-preact';
+import { Bell, Check, ChevronDown, ChevronRight, Plus, Trash } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
 import { Btn } from '../ui.tsx';
-import { fromLocalInput, LoadError, Loading, relTime, sameDay, StateBlock, toLocalInput, useConfirm } from '../mail/kit.tsx';
+import { askMonarch, fromLocalInput, LoadError, Loading, relTime, sameDay, StateBlock, toLocalInput, useConfirm } from '../mail/kit.tsx';
 
 type Group = 'overdue' | 'today' | 'upcoming' | 'nodate' | 'done';
 const GROUP_NAMES: Record<Group, string> = { overdue: 'Overdue', today: 'Today', upcoming: 'Upcoming', nodate: 'No date', done: 'Done' };
@@ -115,7 +115,7 @@ export function TasksPanel(props: { class?: string }) {
   const open = tasks.filter((t) => !t.done).length;
 
   return (
-    <section class={`flex flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden ${props.class ?? ''}`}>
+    <section class={`flex flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden ${props.class ?? ''}`}>
       <header class="flex items-baseline gap-2 px-4 pt-4 pb-2">
         <h2 class="text-[14.5px] font-semibold text-fg">Tasks</h2>
         <span class="text-[12px] text-fg-3">{open ? `${open} open` : 'all done'}</span>
@@ -131,7 +131,7 @@ export function TasksPanel(props: { class?: string }) {
         <div class="flex gap-2">
           <input
             ref={inputRef}
-            class="flex-1 min-w-0 bg-white/[0.04] rounded-md px-3 py-2 text-[13.5px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+            class="flex-1 min-w-0 bg-white/[0.04] rounded-[var(--radius-control)] px-3 py-2 text-[13.5px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
             placeholder="Add a task…"
             title="Use #tags inline, e.g. “Call Pepper #home”"
             value={title}
@@ -155,7 +155,20 @@ export function TasksPanel(props: { class?: string }) {
         ) : res.data === undefined ? (
           <Loading label="Loading tasks" />
         ) : !tasks.length ? (
-          <StateBlock title="Nothing to do">Add one above, or tell Monarch “remind me to…” in chat.</StateBlock>
+          <StateBlock
+            icon={<Check size={18} strokeWidth={1.5} />}
+            title="Nothing to do"
+            actions={
+              <>
+                <Btn variant="primary" onClick={() => inputRef.current?.focus()}>
+                  <Plus size={12} /> Add a task
+                </Btn>
+                <Btn onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')}>Ask Monarch to plan my day</Btn>
+              </>
+            }
+          >
+            Add one above, or tell Monarch “remind me to…” in chat.
+          </StateBlock>
         ) : (
           (['overdue', 'today', 'upcoming', 'nodate'] as Group[])
             .filter((g) => groups[g].length)
@@ -193,7 +206,7 @@ export function TasksPanel(props: { class?: string }) {
 function PrioritySelect(props: { value: Task['priority']; onChange: (p: Task['priority']) => void }) {
   return (
     <select
-      class="select select-xs bg-white/[0.04] border-line rounded-md text-[12px] w-24"
+      class="select select-xs bg-white/[0.04] border-line rounded-[var(--radius-control)] text-[12px] w-24"
       value={props.value}
       onChange={(e) => props.onChange((e.target as HTMLSelectElement).value as Task['priority'])}
       aria-label="Priority"
@@ -209,8 +222,8 @@ function TaskRow(props: { t: Task; now: Date; open: boolean; onToggleOpen: () =>
   const t = props.t;
   const overdue = !t.done && !!t.due && new Date(t.due) < props.now;
   return (
-    <div class={`rounded-md transition-colors ${props.open ? 'bg-white/[0.035]' : ''}`}>
-      <div class="group flex items-start gap-3 px-2.5 py-2 rounded-md hover:bg-raised">
+    <div class={`rounded-[var(--radius-control)] transition-colors ${props.open ? 'bg-white/[0.035]' : ''}`}>
+      <div class="group flex items-start gap-3 px-2.5 py-2 rounded-[var(--radius-control)] hover:bg-raised">
         <button
           class={`mt-[2px] w-4 h-4 shrink-0 rounded-full border grid place-items-center transition-colors ${t.done ? 'bg-fg-2 border-fg-2' : 'border-fg-3 hover:border-fg'}`}
           role="checkbox"

@@ -11,6 +11,7 @@ import type { Project, ProjectView, RepoCommands, RepoProfile } from '@monarch/s
 import { changed, HttpError, newId, nowIso } from '../kernel.ts';
 import { serviceStore } from './persist.ts';
 import { expandHome } from './workspace.ts';
+import { getRepoMap, mapSlice } from './repomap.ts';
 
 const projects = serviceStore<Project[]>('projects', []);
 const profiles = serviceStore<Record<string, RepoProfile>>('repo-profiles', {});
@@ -399,11 +400,15 @@ export function formatProfile(p: RepoProfile, full = true): string {
 }
 
 /** prompt section for a worker in `cwd`: its repo profile + the other repos of its project */
-export async function workerContext(cwd: string): Promise<string> {
+export async function workerContext(cwd: string, task = ''): Promise<string> {
   const out: string[] = [];
   const prof = await getRepoProfile(cwd).catch(() => null);
   const proj = projectOf(cwd);
   if (prof) out.push('## This repository (detected by Monarch from its files; may be incomplete)', formatProfile(prof));
+  // repo map slice for the task (deterministic per task + HEAD, so the prompt stays cache-stable); a slow first build is skipped
+  const map = prof ? await Promise.race([getRepoMap(prof.path).catch(() => null), new Promise<null>((r) => setTimeout(r, 2500, null))]) : null;
+  const slice = map ? mapSlice(map, task, 600) : '';
+  if (slice) out.push('', '## Repo map (likely relevant files: key symbols)', slice);
   if (proj) {
     const view = await projectView(proj).catch(() => null);
     const others = (view?.repos ?? []).filter((r) => r.path !== prof?.path);

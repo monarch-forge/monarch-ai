@@ -10,10 +10,11 @@ import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
-import type { ChatItem, EngineId } from '@monarch/shared';
+import type { AgentRole, ChatItem, EngineId } from '@monarch/shared';
 import { defineTool, type ToolDef } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { looksLikeTextToolCall } from '../agent/text-tools.ts';
+import { roleDefault } from '../agent/roles.ts';
 
 type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
 
@@ -246,10 +247,17 @@ export async function codingAgentsBrief(parentId: string, limit = 8): Promise<st
 const KEYWORDS = ['worker', 'agent', 'delegate', 'workshop', 'coding', 'code', 'implement', 'fix bug', 'refactor', 'research', 'triage', 'inbox', 'plan', 'draft', 'sub-agent', 'project'];
 const common = { group: 'worker-agents', keywords: KEYWORDS, tag: 'CODE' as const };
 
-/** default runtime/model for worker agents (Config → Models → Worker agents); falls back to the user's default */
-function workerDefault(): { engine?: EngineId; model?: string } {
-  const w = (getSettings() as { agent?: { workerModel?: { engine?: EngineId; model?: string } } }).agent?.workerModel;
-  return w?.model ? { engine: w.engine, model: w.model } : {};
+/** link a new worker to a thread on the calling chat's board (chat sessions only; ignored elsewhere) */
+async function linkThread(chatId: string, thread: string, workerId: string, label: string): Promise<void> {
+  const S = await sess();
+  const rec = S.getSession(chatId);
+  if (!rec || rec.kind !== 'chat') return;
+  const T = await import('../agent/threads.ts');
+  const list = T.threadsOf(rec);
+  const byId = list.some((t) => t.id === thread);
+  T.upsertThread(list, { ...(byId ? { id: thread } : { title: thread }), status: 'waiting', links: [{ kind: 'worker', ref: workerId, label: clip(label, 60) }] });
+  S.saveSession(rec);
+  T.broadcastThreads(rec.id);
 }
 
 export const tools: ToolDef[] = [
@@ -261,7 +269,7 @@ export const tools: ToolDef[] = [
       'Use it for heavy or long work: any code change or inspection; thorough inbox/Slack triage across accounts; research and write-ups; planning; long drafts. Do quick actions and lookups yourself instead. ' +
       'Returns sessionId and a Workshop link immediately (wait=false), or blocks until the agent finishes (wait=true). Give a complete, self-contained task and the expected output. ' +
       'cwd: project folder for code work (absolute path or remembered workspace name; default workspace if omitted); not needed for non-code tasks. ' +
-      'Runtime/model: omit both to use the worker default from Config (usually a stronger model than yours). Only pick one when the user asks; agent_models lists what is available.',
+      'Runtime/model: omit both to use the sub-agent default from Config (usually a stronger model than yours). Only pick one when the user asks; agent_models lists what is available.',
     risk: 'sensitive',
     loading: 'always',
     schema: z.object({
@@ -278,6 +286,7 @@ export const tools: ToolDef[] = [
         .describe("claude-sdk: an alias (opus, sonnet, haiku) or a full Claude model id. pi: '<provider>/<model-id>' as listed by agent_models. A '/' implies engine pi."),
       wait: z.boolean().optional().describe('block until the agent finishes its turn (default false; true in small-model mode)'),
       timeoutSec: z.number().int().min(5).max(1800).optional().describe('when wait=true (default 300)'),
+      thread: z.string().optional().describe('board thread id or title to link (created if new); you are pinged when the worker finishes'),
     }),
     summarize: (i) => `Start worker agent${i.cwd ? ` in ${i.cwd}` : ''}: ${clip(i.task, 120)}`,
     async run(i, ctx) {
@@ -292,8 +301,8 @@ export const tools: ToolDef[] = [
       }
       const o = await orch();
       const title = i.title?.trim() || clip(i.task.replace(/\s+/g, ' '), 60);
-      const def = !i.engine && !i.model ? workerDefault() : {};
-      const choice = await validateModel((i.engine ?? def.engine) as EngineId | undefined, i.model ?? def.model);
+      // omitted engine/model: newSession applies the sub-agent role default (Config → Models), then the global default
+      const choice = await validateModel(i.engine as EngineId | undefined, i.model);
       const { sessionId } = o.startPrompt({
         text: i.task,
         kind: 'coding',
@@ -303,6 +312,7 @@ export const tools: ToolDef[] = [
         cwd,
         parentSessionId: ctx.sessionId,
       });
+      if (i.thread?.trim()) await linkThread(ctx.sessionId, i.thread.trim(), sessionId, title);
       if (i.wait ?? ctx.small) {
         const r = await waitAndReport(sessionId, i.timeoutSec ?? 300, ctx.signal, ctx.progress);
         return ctx.small ? `Started worker agent ${sessionId}.\n${compactStatus(r)}` : r;
@@ -417,7 +427,8 @@ export const tools: ToolDef[] = [
       const q = i.query?.trim().toLowerCase();
       const all = (await availableModels()).filter((m) => !q || `${m.spec} ${m.name}`.toLowerCase().includes(q));
       const def = s.engine === 'pi' ? `pi ${s.pi.provider}/${s.pi.model}` : `claude-sdk ${s.claudeSdk.model}`;
-      const lines = [`Default (used when engine/model are omitted): ${def}`];
+      const fmt = (r: AgentRole) => { const m = roleDefault(s, r); return m ? `${m.engine} ${m.model}` : 'global default'; };
+      const lines = [`Global default: ${def}. Role defaults when engine/model are omitted — agents you start from Chat: ${fmt('chatSub')}; from Workshop: ${fmt('workshopSub')}.`];
       for (const eng of ['claude-sdk', 'pi'] as EngineId[]) {
         const ms = all.filter((m) => m.engine === eng);
         if (!ms.length) continue;

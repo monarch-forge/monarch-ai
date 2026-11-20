@@ -19,6 +19,10 @@ It runs as a local web app (`http://localhost:5173`) or as a native desktop app 
 - **Trust in Auto mode.** The first message to a new person or channel, the first edit in a new repo, and any change touching more than 25 items ask once. Monarch learns facts about you from your chats into an editable "What Monarch knows" page in Memory.
 - **Android app.** Each release includes `Monarch-<version>-android-arm64.apk`, a remote client for the Monarch running on your laptop. Turn on Phone access, connect both devices to Tailscale, then enter the pairing link or address in the app. Alerts that need you show as Android notifications while the app is open.
 - **Phone access.** Optional and off by default. Turn it on in Config → Phone access to use Monarch from your phone over Tailscale (recommended) or your LAN. Phones pair once with a code and can be revoked.
+- **Threads board.** Chat keeps a short, pinned list of ongoing threads, each with a status, a next step, an area tag (work, personal, a repo, a person) and links to workers, PRs or mail. It survives compaction and is shown in Chat's side panel. When a linked worker finishes, Chat is prompted to update the thread and report back.
+- **Better coding on small models.** Workers get a compact repo map (files with their key functions and classes, refreshed by commit), a `repo_map` tool to find definitions, and a short plan (`plan_set` / `plan_step`). Open plan steps and a failing check both send the worker back before it can report done.
+- **Learned skills.** When the same kind of task succeeds twice, Monarch drafts a reusable skill for you to approve in System → Evolve.
+- **Default model per agent.** Config → AI → Models sets the default model for Chat, Workshop, Chat sub-agents and Workshop sub-agents. An explicitly requested model still wins.
 - **Projects.** Add a folder of repos (backend, frontend, services). Monarch reads each repo's own files (package.json, Makefile, go.mod, CI workflows, compose, .env.example) to learn how to build, test and run it, and refreshes that profile whenever the repo's commit changes, so no AGENTS.md is needed. Workers get the profile automatically, and after they edit files Monarch runs the repo's check command and sends failures back (up to 2 fix rounds) before reporting done.
 - **Coding workshop.** Point the agent at a workspace. It uses Claude Code's own tools (Claude Agent SDK) or pi's coding tools: read, edit, bash, grep and so on.
 - **Mail.** Several Gmail accounts in one place, with read, search, draft and send. Sending always needs approval.
@@ -80,8 +84,8 @@ Download the `monarch-ai-bin` package from the release, then install the local f
 `webkit2gtk-4.1`, `gtk3` and `nodejs`:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.15.3/monarch-ai-bin-0.15.3-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.15.3-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.16.0/monarch-ai-bin-0.16.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.16.0-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`. The package isn't GPG-signed, and pacman's default
@@ -106,30 +110,30 @@ Uninstall with `sudo pacman -R monarch-ai-bin`. Your data in `~/.monarch-ai` is 
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./Monarch_0.15.3_amd64.deb
+sudo apt install ./Monarch_0.16.0_amd64.deb
 ```
 
 ### Fedora / openSUSE
 
 ```bash
-sudo dnf install ./Monarch-0.15.3-1.x86_64.rpm
+sudo dnf install ./Monarch-0.16.0-1.x86_64.rpm
 ```
 
 ### Any Linux (AppImage)
 
 ```bash
-chmod +x Monarch_0.15.3_amd64.AppImage && ./Monarch_0.15.3_amd64.AppImage
+chmod +x Monarch_0.16.0_amd64.AppImage && ./Monarch_0.16.0_amd64.AppImage
 ```
 
 ### macOS
 
-Open `Monarch_0.15.3_aarch64.dmg` (Apple Silicon) or `Monarch_0.15.3_x64.dmg` (Intel) and drag Monarch to
+Open `Monarch_0.16.0_aarch64.dmg` (Apple Silicon) or `Monarch_0.16.0_x64.dmg` (Intel) and drag Monarch to
 Applications. The app is unsigned: on first launch, right-click it and choose **Open**, or run
 `xattr -dr com.apple.quarantine /Applications/Monarch.app`.
 
 ### Windows
 
-Run `Monarch_0.15.3_x64-setup.exe`, or `Monarch_0.15.3_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
+Run `Monarch_0.16.0_x64-setup.exe`, or `Monarch_0.16.0_x64_en-US.msi`. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Releasing
 

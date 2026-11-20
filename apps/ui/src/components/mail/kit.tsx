@@ -8,7 +8,7 @@ import { createPortal } from 'preact/compat';
 import { X } from 'lucide-preact';
 import { socket } from '../../lib/api.ts';
 import { conn, navigate } from '../../lib/store.ts';
-import { Btn, Spinner } from '../ui.tsx';
+import { Btn, EmptyState } from '../ui.tsx';
 
 /* ─────────── ask Monarch ─────────── */
 
@@ -106,7 +106,7 @@ export function Modal(props: {
         role="dialog"
         aria-modal="true"
         aria-label={props.title}
-        class={`w-full max-h-[90vh] flex flex-col bg-surface rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] overflow-hidden ${props.width ?? 'max-w-lg'}`}
+        class={`w-full max-h-[90vh] flex flex-col bg-surface rounded-[var(--radius-modal)] shadow-[0_12px_32px_rgb(0_0_0/0.45)] overflow-hidden ${props.width ?? 'max-w-lg'}`}
       >
         <header class="flex items-center gap-3 px-5 pt-4 pb-2">
           <h2 class="text-[15px] font-semibold text-fg">{props.title}</h2>
@@ -157,21 +157,24 @@ export function useConfirm(): [ComponentChildren, (o: { title: string; body?: Co
 /* ─────────── state blocks ─────────── */
 
 /** centered status block for empty / error / offline / loading states */
-export function StateBlock(props: { icon?: ComponentChildren; title: string; children?: ComponentChildren; class?: string }) {
-  return (
-    <div class={`flex flex-col items-center justify-center text-center gap-3 px-6 py-10 ${props.class ?? ''}`}>
-      {props.icon && <div class="text-fg-3/80">{props.icon}</div>}
-      <div class="text-[14.5px] font-medium text-fg-2">{props.title}</div>
-      {props.children && <div class="text-[13px] text-fg-3 max-w-sm leading-relaxed">{props.children}</div>}
-    </div>
-  );
+export function StateBlock(props: { icon?: ComponentChildren; title: string; children?: ComponentChildren; class?: string; actions?: ComponentChildren }) {
+  return <EmptyState icon={props.icon} title={props.title} hint={props.children} actions={props.actions} class={props.class} />;
 }
 
-/** inline loading line */
-export function Loading(props: { label?: string; class?: string }) {
+/** first-load placeholder: skeleton list rows shaped like the content (label kept for screen readers) */
+export function Loading(props: { label?: string; class?: string; rows?: number }) {
+  const n = props.rows ?? 4;
   return (
-    <div class={`flex items-center gap-2 text-[12.5px] text-fg-3 px-4 py-5 ${props.class ?? ''}`}>
-      <Spinner /> {props.label ?? 'Loading'}…
+    <div class={`flex flex-col gap-1 px-3 py-3 ${props.class ?? ''}`} aria-busy="true" aria-label={props.label ?? 'Loading'}>
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} class="flex items-center gap-3 px-2 py-2">
+          <div class="ds-skeleton w-7 h-7 rounded-full shrink-0" />
+          <div class="flex-1 min-w-0 flex flex-col gap-1.5">
+            <div class="ds-skeleton h-3" style={{ width: `${70 - (i % 3) * 12}%` }} />
+            <div class="ds-skeleton h-2.5" style={{ width: `${45 + (i % 2) * 15}%` }} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

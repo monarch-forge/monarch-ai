@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2 } from 'lucide-preact';
 import { approvals, navigate, notifications, type Resource } from '../../lib/store.ts';
 import { displayToolName, focusApprovals } from '../approvals.tsx';
 import { notificationsOpen } from '../notifications.tsx';
-import { Panel } from '../ui.tsx';
+import { DotText, Panel } from '../ui.tsx';
 import { Gate } from './common.tsx';
 
 /** approvals + flags that are not purely informational */
@@ -13,7 +13,7 @@ export function WaitingCard(props: { res: Resource<Briefing>; class?: string }) 
   const flags = (props.res.data?.flags ?? []).filter((f) => f.level !== 'info');
   const total = pending.length + flags.length;
   return (
-    <Panel title="Waiting on you" class={props.class} active={pending.length > 0} right={total > 0 ? <span class="text-[12px] text-fg-3 tabular-nums">{total}</span> : undefined}>
+    <Panel title="Waiting on you" class={props.class} active={pending.length > 0} right={total > 0 ? <DotText class="text-[13px] text-fg-2">{total}</DotText> : undefined}>
       {pending.length === 0 && flags.length === 0 && props.res.data === undefined ? (
         <Gate res={props.res}>{() => null}</Gate>
       ) : total === 0 ? (
@@ -81,7 +81,7 @@ export function InboxCard(props: { res: Resource<Briefing>; class?: string }) {
                   onClick={() => (r.go ? navigate(r.go) : (notificationsOpen.value = true))}
                 >
                   <span class="flex-1 text-fg-2">{r.label}</span>
-                  <span class={`text-[15px] tabular-nums ${r.value ? 'text-fg font-medium' : 'text-fg-3'}`}>{r.value ?? 0}</span>
+                  <DotText class={`text-[16px] ${r.value ? 'text-fg' : 'text-fg-3'}`}>{r.value ?? 0}</DotText>
                 </button>
               ))}
             </div>

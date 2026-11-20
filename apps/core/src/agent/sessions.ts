@@ -28,6 +28,10 @@ export interface EngineState {
   piUsageFrom?: number;
   /** pi: the last "your coding agents" context note injected into a user turn (re-sent only on change) */
   codingAgentsNote?: string;
+  /** chat: open-threads board (see threads.ts) */
+  threads?: import('@monarch/shared').ChatThread[];
+  /** pi: the last threads board note injected into a user turn (re-sent only on change) */
+  threadsNote?: string;
   /** coding: automatic check-fix rounds since the last message from the user/manager */
   checkRounds?: number;
 }
@@ -73,6 +77,7 @@ export function toSummary(r: SessionRecord): SessionSummary {
     running: r.running,
     ...(r.parentSessionId ? { parentSessionId: r.parentSessionId } : {}),
     ...(r.context ? { context: r.context } : {}),
+    ...(r.plan ? { plan: r.plan } : {}),
   };
 }
 
@@ -115,6 +120,7 @@ function readRecord(id: string): SessionRecord | undefined {
       running: false,
       parentSessionId: raw.parentSessionId,
       context: raw.context,
+      plan: raw.plan,
       items: (raw.items ?? []).map((it) =>
         // a crash mid-turn can leave streaming / running markers behind
         it.kind === 'assistant' && it.streaming

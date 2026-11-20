@@ -7,6 +7,7 @@ import { skillsPromptContext } from '../extensions/index.ts';
 import { autonomyHigh } from './autonomy.ts';
 import { autoMode } from './approvals.ts';
 import { projectsBrief, workerContext } from '../services/projects.ts';
+import { getSession } from './sessions.ts';
 import { getStatus as getWhatsAppStatus } from '../integrations/whatsapp/index.ts';
 import { deferToolsEnabled, deferredToolIndex, piToolDefs, sdkToolDefs, smallModeForSession } from './toolset.ts';
 
@@ -149,9 +150,13 @@ export async function buildSystemPrompt(opts: PromptOptions): Promise<string> {
 
   const agents = opts.engine === 'claude-sdk' && opts.kind !== 'coding' ? await codingAgentsSection(opts.sessionId) : [];
   if (agents.length) lines.push('', ...agents);
+  lines.push(...(await threadsSection(opts)));
   if (opts.kind === 'coding') {
-    const repo = await withTimeout(workerContext(opts.cwd ?? s.coding.defaultWorkspace), 4000).catch(() => '');
+    const task = getSession(opts.sessionId ?? '')?.items.find((i) => i.kind === 'user');
+    const repo = await withTimeout(workerContext(opts.cwd ?? s.coding.defaultWorkspace, task?.kind === 'user' ? task.text : ''), 4000).catch(() => '');
     if (repo) lines.push('', repo, '- When you finish, Monarch runs the check command above; if it fails you get the output and must fix it.');
+    if (opts.engine === 'pi')
+      lines.push('- Find code with repo_map (where X is defined) before reading files. Before editing, plan_set a short plan; tick steps with plan_step as you go.', '- You may not finish with open plan steps: mark each done, or skipped with a reason.');
   } else {
     const brief = projectsBrief();
     if (brief) lines.push('', '## Code projects (repos are folders; use the repo path as cwd for agent_start)', brief);
@@ -185,6 +190,21 @@ async function codingAgentsSection(sessionId?: string): Promise<string[]> {
     const { codingAgentsBrief } = await import('../tools/delegate.ts');
     const brief = await withTimeout(codingAgentsBrief(sessionId), 1000);
     return brief ? ['## Your worker agents (newest first; use these ids with agent_send / agent_status / agent_wait)', brief] : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Threads board (chat only): one stable rule for every engine; claude-sdk also gets the live board here
+ * (its prompt is rebuilt each turn). pi injects the board into the user turn instead (engines/pi.ts).
+ */
+async function threadsSection(opts: PromptOptions): Promise<string[]> {
+  if (opts.kind !== 'chat') return [];
+  try {
+    const T = await import('./threads.ts');
+    const board = opts.engine === 'claude-sdk' && opts.sessionId ? T.boardBlock((await import('./sessions.ts')).getSession(opts.sessionId)) : '';
+    return ['', T.BOARD_RULE, ...(board ? [board] : [])];
   } catch {
     return [];
   }
@@ -249,6 +269,7 @@ async function buildCompactPrompt(opts: PromptOptions): Promise<string> {
   if (brief) lines.push('', 'CODE PROJECTS (use a repo path as cwd for agent_start):', brief);
   const agents = claude ? await codingAgentsSection(opts.sessionId) : [];
   if (agents.length) lines.push('', ...agents);
+  lines.push(...(await threadsSection(opts)));
   if (memory.trim()) lines.push('', 'ABOUT THE USER (memory):', memory.trim().slice(0, 2000));
   if (s.assistant.persona?.trim()) lines.push('', 'USER INSTRUCTIONS:', s.assistant.persona.trim().slice(0, 1500));
   return lines.join('\n');

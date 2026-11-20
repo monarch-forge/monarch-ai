@@ -5,17 +5,13 @@ import type { McpServer, McpServerInput, McpToolInfo, McpTransport, ToolRisk } f
 import { ChevronRight, Plus, FileJson, RefreshCw, Pencil, Trash2, Play, Plug, X, KeyRound, LogOut } from 'lucide-preact';
 import { api, openExternal } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Panel, Tag, Spinner, Empty, Btn } from '../ui.tsx';
+import { Panel, Tag, Spinner, Empty, Btn, EmptyState, Skeleton, Glyph } from '../ui.tsx';
 import { Modal, useConfirm } from '../mail/kit.tsx';
-import { Field, INPUT, SELECT, TEXTAREA, TOGGLE, ToggleRow } from '../config/fields.tsx';
+import { Field, INPUT, SELECT, TEXTAREA, TOGGLE, ToggleRow, SEL_XS } from '../config/fields.tsx';
 
-const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
-const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
-const SEL_XS = 'select select-xs bg-[#121213] border-line rounded-[6px] text-[12px]';
 const RISKS: ToolRisk[] = ['safe', 'sensitive', 'dangerous'];
 
 const STATUS_TONE: Record<McpServer['status'], 'ok' | 'warn' | 'red' | 'plain'> = { connected: 'ok', connecting: 'warn', error: 'red', disabled: 'plain' };
-const DOT: Record<McpServer['status'], string> = { connected: 'bg-success', connecting: 'bg-warning hud-blink', error: 'bg-red', disabled: 'bg-fg-3' };
 
 const enc = encodeURIComponent;
 const errMsg = (e: any) => e?.message ?? String(e);
@@ -73,30 +69,43 @@ export function McpSection() {
             MCP servers are local commands or remote endpoints that give Monarch extra tools. Their tools are deferred behind tool search and follow your approval policy by risk.
           </p>
           <div class="flex gap-2">
-            <button class={BTN_OUT} onClick={() => setImporting(true)} disabled={unavailable}>
+            <Btn size="xs" onClick={() => setImporting(true)} disabled={unavailable}>
               <FileJson size={11} /> Import JSON
-            </button>
-            <button class={`${BTN} btn-primary`} onClick={() => setEditor({})} disabled={unavailable}>
+            </Btn>
+            <Btn size="xs" variant="primary" onClick={() => setEditor({})} disabled={unavailable}>
               <Plus size={11} /> Add server
-            </button>
+            </Btn>
           </div>
         </div>
       </Panel>
 
       <Panel title="Servers" noPad>
         {res.loading && !res.data ? (
-          <div class="flex justify-center py-8">
-            <Spinner />
-          </div>
+          <Skeleton lines={3} class="p-4" />
         ) : unavailable ? (
           <Empty>MCP service unavailable</Empty>
         ) : list.length === 0 ? (
           <div class="p-4 flex flex-col gap-3">
-            <Empty class="!py-3">No MCP servers yet</Empty>
+            <EmptyState
+              class="!py-4"
+              icon={<Plug size={18} strokeWidth={1.5} />}
+              title="No MCP servers yet"
+              hint="Servers give Monarch extra tools. Add one, paste a config you already use, or start from a preset below."
+              actions={
+                <>
+                  <Btn variant="primary" size="sm" onClick={() => setEditor({})}>
+                    <Plus size={13} /> Add server
+                  </Btn>
+                  <Btn size="sm" onClick={() => setImporting(true)}>
+                    <FileJson size={13} /> Import JSON
+                  </Btn>
+                </>
+              }
+            />
             <div class="hud-label text-[10px]">Quick add</div>
             <div class="grid gap-2 sm:grid-cols-3">
               {EXAMPLES.map((ex) => (
-                <button key={ex.label} class="text-left border border-line rounded-[6px] p-3 hover:border-fg-3 hover:bg-subtle/50" onClick={() => setEditor({ preset: ex.draft })}>
+                <button key={ex.label} class="text-left border border-line rounded-[var(--radius-control)] p-3 hover:border-fg-3 hover:bg-subtle/50" onClick={() => setEditor({ preset: ex.draft })}>
                   <div class="flex items-center gap-2 text-[13px] text-fg">
                     <Plug size={12} class="text-fg-3" /> {ex.label}
                   </div>
@@ -239,7 +248,14 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
       {dialog}
       <div class={`flex items-center gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-white/[0.02] ${props.open ? 'bg-subtle/50' : ''}`} onClick={props.onToggle}>
         <ChevronRight size={12} class={`text-fg-3 shrink-0 transition-transform ${props.open ? 'rotate-90' : ''}`} />
-        <span class={`inline-block w-1.5 h-1.5 shrink-0 ${DOT[s.status]}`} title={s.status} />
+        <Glyph
+          of={3}
+          value={s.status === 'connected' ? 3 : s.status === 'connecting' ? 2 : s.status === 'error' ? 3 : 0}
+          tone={s.status === 'error' ? 'red' : 'fg'}
+          live={s.status === 'connecting'}
+          title={s.status}
+          class="shrink-0"
+        />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[13px] text-fg">{s.name}</span>
@@ -261,8 +277,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
           </span>
         </div>
         {s.authRequired && s.enabled && (
-          <button
-            class={`${BTN} btn-primary shrink-0`}
+          <Btn size="xs" variant="primary" class="shrink-0"
             disabled={busy === 'auth'}
             onClick={(e) => {
               e.stopPropagation();
@@ -270,7 +285,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             }}
           >
             {busy === 'auth' ? <span class="loading loading-spinner loading-xs" /> : <KeyRound size={10} />} Sign in
-          </button>
+          </Btn>
         )}
         <input
           type="checkbox"
@@ -285,13 +300,12 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
       </div>
 
       {authUrl && s.authRequired && (
-        <div class="mx-3.5 mb-2.5 flex flex-wrap items-center gap-2 rounded-[6px] border border-line bg-[#121213] px-3 py-2 text-[12px] text-fg-2">
+        <div class="mx-3.5 mb-2.5 flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-line bg-[#121213] px-3 py-2 text-[12px] text-fg-2">
           <span class="flex-1 min-w-[180px]">Finish signing in to {s.name} in your browser. If no tab opened, use the button.</span>
-          <button class={`${BTN} btn-primary`} onClick={() => void openExternal(authUrl)}>
+          <Btn size="xs" variant="primary" onClick={() => void openExternal(authUrl)}>
             <KeyRound size={10} /> Open sign-in page
-          </button>
-          <button
-            class={BTN_OUT}
+          </Btn>
+          <Btn size="xs"
             onClick={() => {
               void navigator.clipboard?.writeText(authUrl).then(
                 () => toast('Sign-in link copied', 'success'),
@@ -300,10 +314,10 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             }}
           >
             Copy link
-          </button>
-          <button class={BTN_OUT} title="Dismiss" onClick={() => setAuthUrl(null)}>
+          </Btn>
+          <Btn size="xs" title="Dismiss" onClick={() => setAuthUrl(null)}>
             <X size={10} />
-          </button>
+          </Btn>
         </div>
       )}
       {props.open && (
@@ -363,7 +377,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
             {s.tools.length === 0 ? (
               <div class="text-[12px] text-fg-3">{s.status === 'connected' ? 'This server exposes no tools.' : 'Tools appear once the server is connected.'}</div>
             ) : (
-              <div class="border border-line rounded-[6px] overflow-x-auto">
+              <div class="border border-line rounded-[var(--radius-control)] overflow-x-auto">
                 <table class="table table-sm">
                   <thead>
                     <tr class="border-line text-[12px] text-fg-3">
@@ -380,7 +394,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                           <td>
                             <input
                               type="checkbox"
-                              class="checkbox checkbox-xs rounded-[6px] border-line checked:bg-red checked:border-red checked:text-fg"
+                              class="checkbox checkbox-xs rounded-[var(--radius-control)] border-line checked:bg-red checked:border-red checked:text-fg"
                               checked={t.enabled}
                               disabled={busy === `tool:${t.name}`}
                               aria-label={`Enable ${t.name}`}
@@ -401,9 +415,9 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                             </select>
                           </td>
                           <td class="text-right">
-                            <button class={BTN_OUT} disabled={s.status !== 'connected'} onClick={() => setTesting(testing === t.name ? null : t.name)}>
+                            <Btn size="xs" disabled={s.status !== 'connected'} onClick={() => setTesting(testing === t.name ? null : t.name)}>
                               <Play size={10} /> Test
-                            </button>
+                            </Btn>
                           </td>
                         </tr>
                         {testing === t.name && (
@@ -427,7 +441,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                 <ChevronRight size={10} class={showLogs ? 'rotate-90' : ''} /> Stderr ({s.logs.length})
               </button>
               {showLogs && (
-                <pre class="mt-1.5 max-h-48 overflow-auto bg-[#121213] border border-line rounded-[6px] p-2 font-mono text-[10.5px] text-fg-2 whitespace-pre-wrap break-all">
+                <pre class="mt-1.5 max-h-48 overflow-auto bg-[#121213] border border-line rounded-[var(--radius-control)] p-2 font-mono text-[10.5px] text-fg-2 whitespace-pre-wrap break-all">
                   {s.logs.join('\n')}
                 </pre>
               )}
@@ -435,24 +449,24 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
           )}
 
           <div class="flex flex-wrap gap-2 pt-1">
-            <button class={BTN_OUT} disabled={!s.enabled || busy === 'reconnect'} onClick={() => void reconnect()}>
+            <Btn size="xs" disabled={!s.enabled || busy === 'reconnect'} onClick={() => void reconnect()}>
               {busy === 'reconnect' ? <span class="loading loading-spinner loading-xs" /> : <RefreshCw size={10} />} Reconnect
-            </button>
+            </Btn>
             {s.transport !== 'stdio' && (s.oauth ? (
-              <button class={BTN_OUT} disabled={busy === 'auth'} onClick={() => void signOut()}>
+              <Btn size="xs" disabled={busy === 'auth'} onClick={() => void signOut()}>
                 <LogOut size={10} /> Sign out
-              </button>
+              </Btn>
             ) : (
-              <button class={BTN_OUT} disabled={!s.enabled || busy === 'auth'} onClick={() => void signIn()}>
+              <Btn size="xs" disabled={!s.enabled || busy === 'auth'} onClick={() => void signIn()}>
                 {busy === 'auth' ? <span class="loading loading-spinner loading-xs" /> : <KeyRound size={10} />} Sign in
-              </button>
+              </Btn>
             ))}
-            <button class={BTN_OUT} onClick={props.onEdit}>
+            <Btn size="xs" onClick={props.onEdit}>
               <Pencil size={10} /> Edit
-            </button>
-            <button class={`${BTN_OUT} hover:!text-red hover:!border-red ml-auto`} onClick={() => void remove()}>
+            </Btn>
+            <Btn size="xs" class="hover:!text-red hover:!border-red ml-auto" onClick={() => void remove()}>
               <Trash2 size={10} /> Remove
-            </button>
+            </Btn>
           </div>
         </div>
       )}
@@ -534,12 +548,12 @@ function ToolTester(props: { serverId: string; tool: McpToolInfo; onClose: () =>
       />
       <div class="flex items-center gap-2">
         {parseErr ? <span class="text-[11px] font-mono text-red flex-1">{parseErr}</span> : <span class="text-[11px] text-fg-3 flex-1">Runs the tool directly, without approval. Ctrl+Enter to run.</span>}
-        <button class={`${BTN} btn-primary`} disabled={!!parseErr || running} onClick={() => void run()}>
+        <Btn size="xs" variant="primary" disabled={!!parseErr || running} onClick={() => void run()}>
           {running ? <span class="loading loading-spinner loading-xs" /> : <Play size={10} />} Run
-        </button>
+        </Btn>
       </div>
       {result && (
-        <div class="border border-line rounded-[6px]">
+        <div class="border border-line rounded-[var(--radius-control)]">
           <div class="flex items-center gap-2 px-2 py-1 border-b border-line">
             <Tag tone={result.ok ? 'ok' : 'red'}>{result.ok ? 'ok' : 'error'}</Tag>
             {result.durationMs > 0 && <span class="font-mono text-[10px] text-fg-3">{result.durationMs} ms</span>}
@@ -673,7 +687,7 @@ function ServerEditor(props: { server?: McpServer; preset?: Partial<Draft>; onCl
         </Field>
 
         <Field label="Transport">
-          <div class="flex border border-line rounded-[6px] w-fit" role="radiogroup">
+          <div class="flex border border-line rounded-[var(--radius-control)] w-fit" role="radiogroup">
             {(['stdio', 'http', 'sse'] as McpTransport[]).map((t) => (
               <button
                 type="button"
@@ -770,9 +784,9 @@ function KVRows(props: { label: string; addLabel: string; keyPlaceholder: string
             </button>
           </div>
         ))}
-        <button type="button" class={`${BTN_OUT} w-fit`} onClick={() => props.onChange([...props.rows, { key: '', value: '', stored: false }])}>
+        <Btn type="button" size="xs" class="w-fit" onClick={() => props.onChange([...props.rows, { key: '', value: '', stored: false }])}>
           <Plus size={10} /> {props.addLabel}
-        </button>
+        </Btn>
         <FieldErr text={props.error} />
       </div>
     </Field>

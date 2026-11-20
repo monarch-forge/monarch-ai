@@ -250,7 +250,7 @@ const skillList = defineTool({
   schema: z.object({}),
   summarize: () => 'List skills',
   run: () => {
-    const list = listSkills();
+    const list = listSkills().filter((s) => !s.draft);
     return list.length ? list.map((s) => `- ${s.name} (${s.id}) — ${s.description} [${s.origin}, used ${s.uses}×]`).join('\n') : 'No skills yet.';
   },
 });

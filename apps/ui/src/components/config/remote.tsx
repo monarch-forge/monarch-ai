@@ -80,7 +80,7 @@ export function RemoteSection() {
   return (
     <div class="flex flex-col gap-4">
       <Panel title="Phone access" right={st.running ? <Tag tone="ok">on · {st.running.url}</Tag> : <Tag>off</Tag>}>
-        <div class="rounded-[6px] border border-warning/40 bg-warning/5 p-3 text-[13px] text-fg-2 mb-3">
+        <div class="rounded-[var(--radius-control)] border border-warning/40 bg-warning/5 p-3 text-[13px] text-fg-2 mb-3">
           A paired phone gets the same power as this desktop: it can read your mail, send messages and run commands. Only
           enable this on networks you trust — Tailscale is recommended. Traffic is plain HTTP (Tailscale encrypts it; on a
           LAN anyone on the network can watch it).
@@ -128,7 +128,7 @@ export function RemoteSection() {
         <Panel title="Pair a phone" right={<Btn size="xs" onClick={() => void newCode()}>{pair ? 'New code' : 'Show pairing code'}</Btn>}>
           {pair ? (
             <div class="flex flex-col sm:flex-row gap-4 items-start animate-monarch-fade">
-              <div class="w-44 h-44 rounded-[6px] overflow-hidden bg-white p-1 shrink-0" dangerouslySetInnerHTML={{ __html: pair.qrSvg }} />
+              <div class="w-44 h-44 rounded-[var(--radius-control)] overflow-hidden bg-white p-1 shrink-0" dangerouslySetInnerHTML={{ __html: pair.qrSvg }} />
               <div class="text-[13px] text-fg-2 flex flex-col gap-2 min-w-0">
                 <p>Scan with the phone camera (it must be on the same {c.iface === 'tailscale' ? 'tailnet' : 'network'}), then tap Pair.</p>
                 <code class="break-all text-fg text-[12px]">{pair.url}</code>

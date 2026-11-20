@@ -5,11 +5,9 @@ import { KeyRound, Mic, Play, Square } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { settings, toast } from '../../lib/store.ts';
 import { listen, micLevel, listening, refreshVoiceStatus, speak, speaking, stopListening, stopSpeaking, voiceStatus } from '../../lib/voice.ts';
-import { Panel, Tag } from '../ui.tsx';
+import { Panel, Tag, Btn } from '../ui.tsx';
 import { Field, INPUT, SELECT, ToggleRow, saveSettings } from './fields.tsx';
 
-const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
-const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
 
 type Voice = Settings['assistant']['voice'];
 
@@ -165,13 +163,13 @@ function KeyField(props: { provider: VoiceKeyProvider; status?: VoiceSideStatus 
           onInput={(e) => setKey((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && void save()}
         />
-        <button class={`${BTN} btn-primary h-8`} disabled={!key.trim() || busy} onClick={() => void save()}>
+        <Btn size="sm" variant="primary" disabled={!key.trim() || busy} onClick={() => void save()}>
           Save
-        </button>
+        </Btn>
         {src === 'voice' && (
-          <button class={`${BTN_OUT} h-8`} disabled={busy} onClick={() => void clear()}>
+          <Btn size="sm" disabled={busy} onClick={() => void clear()}>
             Clear
-          </button>
+          </Btn>
         )}
       </div>
     </Field>
@@ -249,9 +247,9 @@ function SttPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
               </Field>
             </div>
             <div class="flex items-center gap-3">
-              <button class={listening.value ? `${BTN} btn-primary h-8` : `${BTN_OUT} h-8`} disabled={!props.status?.ready} onClick={() => void test()}>
+              <Btn size="sm" variant={listening.value ? 'primary' : 'outline'} disabled={!props.status?.ready} onClick={() => void test()}>
                 {listening.value ? <Square size={11} /> : <Mic size={11} />} {listening.value ? 'Stop' : 'Test mic'}
-              </button>
+              </Btn>
               {listening.value && (
                 <span class="flex-1 h-1.5 bg-subtle max-w-[220px]">
                   <span class="block h-full bg-red transition-[width] duration-100" style={{ width: `${Math.round(micLevel.value * 100)}%` }} />
@@ -357,9 +355,9 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
               />
             </Field>
             <div>
-              <button class={speaking.value ? `${BTN} btn-primary h-8` : `${BTN_OUT} h-8`} disabled={!ready} onClick={() => void test()}>
+              <Btn size="sm" variant={speaking.value ? 'primary' : 'outline'} disabled={!ready} onClick={() => void test()}>
                 {speaking.value ? <Square size={11} /> : <Play size={11} />} {speaking.value ? 'Stop' : 'Test voice'}
-              </button>
+              </Btn>
             </div>
           </>
         )}

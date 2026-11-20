@@ -87,7 +87,7 @@ export function PermissionsSection() {
           <Field label="Memory vault" hint="Obsidian-compatible folder of markdown notes. Monarch reads and writes its long-term memory here.">
             <div class="flex gap-2">
               <input class={`${INPUT} font-mono`} value={draft.vaultDir} onInput={(e) => set({ vaultDir: (e.target as HTMLInputElement).value })} placeholder="~/.monarch-ai/vault" spellcheck={false} />
-              <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('vault')}>
+              <button class="btn btn-sm btn-outline border-line rounded-[var(--radius-control)] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('vault')}>
                 <FolderOpen size={12} /> Browse
               </button>
             </div>
@@ -107,7 +107,7 @@ export function PermissionsSection() {
                   <option key={w} value={w} />
                 ))}
               </datalist>
-              <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('ws')}>
+              <button class="btn btn-sm btn-outline border-line rounded-[var(--radius-control)] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('ws')}>
                 <FolderOpen size={12} /> Browse
               </button>
             </div>

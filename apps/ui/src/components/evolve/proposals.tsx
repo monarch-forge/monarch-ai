@@ -4,7 +4,7 @@ import type { EvolutionProposal } from '@monarch/shared';
 import { Blocks, BookText, ChevronDown, ChevronRight, Hammer, MessageSquare, X } from 'lucide-preact';
 import { api } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Btn, Panel, Tag } from '../ui.tsx';
+import { Btn, EmptyState, Panel, Tag } from '../ui.tsx';
 import { Markdown } from '../chat/markdown.tsx';
 import { EvoGate, EvoNote, ago, errMsg, openSession, stamp } from './common.tsx';
 
@@ -44,10 +44,15 @@ export function ProposalsTab() {
                 ))}
               </div>
             ) : (
-              <EvoNote
-                icon
-                label="No open proposals"
-                sub="Reflection reviews recent sessions for friction — repeated manual steps, missing tools, failed calls — and suggests what Monarch could build. Run one with “Reflect now”."
+              <EmptyState
+                icon={<Hammer size={18} strokeWidth={1.5} />}
+                title="No open proposals"
+                hint="Reflection reviews recent sessions for friction and suggests what Monarch could build. Or describe a capability yourself and Monarch builds it."
+                actions={
+                  <Btn variant="primary" size="sm" onClick={() => document.getElementById('evolve-forge')?.focus()}>
+                    <Hammer size={13} /> Ask Monarch to build a capability
+                  </Btn>
+                }
               />
             )}
             {showClosed && closed.length > 0 && (

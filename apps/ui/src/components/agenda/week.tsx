@@ -4,8 +4,8 @@ import type { CalendarEvent, GoogleAccount } from '@monarch/shared';
 import { ChevronLeft, ChevronRight, MapPin, Plus, Trash, Video, X, CalendarDays } from 'lucide-preact';
 import { api, openExternal, qs } from '../../lib/api.ts';
 import { toast, useResource } from '../../lib/store.ts';
-import { Btn, useNow } from '../ui.tsx';
-import { AccountMark, accountColor, Button, LoadError, Modal, sameDay, toDateInput, useConfirm } from '../mail/kit.tsx';
+import { Btn, EmptyState, Glyph, useNow } from '../ui.tsx';
+import { AccountMark, accountColor, askMonarch, Button, LoadError, Modal, sameDay, toDateInput, useConfirm } from '../mail/kit.tsx';
 
 const H0 = 6;
 const H1 = 24;
@@ -148,26 +148,25 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
     [events, todayIdx],
   );
   const chip = (color: string) => ({ background: `color-mix(in srgb, ${color} 16%, transparent)`, color: `color-mix(in srgb, ${color} 55%, #f4f4f6)` });
-  const navBtn = 'p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors';
 
   return (
-    <section class="flex-1 min-w-0 flex flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden">
+    <section class="flex-1 min-w-0 flex flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden">
       <header class="flex items-center gap-2 px-4 sm:px-5 pt-4 pb-3">
         <div class="min-w-0">
           <h1 class="text-[17px] font-semibold text-fg truncate">{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
           <div class="text-[12.5px] text-fg-3 truncate">{thisWeek ? 'This week' : rangeLabel}</div>
         </div>
-        {res.loading && <span class="loading loading-spinner loading-xs text-fg-3 ml-1" />}
+        {res.loading && <Glyph value={3} of={3} live class="ml-1" title="Syncing" />}
         <div class="ml-auto flex items-center gap-0.5">
-          <button class={navBtn} title="Previous week ([)" aria-label="Previous week" onClick={() => setAnchor(addDays(anchor, -7))}>
+          <Btn variant="ghost" size="xs" class="btn-square" title="Previous week ([)" aria-label="Previous week" onClick={() => setAnchor(addDays(anchor, -7))}>
             <ChevronLeft size={15} />
-          </button>
-          <button class="px-2.5 py-1 rounded-md text-[12.5px] text-fg-2 hover:text-fg hover:bg-subtle transition-colors" title="This week (.)" onClick={() => setAnchor(startOfWeek(new Date()))}>
+          </Btn>
+          <Btn variant="ghost" size="xs" title="This week (.)" onClick={() => setAnchor(startOfWeek(new Date()))}>
             Today
-          </button>
-          <button class={navBtn} title="Next week (])" aria-label="Next week" onClick={() => setAnchor(addDays(anchor, 7))}>
+          </Btn>
+          <Btn variant="ghost" size="xs" class="btn-square" title="Next week (])" aria-label="Next week" onClick={() => setAnchor(addDays(anchor, 7))}>
             <ChevronRight size={15} />
-          </button>
+          </Btn>
         </div>
         <Btn size="sm" variant="primary" onClick={() => setCreate({ start: defaultStart(now) })} title="New event">
           <Plus size={13} /> <span class="hidden sm:inline">Event</span>
@@ -186,12 +185,24 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
             </button>
           </div>
         ) : !todayList.length ? (
-          <div class="px-2 py-6 text-[13.5px] text-fg-3">Nothing on the calendar today. A clear day.</div>
+          <EmptyState
+            icon={<CalendarDays size={18} strokeWidth={1.5} />}
+            title="A clear day"
+            hint="Nothing on the calendar today."
+            actions={
+              <>
+                <Btn variant="primary" onClick={() => setCreate({ start: defaultStart(now) })}>
+                  <Plus size={12} /> Add event
+                </Btn>
+                <Btn onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')}>Plan my day</Btn>
+              </>
+            }
+          />
         ) : (
           todayList.map((x) => {
             const color = x.ev.source === 'google' ? accountColor(x.ev.accountId) : '#9E9EA4';
             return (
-              <button key={x.ev.id} class={`w-full text-left flex gap-3 px-2 py-2.5 rounded-md hover:bg-white/[0.03] ${x.e < now ? 'opacity-55' : ''}`} onClick={(e) => openPop(x.ev, e as unknown as MouseEvent)}>
+              <button key={x.ev.id} class={`w-full text-left flex gap-3 px-2 py-2.5 rounded-[var(--radius-control)] hover:bg-white/[0.03] ${x.e < now ? 'opacity-55' : ''}`} onClick={(e) => openPop(x.ev, e as unknown as MouseEvent)}>
                 <span class="w-12 shrink-0 font-mono text-[11.5px] text-fg-3 pt-0.5">{x.all ? 'all day' : hm(x.s)}</span>
                 <span class="w-[3px] self-stretch rounded-full shrink-0" style={{ background: color }} />
                 <span class="min-w-0">
@@ -232,7 +243,7 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
                   <button
                     key={ev.id}
                     data-ev
-                    class="text-left text-[11.5px] truncate px-2 py-0.5 rounded-md hover:brightness-125 transition"
+                    class="text-left text-[11.5px] truncate px-2 py-0.5 rounded-[var(--radius-control)] hover:brightness-125 transition"
                     style={chip(ev.source === 'google' ? accountColor(ev.accountId) : '#9E9EA4')}
                     onClick={(e) => openPop(ev, e)}
                     title={ev.title}
@@ -261,7 +272,7 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
               return (
                 <div
                   key={d.toISOString()}
-                  class={`relative cursor-cell rounded-md ${today ? 'bg-white/[0.025]' : ''}`}
+                  class={`relative cursor-cell rounded-[var(--radius-control)] ${today ? 'bg-white/[0.025]' : ''}`}
                   onClick={(e) => onGridClick(d, e as unknown as MouseEvent)}
                   style={{
                     backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${2 * ROW - 1}px, rgb(255 255 255 / 0.035) ${2 * ROW - 1}px, rgb(255 255 255 / 0.035) ${2 * ROW}px)`,
@@ -275,7 +286,7 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
                       <button
                         key={p.ev.id + di}
                         data-ev
-                        class={`absolute text-left overflow-hidden rounded-md px-2 py-1 hover:brightness-125 transition ${past ? 'opacity-50' : ''}`}
+                        class={`absolute text-left overflow-hidden rounded-[var(--radius-control)] px-2 py-1 hover:brightness-125 transition ${past ? 'opacity-50' : ''}`}
                         style={{
                           top: `${p.top + 1}px`,
                           height: `${p.height}px`,
@@ -393,13 +404,13 @@ function EventPopover(props: { ev: CalendarEvent; x: number; y: number; accounts
 
   return (
     <>
-      <div ref={ref} tabIndex={-1} role="dialog" aria-label={ev.title} class="fixed z-30 w-80 bg-surface rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none" style={{ left: `${pos.left}px`, top: `${pos.top}px` }}>
+      <div ref={ref} tabIndex={-1} role="dialog" aria-label={ev.title} class="fixed z-30 w-80 bg-surface rounded-[var(--radius-card)] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none" style={{ left: `${pos.left}px`, top: `${pos.top}px` }}>
         <header class="flex items-center gap-2.5 px-4 pt-4">
           {ev.source === 'google' ? <AccountMark id={ev.accountId} size={8} /> : <span class="w-2 h-2 rounded-full bg-fg-2 shrink-0" />}
           <h2 class="text-[14.5px] font-semibold text-fg truncate">{ev.title || '(untitled)'}</h2>
-          <button class="ml-auto -mr-1 p-1 rounded-md text-fg-3 hover:text-fg hover:bg-subtle" onClick={props.onClose} aria-label="Close">
+          <Btn variant="ghost" size="xs" class="ml-auto -mr-1 btn-square" onClick={props.onClose} aria-label="Close">
             <X size={14} />
-          </button>
+          </Btn>
         </header>
         <div class="px-4 pt-1.5 pb-4 flex flex-col gap-2 text-[13px]">
           <div class="text-fg-2">{when}</div>
@@ -531,7 +542,7 @@ function NewEventModal(props: { open: boolean; start: Date | null; accounts: Goo
         </label>
         <label class="col-span-2 flex flex-col gap-1.5">
           <span class={lab}>Calendar</span>
-          <select class="select select-sm w-full bg-white/[0.04] border-line text-[13px] rounded-md" value={f.cal} onChange={set('cal')}>
+          <select class="select select-sm w-full bg-white/[0.04] border-line text-[13px] rounded-[var(--radius-control)]" value={f.cal} onChange={set('cal')}>
             <option value="local">Local (Monarch)</option>
             {props.accounts.map((a) => (
               <option key={a.id} value={a.id}>

@@ -175,11 +175,11 @@ export function Composer(props: {
     <div class="shrink-0 px-3 md:px-6 pb-3 md:pb-4 pt-1">
       <div class="relative max-w-[760px] mx-auto">
         {slash.length > 0 && (
-          <div class="absolute bottom-full left-0 right-0 mb-2 z-30 rounded-[14px] bg-[var(--bg-surface)] p-1.5 shadow-[0_12px_32px_rgb(0_0_0/.45)]">
+          <div class="absolute bottom-full left-0 right-0 mb-2 z-30 rounded-[var(--radius-card)] bg-[var(--bg-surface)] p-1.5 shadow-[0_12px_32px_rgb(0_0_0/.45)]">
             {slash.map((c, i) => (
               <button
                 key={c.cmd}
-                class={`w-full flex items-center gap-3 px-3 py-2 rounded-[8px] text-left ${i === sel ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'}`}
+                class={`w-full flex items-center gap-3 px-3 py-2 rounded-[var(--radius-control)] text-left ${i === sel ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'}`}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   setText('');
@@ -192,7 +192,7 @@ export function Composer(props: {
             ))}
           </div>
         )}
-        <div class="flex items-end gap-1.5 rounded-[14px] bg-[var(--bg-surface)] border border-[var(--border-default)] focus-within:border-fg-3/60 transition-colors duration-150 pl-4 pr-2 py-2">
+        <div class="flex items-end gap-1.5 rounded-[var(--radius-modal)] bg-[var(--bg-surface)] border border-[var(--border-default)] focus-within:border-fg-3/60 transition-colors duration-150 pl-4 pr-2 py-2.5">
           <textarea
             ref={ta}
             rows={1}

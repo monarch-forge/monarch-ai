@@ -6,7 +6,7 @@ import { CloudUpload, History, KeyRound, Link2, RotateCcw } from 'lucide-preact'
 import { ApiError, api } from '../../lib/api.ts';
 import { conn, onCollectionChanged, settings, toast } from '../../lib/store.ts';
 import { socket } from '../../lib/api.ts';
-import { Btn, ErrorLine, Panel, Tag, fmt } from '../ui.tsx';
+import { Btn, ErrorLine, Glyph, Panel, Tag, fmt } from '../ui.tsx';
 import { Modal, relTime, useConfirm } from '../mail/kit.tsx';
 import { Field, INPUT, Kbd, SELECT, SaveBar, ToggleRow, saveSettings, useDraft } from './fields.tsx';
 
@@ -75,6 +75,15 @@ function strength(p: string): { label: string; tone: 'red' | 'warn' | 'ok' } {
   if (p.length < 8 || s <= 1) return { label: 'weak', tone: 'red' };
   if (s <= 3) return { label: 'fair', tone: 'warn' };
   return { label: 'strong', tone: 'ok' };
+}
+
+/** glyph strip mirroring statusTag: lit = synced, pulsing = busy, red = error */
+function syncGlyph(st: SyncStatus | undefined) {
+  if (!st || !st.configured || !st.remoteReady) return <Glyph value={0} of={4} />;
+  if (st.error) return <Glyph value={4} of={4} tone="red" title="Sync error" />;
+  if (st.busy) return <Glyph value={2} of={4} live title="Syncing" />;
+  if (st.localChanged) return <Glyph value={2} of={4} tone="warn" title="Changes not synced" />;
+  return <Glyph value={4} of={4} title="Synced" />;
 }
 
 function statusTag(st: SyncStatus | undefined) {
@@ -241,7 +250,7 @@ export function SyncSection() {
 
   return (
     <>
-      <Panel title="Encrypted sync" right={statusTag(st)}>
+      <Panel title="Encrypted sync" right={<span class="flex items-center gap-2">{syncGlyph(st)}{statusTag(st)}</span>}>
         <p class="text-[13px] text-fg-2 leading-relaxed">
           Backs up all Monarch data — settings, secrets and tokens, sessions, memory vault, extensions, skills and stores — to a private git repo you own. Everything is
           encrypted on this device with your passphrase before it leaves; GitHub or GitLab only ever see ciphertext.

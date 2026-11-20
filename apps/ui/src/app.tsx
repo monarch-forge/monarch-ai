@@ -26,7 +26,10 @@ import {
 } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route, conn, health, phase, settings, toasts, toast, unreadNotifications } from './lib/store.ts';
-import { useNow, fmt } from './components/ui.tsx';
+import { useNow, fmt, DotText } from './components/ui.tsx';
+import { Presence } from './components/os/presence.tsx';
+import { AskBar } from './components/os/ask-bar.tsx';
+import { StatusStrip } from './components/os/status-strip.tsx';
 import { api } from './lib/api.ts';
 import type { Settings } from '@monarch/shared';
 import OverviewPage from './pages/overview.tsx';
@@ -133,6 +136,7 @@ export function App() {
       <OfflineBanner />
       <ApprovalDock />
       <CommandPalette />
+      <AskBar />
       <NotificationDrawer />
       <Toasts />
     </div>
@@ -144,10 +148,12 @@ function TopBar(props: { active: string }) {
   const unread = unreadNotifications.value;
   return (
     <header class="relative z-40 h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 bg-[#121213]/85 backdrop-blur-md" data-tauri-drag-region>
-      <a href="#/overview" class="flex items-center gap-2 pr-2 sm:pr-3 shrink-0 text-fg" title={statusTitle()}>
-        <span class={`inline-block w-2 h-2 rounded-full ${conn.value === 'open' ? 'bg-red' : 'bg-fg-3'} ${phase.value !== 'idle' && conn.value === 'open' ? 'hud-blink' : ''}`} />
-        <span class="hidden sm:inline text-[14px] font-semibold tracking-[-0.01em]">Monarch</span>
-      </a>
+      <div class="flex items-center gap-1.5 pr-2 sm:pr-3 shrink-0">
+        <Presence />
+        <a href="#/overview" class="hidden sm:inline text-[14px] font-semibold tracking-[-0.01em] text-fg" title={statusTitle()}>
+          Monarch
+        </a>
+      </div>
       <nav class="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none]" aria-label="Sections">
         {PRIMARY.map((id) => {
           const r = GROUPS[id] ?? byId(id);
@@ -162,10 +168,11 @@ function TopBar(props: { active: string }) {
         })}
       </nav>
       <div class="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" data-tauri-drag-region>
+        <StatusStrip />
         <AutoSwitch />
         <button
           type="button"
-          class="hidden md:flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] text-fg-3 hover:text-fg hover:bg-raised transition-colors"
+          class="hidden md:flex items-center gap-1.5 h-7 px-2 rounded-[9px] text-[12px] text-fg-3 hover:text-fg hover:bg-raised transition-colors"
           onClick={() => (paletteOpen.value = true)}
           title="Search and commands"
         >
@@ -174,7 +181,7 @@ function TopBar(props: { active: string }) {
         </button>
         <button
           type="button"
-          class="relative w-8 h-8 flex items-center justify-center rounded-md text-fg-2 hover:text-fg hover:bg-raised transition-colors"
+          class="relative w-8 h-8 flex items-center justify-center rounded-[9px] text-fg-2 hover:text-fg hover:bg-raised transition-colors"
           onClick={() => (notificationsOpen.value = !notificationsOpen.value)}
           title="Notifications"
           aria-label={unread ? `Notifications, ${unread} new` : 'Notifications'}
@@ -184,7 +191,7 @@ function TopBar(props: { active: string }) {
         </button>
         <a
           href="#/config"
-          class={`w-8 h-8 flex items-center justify-center rounded-md hover:text-fg hover:bg-raised transition-colors ${props.active === 'config' ? 'text-fg bg-raised' : 'text-fg-2'}`}
+          class={`w-8 h-8 flex items-center justify-center rounded-[9px] hover:text-fg hover:bg-raised transition-colors ${props.active === 'config' ? 'text-fg bg-raised' : 'text-fg-2'}`}
           title="Settings"
           aria-label="Settings"
           aria-current={props.active === 'config' ? 'page' : undefined}
@@ -196,7 +203,7 @@ function TopBar(props: { active: string }) {
           title={now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           data-tauri-drag-region
         >
-          {fmt.time(now)}
+          <DotText>{fmt.time(now)}</DotText>
         </div>
       </div>
     </header>
@@ -212,7 +219,7 @@ function GroupTabs(props: { group: string; active: string }) {
         const Icon = r.icon;
         const on = props.active === id;
         return (
-          <a key={id} href={`#/${id}`} class={`flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[12.5px] transition-colors ${on ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2'}`} aria-current={on ? 'page' : undefined}>
+          <a key={id} href={`#/${id}`} class={`flex items-center gap-1.5 px-2.5 h-7 rounded-[9px] text-[12.5px] transition-colors ${on ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2'}`} aria-current={on ? 'page' : undefined}>
             <Icon size={13} strokeWidth={1.7} /> {r.label}
           </a>
         );
@@ -274,7 +281,7 @@ function AutoSwitch() {
       disabled={busy}
       onClick={() => void toggle()}
       title={on ? 'Auto mode on: hands-off, only send/post/delete need approval. Click to turn off.' : 'Turn on Auto mode: Monarch works on its own and notifies you only when it needs you.'}
-      class={`flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] transition-colors ${on ? 'text-fg bg-raised' : 'text-fg-3 hover:text-fg hover:bg-raised'}`}
+      class={`flex items-center gap-1.5 h-7 px-2 rounded-[9px] text-[12px] transition-colors ${on ? 'text-fg bg-raised' : 'text-fg-3 hover:text-fg hover:bg-raised'}`}
     >
       <Zap size={13} strokeWidth={1.75} class={on ? 'text-red' : ''} />
       <span class="hidden sm:inline">Auto</span>

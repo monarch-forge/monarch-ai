@@ -74,7 +74,7 @@ export function ProfilePanel() {
                 edit?.s === s && edit.i === i ? (
                   <li key={i}>
                     <input
-                      class="w-full bg-[#121213] rounded-md px-2 py-1 text-[13px] outline-none"
+                      class="w-full bg-[#121213] rounded-[var(--radius-control)] px-2 py-1 text-[13px] outline-none"
                       value={edit.text}
                       autoFocus
                       aria-label="Fact"

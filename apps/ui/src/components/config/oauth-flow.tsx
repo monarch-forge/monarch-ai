@@ -94,10 +94,10 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
           <span class="font-mono text-[11px] text-fg-3 truncate flex-1 border border-line px-2 py-1 bg-surface" title={flow.url}>
             {flow.url}
           </span>
-          <button class="btn btn-xs btn-primary rounded-[6px] font-normal text-[12px]" onClick={() => void openExternal(flow.url!)}>
+          <button class="btn btn-xs btn-primary rounded-[var(--radius-control)] font-normal text-[12px]" onClick={() => void openExternal(flow.url!)}>
             <ExternalLink size={11} /> Open
           </button>
-          <button class="btn btn-xs btn-outline border-line rounded-[6px] font-normal text-[12px] text-fg-2" onClick={() => void copyText(flow.url!, 'Link copied')}>
+          <button class="btn btn-xs btn-outline border-line rounded-[var(--radius-control)] font-normal text-[12px] text-fg-2" onClick={() => void copyText(flow.url!, 'Link copied')}>
             <Copy size={11} /> Copy
           </button>
         </div>
@@ -113,7 +113,7 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
             autoFocus
             spellcheck={false}
           />
-          <button class="btn btn-sm btn-primary rounded-[6px] font-normal text-[12px]" disabled={busy || !code.trim()} onClick={() => void submitCode()}>
+          <button class="btn btn-sm btn-primary rounded-[var(--radius-control)] font-normal text-[12px]" disabled={busy || !code.trim()} onClick={() => void submitCode()}>
             {busy && <span class="loading loading-spinner loading-xs" />}Submit
           </button>
         </div>

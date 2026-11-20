@@ -14,6 +14,7 @@ import { tools as memory } from '../tools/memory.ts';
 import { tools as evolve } from '../tools/evolve.ts';
 import {
   acceptProposal,
+  approveSkill,
   deleteSkill,
   dismissProposal,
   evolutionStats,
@@ -127,6 +128,11 @@ export function register(app: Hono): void {
     const { skill, created } = writeSkill(c.req.param('id'), body, 'user');
     recordEvolution(created ? 'skill.created' : 'skill.updated', `${created ? 'Added' : 'Edited'} skill: ${skill.name}`, { actor: 'user', ref: skill.id });
     return c.json(skill);
+  });
+  app.post('/api/skills/:id/approve', (c) => {
+    const s = approveSkill(c.req.param('id'));
+    recordEvolution('skill.updated', `Approved drafted skill: ${s.name}`, { actor: 'user', ref: s.id });
+    return c.json(s);
   });
   app.delete('/api/skills/:id', (c) => {
     const s = deleteSkill(c.req.param('id'));

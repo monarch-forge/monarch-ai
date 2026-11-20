@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef } from 'preact/hooks';
 import type { CalendarEvent, Weather } from '@monarch/shared';
 import { conn, metrics, metricsHistory, navigate, settings, useResource } from '../../lib/store.ts';
 import { Panel, SegBar, Tag, fmt, useNow } from '../ui.tsx';
-import { Gate, KV, Offline, PanelNote, dayKey, endOfDay, startOfDay, tone85 } from './common.tsx';
+import { Gate, KV, Offline, PanelNote, RetryLink, dayKey, endOfDay, startOfDay, tone85 } from './common.tsx';
+import { askMonarch } from '../mail/kit.tsx';
 
 /* ───────────────────────── ENV.01 ───────────────────────── */
 
@@ -80,7 +81,7 @@ function WeatherBody(props: { wx: Weather }) {
       {hours.length > 0 && (
         <div class="grid grid-cols-6 gap-1">
           {hours.map((h) => (
-            <div key={h.time} class="bg-raised rounded-md py-1.5 text-center">
+            <div key={h.time} class="bg-raised rounded-[var(--radius-control)] py-1.5 text-center">
               <div class="font-mono text-[10px] text-fg-3 tabular-nums">{fmt.time(h.time)}</div>
               <div class="font-mono text-[13px] text-fg tabular-nums mt-0.5">{Math.round(temp(h.tempC))}°</div>
             </div>
@@ -131,7 +132,7 @@ export function SchedulePanel(props: { class?: string }) {
       <Gate res={res}>
         {() =>
           events.length === 0 ? (
-            <PanelNote label="Nothing on the calendar" sub="Your day is wide open." />
+            <PanelNote label="Nothing on the calendar" sub="Your day is wide open." action={<RetryLink label="Plan my day with Monarch" onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')} />} />
           ) : (
             <div class="flex flex-col min-h-0 flex-1">
               <div ref={listRef} class="flex-1 min-h-0 overflow-y-auto px-2.5 pb-3 pt-1">

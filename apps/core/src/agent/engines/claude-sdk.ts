@@ -127,7 +127,7 @@ async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: 
   const rec = ctx.session;
   const coding = rec.kind === 'coding';
   const exe = resolveClaudeExecutable();
-  const defs = sdkToolDefs();
+  const defs = sdkToolDefs(rec.kind);
   // deferred loading: core tools always in the prompt, the rest behind Claude Code's ToolSearch
   const defer = deferToolsEnabled();
   const small = !coding && smallModeFor(rec.model || settings.claudeSdk.model);

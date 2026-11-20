@@ -198,7 +198,7 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
                   <label class="flex items-center gap-2 text-[12px] text-fg-2 mr-1 cursor-pointer">
                     <input
                       type="checkbox"
-                      class="toggle toggle-xs rounded-[6px] border-line checked:bg-red checked:border-red checked:text-fg"
+                      class="toggle toggle-xs rounded-[var(--radius-control)] border-line checked:bg-red checked:border-red checked:text-fg"
                       checked={d.enabled}
                       disabled={busy !== null}
                       onChange={() => void act('toggle')}

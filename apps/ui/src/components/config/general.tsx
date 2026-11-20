@@ -4,8 +4,7 @@ import type { GeoLocation, Settings } from '@monarch/shared';
 import { MapPin, Search, X } from 'lucide-preact';
 import { api, qs } from '../../lib/api.ts';
 import { settings } from '../../lib/store.ts';
-import { Panel, Spinner, ErrorLine, Tag } from '../ui.tsx';
-import { Segmented } from '../chat/session-list.tsx';
+import { Panel, Spinner, ErrorLine, Tag, Pills } from '../ui.tsx';
 import { Field, INPUT, SELECT, TEXTAREA, ToggleRow, SaveBar, saveSettings, useDraft } from './fields.tsx';
 
 type Slice = Pick<Settings, 'user' | 'assistant'>;
@@ -41,8 +40,7 @@ export function GeneralSection() {
             <input class={INPUT} value={u.honorific} onInput={(e) => setUser({ honorific: (e.target as HTMLInputElement).value })} placeholder="sir" />
           </Field>
           <Field label="Units">
-            <Segmented
-              class="max-w-[240px]"
+            <Pills
               value={u.units}
               onChange={(v) => setUser({ units: v })}
               options={[
@@ -55,6 +53,12 @@ export function GeneralSection() {
         <div class="mt-5">
           <LocationPicker />
         </div>
+      </Panel>
+
+      <Panel title="Appearance">
+        <Field label="Text size" hint="Scales the whole interface. Saved on this device only.">
+          <TextSizePicker />
+        </Field>
       </Panel>
 
       <Panel title="Assistant">
@@ -142,7 +146,7 @@ function LocationPicker() {
           onInput={(e) => setQ((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && void search()}
         />
-        <button class="btn btn-sm btn-outline border-line rounded-[6px] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => void search()} disabled={loading || !q.trim()}>
+        <button class="btn btn-sm btn-outline border-line rounded-[var(--radius-control)] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => void search()} disabled={loading || !q.trim()}>
           {loading ? <Spinner /> : <Search size={12} />} Search
         </button>
       </div>
@@ -162,5 +166,42 @@ function LocationPicker() {
         </div>
       )}
     </div>
+  );
+}
+
+type TextSize = 's' | 'm' | 'l' | 'xl';
+const TEXT_SIZE_KEY = 'monarch.textSize';
+
+function TextSizePicker() {
+  const [size, setSize] = useState<TextSize>(() => {
+    try {
+      return (localStorage.getItem(TEXT_SIZE_KEY) as TextSize) || 'm';
+    } catch {
+      return 'm';
+    }
+  });
+  const apply = (v: TextSize) => {
+    setSize(v);
+    const root = document.documentElement;
+    if (v === 'm') delete root.dataset.textSize;
+    else root.dataset.textSize = v;
+    try {
+      if (v === 'm') localStorage.removeItem(TEXT_SIZE_KEY);
+      else localStorage.setItem(TEXT_SIZE_KEY, v);
+    } catch {
+      /* storage blocked: still applied for this session */
+    }
+  };
+  return (
+    <Pills
+      value={size}
+      onChange={apply}
+      options={[
+        { value: 's', label: 'S', title: 'Small' },
+        { value: 'm', label: 'M', title: 'Default' },
+        { value: 'l', label: 'L', title: 'Large' },
+        { value: 'xl', label: 'XL', title: 'Extra large' },
+      ]}
+    />
   );
 }

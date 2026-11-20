@@ -4,7 +4,7 @@ import type { WhatsAppChat, WhatsAppMessage, WhatsAppStatus } from '@monarch/sha
 import { CheckCheck, MessageCircle, Send, Users, X } from 'lucide-preact';
 import { api } from '../lib/api.ts';
 import { navigate, toast, useResource } from '../lib/store.ts';
-import { Btn } from '../components/ui.tsx';
+import { Btn, ListRow } from '../components/ui.tsx';
 import { Button, LoadError, Loading, relTime, StateBlock } from '../components/mail/kit.tsx';
 
 const enc = encodeURIComponent;
@@ -24,13 +24,16 @@ export default function WhatsAppPage(props: { params: string[] }) {
   if (!linked)
     return (
       <div class="h-full flex items-center justify-center p-4">
-        <StateBlock icon={<MessageCircle size={30} strokeWidth={1.25} />} title="WhatsApp not linked">
-          <div>Link your phone by QR and Monarch can read your chats and reply for you (after you approve).</div>
-          <div class="mt-5">
+        <StateBlock
+          icon={<MessageCircle size={18} strokeWidth={1.5} />}
+          title="WhatsApp not linked"
+          actions={
             <Btn variant="primary" onClick={() => navigate('config/accounts')}>
               Link WhatsApp
             </Btn>
-          </div>
+          }
+        >
+          Link your phone by QR and Monarch can read your chats and reply for you (after you approve).
         </StateBlock>
       </div>
     );
@@ -51,7 +54,7 @@ export default function WhatsAppPage(props: { params: string[] }) {
           {st.data.state !== 'open' && <span class="text-[11.5px] text-fg-3">{st.data.state}…</span>}
         </div>
         <input
-          class="mt-3 w-full bg-white/[0.04] rounded-md px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+          class="mt-3 w-full bg-white/[0.04] rounded-[var(--radius-control)] px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
           placeholder="Jump to…"
           value={filter}
           onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
@@ -63,37 +66,41 @@ export default function WhatsAppPage(props: { params: string[] }) {
           ) : chatsRes.data === undefined ? (
             <Loading label="Listing chats" />
           ) : !chats.length ? (
-            <StateBlock title={filter ? 'No match' : 'No chats yet'}>{filter ? `Nothing matches “${filter}”.` : 'New messages show up here as they arrive.'}</StateBlock>
+            <StateBlock
+              icon={<MessageCircle size={18} strokeWidth={1.5} />}
+              title={filter ? 'No match' : 'No chats yet'}
+              actions={filter ? <Btn onClick={() => setFilter('')}>Clear filter</Btn> : <Btn onClick={() => void chatsRes.reload()}>Refresh</Btn>}
+            >{filter ? `Nothing matches “${filter}”.` : 'New messages show up here as they arrive.'}</StateBlock>
           ) : (
             chats.map((c) => {
               const active = c.id === chatId;
               return (
-                <button
+                <ListRow
                   key={c.id}
-                  class={`relative w-full flex items-center gap-2.5 text-left px-3 py-1.5 rounded-md text-[13.5px] transition-colors ${active ? 'bg-white/[0.06] text-fg' : 'hover:bg-raised'}`}
+                  active={active}
+                  marker
+                  class="py-1.5"
+                  attrs={{ title: c.lastText }}
                   onClick={() => navigate(`whatsapp/${enc(c.id)}`)}
-                  title={c.lastText}
-                >
-                  {active && <span class="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red" />}
-                  {c.isGroup ? <Users size={13} class="shrink-0 text-fg-3" /> : <MessageCircle size={13} class="shrink-0 text-fg-3" />}
-                  <span class={`truncate ${c.unread ? 'text-fg font-semibold' : active ? 'text-fg' : 'text-fg-2'}`}>{c.name}</span>
-                  {!!c.unread && <span class="ml-auto font-mono text-[11px] text-fg-2">{c.unread > 99 ? '99+' : c.unread}</span>}
-                </button>
+                  lead={c.isGroup ? <Users size={13} /> : <MessageCircle size={13} />}
+                  title={<span class={c.unread ? 'text-fg font-semibold' : active ? 'text-fg' : 'text-fg-2'}>{c.name}</span>}
+                  trail={!!c.unread && <span class="font-mono text-[11px] text-fg-2">{c.unread > 99 ? '99+' : c.unread}</span>}
+                />
               );
             })
           )}
         </div>
       </aside>
 
-      <section class={`${chatId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
+      <section class={`${chatId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
         {!chatId ? (
-          <div class="flex-1 flex items-center justify-center text-[13px] text-fg-3">Pick a chat</div>
+          <div class="flex-1 flex items-center justify-center"><StateBlock icon={<MessageCircle size={18} strokeWidth={1.5} />} title="Pick a chat">Choose a conversation on the left to read and reply.</StateBlock></div>
         ) : (
           <>
             <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
-              <button class="lg:hidden -ml-1 p-1 rounded-md text-fg-3 hover:text-fg" aria-label="Back to chats" onClick={() => navigate('whatsapp')}>
+              <Btn variant="ghost" size="xs" class="lg:hidden -ml-1 btn-square" aria-label="Back to chats" onClick={() => navigate('whatsapp')}>
                 <X size={15} />
-              </button>
+              </Btn>
               <h1 class="flex-1 min-w-0 text-[16px] font-semibold text-fg truncate">{chat?.name ?? chatId}</h1>
               {!!chat?.unread && (
                 <Btn size="xs" variant="ghost" onClick={markRead} title="Mark read">
@@ -122,7 +129,7 @@ function Messages(props: { res: { data?: WhatsAppMessage[]; error?: string; relo
     <div ref={ref} class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-2 flex flex-col gap-1.5">
       {!list.length && <div class="m-auto text-[13px] text-fg-3">Only messages received since linking are shown.</div>}
       {list.map((m) => (
-        <div key={m.id} class={`max-w-[80%] rounded-[10px] px-3 py-1.5 text-[13.5px] leading-relaxed ${m.fromMe ? 'self-end bg-white/[0.08]' : 'self-start bg-white/[0.04]'}`}>
+        <div key={m.id} class={`max-w-[80%] rounded-[var(--radius-card)] px-3 py-1.5 text-[13.5px] leading-relaxed ${m.fromMe ? 'self-end bg-white/[0.08]' : 'self-start bg-white/[0.04]'}`}>
           {props.isGroup && !m.fromMe && <div class="text-[11.5px] font-semibold text-fg-2">{m.senderName}</div>}
           <div class="whitespace-pre-wrap break-words text-fg">{m.text}</div>
           <div class="text-[10.5px] text-fg-3 text-right">{relTime(new Date(m.ts).toISOString())}</div>
@@ -151,7 +158,7 @@ function Composer(props: { chatId: string; label: string; disabled: boolean }) {
   };
   return (
     <div class="px-3 sm:px-4 pb-3 sm:pb-4">
-      <div class="flex items-end gap-2 rounded-[10px] bg-white/[0.04] focus-within:bg-white/[0.06] transition-colors">
+      <div class="flex items-end gap-2 rounded-[var(--radius-control)] bg-white/[0.04] focus-within:bg-white/[0.06] transition-colors">
         <textarea
           rows={Math.min(8, Math.max(1, text.split('\n').length))}
           class="flex-1 bg-transparent outline-none resize-none px-3.5 py-2.5 text-[14px] leading-relaxed text-fg placeholder:text-fg-3"

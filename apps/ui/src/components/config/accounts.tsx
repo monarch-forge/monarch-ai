@@ -4,13 +4,11 @@ import type { GoogleAccount, GoogleClientConfig, OAuthFlowState, SlackWorkspace 
 import { Plus, Check, X, ExternalLink } from 'lucide-preact';
 import { api, openExternal } from '../../lib/api.ts';
 import { oauthFlows, toast, useResource } from '../../lib/store.ts';
-import { Panel, Tag, Spinner, ErrorLine, Empty, fmt } from '../ui.tsx';
+import { Panel, Tag, Spinner, ErrorLine, Empty, Skeleton, fmt, Btn } from '../ui.tsx';
 import { Field, INPUT, Kbd } from './fields.tsx';
 import { OAuthFlowView } from './oauth-flow.tsx';
 import { WhatsAppAccount } from './whatsapp.tsx';
 
-const BTN = 'btn btn-xs rounded-[6px] font-normal text-[12px]';
-const BTN_OUT = `${BTN} btn-outline border-line text-fg-2 hover:bg-subtle hover:border-fg-3 hover:text-fg`;
 
 const SLACK_SCOPES = [
   'channels:history',
@@ -38,9 +36,9 @@ function ConfirmRemove(props: { label: string; onConfirm: () => Promise<void> })
   const [busy, setBusy] = useState(false);
   if (!ask)
     return (
-      <button class={BTN_OUT} onClick={() => setAsk(true)}>
+      <Btn size="xs" onClick={() => setAsk(true)}>
         {props.label}
-      </button>
+      </Btn>
     );
   return (
     <span class="flex items-center gap-1.5">
@@ -161,9 +159,9 @@ function GoogleClient() {
         </Field>
       </div>
       <div class="flex justify-end mt-3">
-        <button class={`${BTN} btn-primary btn-sm h-8`} disabled={!dirty || saving || !clientId.trim() || (!configured && !secret.trim())} onClick={() => void save()}>
+        <Btn size="sm" variant="primary" disabled={!dirty || saving || !clientId.trim() || (!configured && !secret.trim())} onClick={() => void save()}>
           {saving && <span class="loading loading-spinner loading-xs" />}Save client
-        </button>
+        </Btn>
       </div>
     </Panel>
   );
@@ -204,9 +202,9 @@ function GoogleAccounts() {
     <Panel
       title="Google accounts"
       right={
-        <button class={`${BTN} btn-primary`} disabled={!configured || busy || (!!flow && flow.status !== 'error' && flow.status !== 'done')} onClick={() => void connect()} title={configured ? 'Connect a Google account' : 'Configure the OAuth client first'}>
+        <Btn size="xs" variant="primary" disabled={!configured || busy || (!!flow && flow.status !== 'error' && flow.status !== 'done')} onClick={() => void connect()} title={configured ? 'Connect a Google account' : 'Configure the OAuth client first'}>
           {busy ? <span class="loading loading-spinner loading-xs" /> : <Plus size={11} />} Connect
-        </button>
+        </Btn>
       }
     >
       {flow && (
@@ -226,9 +224,7 @@ function GoogleAccounts() {
         </div>
       )}
       {res.loading && !res.data ? (
-        <div class="flex justify-center py-4">
-          <Spinner />
-        </div>
+<Skeleton lines={2} class="py-2" />
       ) : res.error && !res.data ? (
         <ErrorLine error={res.error} />
       ) : !res.data?.length ? (
@@ -238,7 +234,7 @@ function GoogleAccounts() {
           {res.data.map((a) => (
             <div key={a.id} class="flex items-center gap-3 py-2 border-b border-line last:border-b-0">
               {a.picture ? (
-                <img src={a.picture} alt="" class="w-7 h-7 rounded-[6px] grayscale opacity-80" referrerpolicy="no-referrer" />
+                <img src={a.picture} alt="" class="w-7 h-7 rounded-full grayscale opacity-80" referrerpolicy="no-referrer" />
               ) : (
                 <div class="w-7 h-7 border border-line flex items-center justify-center text-[12px] text-fg-2">{(a.name || a.email)[0]}</div>
               )}
@@ -344,9 +340,9 @@ function SlackWorkspaces() {
             onInput={(e) => setToken((e.target as HTMLInputElement).value)}
             onKeyDown={(e) => e.key === 'Enter' && void add()}
           />
-          <button class={`${BTN} btn-primary h-8`} disabled={busy || !token.trim()} onClick={() => void add()}>
+          <Btn size="sm" variant="primary" disabled={busy || !token.trim()} onClick={() => void add()}>
             {busy && <span class="loading loading-spinner loading-xs" />}Connect
-          </button>
+          </Btn>
         </div>
       </Field>
       {showScopes && (

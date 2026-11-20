@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { EngineId } from '@monarch/shared';
 import { Plus, FolderOpen, X, GitBranch, ChevronDown, RefreshCw, FolderGit2, SquarePen } from 'lucide-preact';
-import { Spinner, ErrorLine, Btn, fmt } from '../components/ui.tsx';
+import { Spinner, ErrorLine, Btn, EmptyState, Skeleton, fmt } from '../components/ui.tsx';
 import { ChatLayout, SideLabel, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
 import { Composer, focusComposer, type SlashCommand } from '../components/chat/composer.tsx';
@@ -14,6 +14,7 @@ import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.t
 import { DirBrowser } from '../components/config/dir-browser.tsx';
 import { saveSettings } from '../components/config/fields.tsx';
 import { PrPanel } from '../components/pr-panel.tsx';
+import { PlanPanel } from '../components/chat/plan-panel.tsx';
 import { useChatSession, useSessions } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast, useResource } from '../lib/store.ts';
 
@@ -163,7 +164,7 @@ export default function WorkshopPage(props: { params: string[] }) {
         {wsOpen && (
           <div class="mt-1.5 rounded-[10px] bg-[var(--bg-primary)]/60 p-1">
             {!s ? (
-              <div class="flex justify-center py-3">{conn.value === 'open' ? <Spinner /> : <ErrorLine error="Core offline" />}</div>
+              <div class="flex justify-center py-3">{conn.value === 'open' ? <Skeleton lines={2} class="w-full px-2" /> : <ErrorLine error="Core offline" />}</div>
             ) : (
               allWs.map((w) => {
                 const saved = workspaces.map(norm).includes(w);
@@ -171,7 +172,7 @@ export default function WorkshopPage(props: { params: string[] }) {
                 return (
                   <div
                     key={w}
-                    class={`group flex items-center gap-2 rounded-[6px] px-2.5 py-2 cursor-pointer transition-colors duration-150 ${on ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'}`}
+                    class={`group flex items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-2 cursor-pointer transition-colors duration-150 ${on ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'}`}
                     onClick={() => {
                       pickWorkspace(w);
                       setWsOpen(false);
@@ -211,7 +212,7 @@ export default function WorkshopPage(props: { params: string[] }) {
               })
             )}
             <button
-              class="w-full flex items-center gap-2 rounded-[6px] px-2.5 py-2 text-[13px] text-fg-3 hover:text-fg hover:bg-[var(--bg-raised,#202023)] disabled:opacity-40"
+              class="w-full flex items-center gap-2 rounded-[var(--radius-control)] px-2.5 py-2 text-[13px] text-fg-3 hover:text-fg hover:bg-[var(--bg-raised,#202023)] disabled:opacity-40"
               onClick={() => {
                 setWsOpen(false);
                 setBrowse(true);
@@ -234,17 +235,35 @@ export default function WorkshopPage(props: { params: string[] }) {
       </SideLabel>
       <div class="flex-1 min-h-0 overflow-y-auto pb-2">
         {coding.loading && !coding.sessions ? (
-          <div class="flex justify-center py-6">
-            <Spinner />
-          </div>
+          <Skeleton lines={4} class="px-4 py-2" />
         ) : coding.error && !coding.sessions ? (
           <div class="px-4">
             <ErrorLine error={conn.value === 'open' ? coding.error : 'Core offline'} />
           </div>
         ) : !selected ? (
-          <p class="px-5 py-4 text-[13px] text-fg-3">Pick a workspace to see its sessions.</p>
+          <EmptyState
+            class="!py-8"
+            icon={<FolderOpen size={18} strokeWidth={1.5} />}
+            title="No workspace picked"
+            hint="Choose a folder to code in. Monarch keeps its sessions per workspace."
+            actions={
+              <Btn size="sm" variant="primary" disabled={conn.value !== 'open'} onClick={() => setBrowse(true)}>
+                <FolderOpen size={13} /> Add folder
+              </Btn>
+            }
+          />
         ) : wsSessions.length === 0 ? (
-          <p class="px-5 py-4 text-[13px] text-fg-3 leading-relaxed">No sessions here yet. Describe a task to start one.</p>
+          <EmptyState
+            class="!py-8"
+            icon={<SquarePen size={18} strokeWidth={1.5} />}
+            title="No sessions here yet"
+            hint="Describe a task in the composer, or start a fresh session."
+            actions={
+              <Btn size="sm" onClick={newSession}>
+                <SquarePen size={13} /> New session
+              </Btn>
+            }
+          />
         ) : (
           wsSessions.map((x) => (
             <SessionRow
@@ -264,6 +283,7 @@ export default function WorkshopPage(props: { params: string[] }) {
   const details = (
     <>
       {session?.id ? <SessionStats session={session} lastTurn={chat.lastTurn} /> : null}
+      <PlanPanel plan={session?.plan} />
       <EngineNote engine={session?.id ? session.engine : effEngine} />
       {cwd && <GitLog cwd={cwd} refreshKey={chat.running ? 1 : 0} />}
       <PrPanel />
@@ -415,7 +435,7 @@ function GitChip(props: { cwd: string; refreshKey: number }) {
       onClick={() => void git.reload()}
     >
       {git.loading && !git.data ? (
-        <Spinner />
+        <Skeleton h={10} class="w-20" />
       ) : info ? (
         <>
           <GitBranch size={13} strokeWidth={1.75} class="text-fg-3 shrink-0" />

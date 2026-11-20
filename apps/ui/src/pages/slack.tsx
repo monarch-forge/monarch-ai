@@ -7,13 +7,13 @@ import type { SlackChannel, SlackMessage, SlackWorkspace } from '@monarch/shared
 import { Hash, Lock, MessageSquare, Users, Search, Sparkles, Send, X, RefreshCw, ExternalLink, MessagesSquare } from 'lucide-preact';
 import { api, openExternal, qs } from '../lib/api.ts';
 import { invalidateResources, navigate, toast, useResource } from '../lib/store.ts';
-import { Btn } from '../components/ui.tsx';
+import { Btn, ListRow } from '../components/ui.tsx';
 import { askMonarch, Button, LoadError, Loading, RefreshHint, relTime, StateBlock, useConfirm, useHotkeys } from '../components/mail/kit.tsx';
 import { mrkdwn } from '../components/slack/mrkdwn.ts';
 
 const enc = encodeURIComponent;
 const SLK_CLASS =
-  'break-words text-[14px] leading-[1.6] text-fg/90 [&_a]:underline [&_a]:decoration-fg-3 [&_a]:underline-offset-2 [&_a:hover]:decoration-red [&_code]:font-mono [&_code]:text-[0.8em] [&_code]:bg-subtle [&_code]:px-1 [&_code]:rounded [&_pre]:bg-black/20 [&_pre]:rounded-md [&_pre]:p-2.5 [&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_.slk-mention]:text-fg [&_.slk-mention]:bg-subtle [&_.slk-mention]:px-1 [&_.slk-mention]:rounded [&_.slk-quote]:block [&_.slk-quote]:border-l-2 [&_.slk-quote]:border-subtle [&_.slk-quote]:pl-2 [&_.slk-quote]:text-fg-2 [&_del]:text-fg-3';
+  'break-words text-[14px] leading-[1.6] text-fg/90 [&_a]:underline [&_a]:decoration-fg-3 [&_a]:underline-offset-2 [&_a:hover]:decoration-red [&_code]:font-mono [&_code]:text-[0.8em] [&_code]:bg-subtle [&_code]:px-1 [&_code]:rounded [&_pre]:bg-black/20 [&_pre]:rounded-[var(--radius-control)] [&_pre]:p-2.5 [&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_.slk-mention]:text-fg [&_.slk-mention]:bg-subtle [&_.slk-mention]:px-1 [&_.slk-mention]:rounded [&_.slk-quote]:block [&_.slk-quote]:border-l-2 [&_.slk-quote]:border-subtle [&_.slk-quote]:pl-2 [&_.slk-quote]:text-fg-2 [&_del]:text-fg-3';
 
 const GROUPS: { id: string; name: string; kinds: SlackChannel['kind'][] }[] = [
   { id: 'channel', name: 'Channels', kinds: ['channel'] },
@@ -111,13 +111,16 @@ export default function SlackPage(props: { params: string[] }) {
   if (!workspaces.length) {
     return (
       <div class="h-full flex items-center justify-center p-4">
-        <StateBlock icon={<Hash size={30} strokeWidth={1.25} />} title="No Slack workspace yet">
-          <div>Add a Slack token and Monarch can read channels, search history, post for you (after you approve) and send you gentle digests.</div>
-          <div class="mt-5">
+        <StateBlock
+          icon={<Hash size={18} strokeWidth={1.5} />}
+          title="No Slack workspace yet"
+          actions={
             <Btn variant="primary" onClick={() => navigate('config/accounts')}>
               Connect Slack
             </Btn>
-          </div>
+          }
+        >
+          Add a Slack token and Monarch can read channels, search history, post for you (after you approve) and send you gentle digests.
         </StateBlock>
       </div>
     );
@@ -129,7 +132,7 @@ export default function SlackPage(props: { params: string[] }) {
       <aside class={`${channelId || search ? 'hidden lg:flex' : 'flex'} w-full lg:w-60 shrink-0 flex-col min-h-0`}>
         {workspaces.length > 1 ? (
           <select
-            class="w-full bg-subtle rounded-md text-[13.5px] font-medium text-fg px-2.5 py-2 outline-none"
+            class="w-full bg-subtle rounded-[var(--radius-control)] text-[13.5px] font-medium text-fg px-2.5 py-2 outline-none"
             value={wsId ?? ''}
             onChange={(e) => navigate(`slack/${enc((e.target as HTMLSelectElement).value)}`)}
             aria-label="Workspace"
@@ -144,7 +147,7 @@ export default function SlackPage(props: { params: string[] }) {
           </select>
         ) : (
           <div class="flex items-center gap-2.5 px-2 py-1" title={ws?.error ?? (ws?.user ? `@${ws.user} · ${ws.tokenType}` : ws?.tokenType)}>
-            <span class="w-7 h-7 shrink-0 rounded-md bg-subtle grid place-items-center text-[12px] font-semibold text-fg-2">{(ws?.name || '?').slice(0, 1).toUpperCase()}</span>
+            <span class="w-7 h-7 shrink-0 rounded-[var(--radius-control)] bg-subtle grid place-items-center text-[12px] font-semibold text-fg-2">{(ws?.name || '?').slice(0, 1).toUpperCase()}</span>
             <span class="min-w-0">
               <span class="block truncate text-[14px] font-semibold text-fg">{ws?.name}</span>
               {ws?.user && <span class="block truncate text-[11.5px] text-fg-3">@{ws.user}</span>}
@@ -154,7 +157,7 @@ export default function SlackPage(props: { params: string[] }) {
         {ws?.error && <div class="mt-2 px-2 text-[12px] text-red/90">{ws.error}</div>}
         <input
           ref={filterRef}
-          class="mt-3 w-full bg-white/[0.04] rounded-md px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+          class="mt-3 w-full bg-white/[0.04] rounded-[var(--radius-control)] px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
           placeholder="Jump to…"
           title="Filter channels (f)"
           value={filter}
@@ -176,7 +179,7 @@ export default function SlackPage(props: { params: string[] }) {
           ) : chRes.data === undefined ? (
             <Loading label="Listing channels" />
           ) : !grouped.length ? (
-            <StateBlock title={filter ? 'No match' : 'No conversations'}>{filter ? `Nothing matches “${filter}”.` : 'This token can’t see any conversations.'}</StateBlock>
+            <StateBlock title={filter ? 'No match' : 'No conversations'} actions={filter ? <Btn size="xs" onClick={() => setFilter('')}>Clear filter</Btn> : <Btn size="xs" onClick={() => navigate('config/accounts')}>Check token</Btn>}>{filter ? `Nothing matches “${filter}”.` : 'This token can’t see any conversations.'}</StateBlock>
           ) : (
             grouped.map((g) => (
               <div key={g.id} class="mt-3 first:mt-1">
@@ -184,19 +187,17 @@ export default function SlackPage(props: { params: string[] }) {
                 {g.items.map((c) => {
                   const active = c.id === channelId;
                   return (
-                    <button
+                    <ListRow
                       key={c.id}
-                      class={`relative w-full flex items-center gap-2.5 text-left px-3 py-1.5 rounded-md text-[13.5px] transition-colors ${
-                        active ? 'bg-white/[0.06] text-fg' : 'hover:bg-raised'
-                      }`}
+                      active={active}
+                      marker
+                      class="py-1.5"
+                      attrs={{ title: c.topic || c.name }}
                       onClick={() => go(c)}
-                      title={c.topic || c.name}
-                    >
-                      {active && <span class="absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-red" />}
-                      <ChanIcon kind={c.kind} />
-                      <span class={`truncate ${c.unread ? 'text-fg font-semibold' : active ? 'text-fg' : 'text-fg-2'}`}>{c.name}</span>
-                      {!!c.unread && <span class="ml-auto font-mono text-[11px] text-fg-2">{c.unread > 99 ? '99+' : c.unread}</span>}
-                    </button>
+                      lead={<ChanIcon kind={c.kind} />}
+                      title={<span class={c.unread ? 'text-fg font-semibold' : active ? 'text-fg' : 'text-fg-2'}>{c.name}</span>}
+                      trail={!!c.unread && <span class="font-mono text-[11px] text-fg-2">{c.unread > 99 ? '99+' : c.unread}</span>}
+                    />
                   );
                 })}
               </div>
@@ -206,12 +207,12 @@ export default function SlackPage(props: { params: string[] }) {
       </aside>
 
       {/* ── main ── */}
-      <section class={`${threadTs && !search ? 'hidden lg:flex' : channelId || search ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden`}>
+      <section class={`${threadTs && !search ? 'hidden lg:flex' : channelId || search ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
         <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
           {(channelId || search) && (
-            <button class="lg:hidden -ml-1 p-1 rounded-md text-fg-3 hover:text-fg" aria-label="Back to channels" onClick={() => (search ? (setSearch(''), setSearchInput('')) : navigate(`slack/${enc(wsId!)}`))}>
+            <Btn variant="ghost" size="xs" class="lg:hidden -ml-1 btn-square" aria-label="Back to channels" onClick={() => (search ? (setSearch(''), setSearchInput('')) : navigate(`slack/${enc(wsId!)}`))}>
               <X size={15} />
-            </button>
+            </Btn>
           )}
           <div class="min-w-0 flex-1">
             <h1 class="text-[16px] font-semibold text-fg truncate">{search ? `Search: ${search}` : channel ? chanLabel(channel) : channelId ? channelId : ws?.name ?? 'Slack'}</h1>
@@ -228,7 +229,7 @@ export default function SlackPage(props: { params: string[] }) {
             <Search size={13} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="w-28 sm:w-48 xl:w-60 bg-white/[0.04] rounded-md pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+              class="w-28 sm:w-48 xl:w-60 bg-white/[0.04] rounded-[var(--radius-control)] pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
               placeholder="Search"
               title={`Search ${ws?.name ?? ''} (/)`}
               value={searchInput}
@@ -245,11 +246,12 @@ export default function SlackPage(props: { params: string[] }) {
           </form>
           {channelId && !search && (
             <>
-              <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Refresh (auto every 20s)" aria-label="Refresh" onClick={() => void msgRes.reload()}>
+              <Btn variant="ghost" size="xs" class="btn-square" title="Refresh (auto every 20s)" aria-label="Refresh" onClick={() => void msgRes.reload()}>
                 <RefreshCw size={13} class={msgRes.loading ? 'animate-spin' : ''} />
-              </button>
-              <button
-                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
+              </Btn>
+              <Btn
+                variant="ghost"
+                size="xs"
                 title="Ask Monarch to summarize this channel"
                 onClick={() =>
                   askMonarch(
@@ -258,7 +260,7 @@ export default function SlackPage(props: { params: string[] }) {
                 }
               >
                 <Sparkles size={13} /> <span class="hidden md:inline">Catch me up</span>
-              </button>
+              </Btn>
             </>
           )}
         </header>
@@ -279,15 +281,18 @@ export default function SlackPage(props: { params: string[] }) {
           />
         ) : !channelId ? (
           <div class="flex-1 flex items-center justify-center">
-            <StateBlock icon={<MessagesSquare size={28} strokeWidth={1.25} />} title="Pick a conversation">
-              Choose a channel or DM on the left (j / k to step through), or press / to search everything.
-              {ws && (
-                <div class="mt-4">
+            <StateBlock
+              icon={<MessagesSquare size={18} strokeWidth={1.5} />}
+              title="Pick a conversation"
+              actions={
+                ws && (
                   <Btn size="xs" onClick={() => askMonarch(`Give me a digest of what happened today across my Slack workspace "${ws.name}" (workspaceId ${ws.id}). Flag mentions, questions directed at me and anything urgent.`)}>
                     <Sparkles size={12} /> Workspace digest
                   </Btn>
-                </div>
-              )}
+                )
+              }
+            >
+              Choose a channel or DM on the left (j / k to step through), or press / to search everything.
             </StateBlock>
           </div>
         ) : (
@@ -365,7 +370,7 @@ function MessageLog(props: { res: MsgRes; activeThread?: string | null; onOpenTh
 
   if (props.res.error && !msgs.length) return <div class="flex-1 flex items-center justify-center"><LoadError error={props.res.error} onRetry={props.res.reload} /></div>;
   if (props.res.data === undefined) return <div class="flex-1"><Loading label="Loading history" /></div>;
-  if (!msgs.length) return <div class="flex-1 flex items-center justify-center"><StateBlock title="No messages yet">Be the first to say something.</StateBlock></div>;
+  if (!msgs.length) return <div class="flex-1 flex items-center justify-center"><StateBlock icon={<MessageSquare size={18} strokeWidth={1.5} />} title="No messages yet">Be the first to say something.</StateBlock></div>;
 
   return (
     <div
@@ -407,7 +412,7 @@ function MsgList(props: { msgs: SlackMessage[]; users: Map<string, string>; acti
                 <span class="text-[11.5px] text-fg-3 bg-white/[0.03] rounded-full px-3 py-0.5">{d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               </div>
             )}
-            <div class={`group flex gap-3 px-2 py-0.5 rounded-md transition-colors ${active ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'} ${grouped ? '' : 'mt-3'}`}>
+            <div class={`group flex gap-3 px-2 py-0.5 rounded-[var(--radius-control)] transition-colors ${active ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'} ${grouped ? '' : 'mt-3'}`}>
               <span class="w-8 shrink-0 pt-0.5">
                 {grouped ? (
                   <span class="block font-mono text-[10px] text-fg-3 pt-[3px] opacity-0 group-hover:opacity-100 tabular-nums">{fmtTime(d)}</span>
@@ -435,7 +440,7 @@ function MsgList(props: { msgs: SlackMessage[]; users: Map<string, string>; acti
                   <div class="flex items-center gap-3 mt-1 text-[12px] text-fg-3">
                     {isParent && !props.inThread && (
                       <button
-                        class={`inline-flex items-center gap-1.5 -ml-1.5 px-1.5 py-0.5 rounded-md transition-colors ${active ? 'text-fg' : 'text-fg-2 hover:text-fg hover:bg-white/[0.04]'}`}
+                        class={`inline-flex items-center gap-1.5 -ml-1.5 px-1.5 py-0.5 rounded-[var(--radius-control)] transition-colors ${active ? 'text-fg' : 'text-fg-2 hover:text-fg hover:bg-white/[0.04]'}`}
                         onClick={() => props.onOpenThread?.(m.ts)}
                         title="Open thread"
                       >
@@ -488,16 +493,16 @@ function ThreadPane(props: {
   }, [lastTs]);
 
   return (
-    <aside class="flex flex-1 lg:flex-none lg:w-[380px] xl:w-[420px] min-w-0 flex-col min-h-0 bg-surface rounded-[10px] overflow-hidden" aria-label="Thread">
+    <aside class="flex flex-1 lg:flex-none lg:w-[380px] xl:w-[420px] min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden" aria-label="Thread">
       <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
         <div class="min-w-0 flex-1">
           <h2 class="text-[15px] font-semibold text-fg">Thread</h2>
           <div class="text-[12px] text-fg-3 truncate">{props.label}</div>
         </div>
         <RefreshHint res={props.res} />
-        <button class="p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" title="Close thread (Esc)" aria-label="Close thread" onClick={props.onClose}>
+        <Btn variant="ghost" size="xs" class="btn-square" title="Close thread (Esc)" aria-label="Close thread" onClick={props.onClose}>
           <X size={14} />
-        </button>
+        </Btn>
       </header>
       <div ref={ref} class="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 pb-4" onClick={onExternalClick}>
         {props.res.error && !msgs.length ? (
@@ -556,9 +561,9 @@ function SearchResults(props: {
     <div class="flex-1 min-h-0 flex flex-col">
       <div class="flex items-center gap-2 px-5 pb-2 text-[12.5px] text-fg-3">
         <span>{props.res.data === undefined ? 'Searching…' : `${list.length} result${list.length === 1 ? '' : 's'}`}</span>
-        <button class="ml-auto inline-flex items-center gap-1 hover:text-fg" onClick={props.onClose}>
+        <Btn variant="ghost" size="xs" class="ml-auto" onClick={props.onClose}>
           <X size={12} /> Back to channel
-        </button>
+        </Btn>
       </div>
       <div class="flex-1 min-h-0 overflow-y-auto px-2 pb-3" onClick={onExternalClick}>
         {props.res.error ? (
@@ -571,7 +576,7 @@ function SearchResults(props: {
           list.map((m) => {
             const c = props.channels.find((x) => x.id === m.channelId);
             return (
-              <div key={`${m.channelId}:${m.ts}`} class="px-3 py-3 rounded-md hover:bg-raised transition-colors">
+              <div key={`${m.channelId}:${m.ts}`} class="px-3 py-3 rounded-[var(--radius-control)] hover:bg-raised transition-colors">
                 <div class="flex items-center gap-2 text-[12px] text-fg-3">
                   <button class="text-fg-2 hover:text-fg" onClick={() => props.onOpen(m)} title="Open channel">
                     {chanLabel(c, m.channelId)}
@@ -626,7 +631,7 @@ function SlackComposer(props: {
           <div class="mb-2">
             {props.threadTs ? 'Reply as you in a thread in' : 'Post as you to'} <span class="text-fg font-mono">{props.label}</span> in <span class="text-fg">{props.wsName}</span>:
           </div>
-          <div class={`${SLK_CLASS} rounded-md bg-white/[0.04] p-3 max-h-60 overflow-y-auto`} dangerouslySetInnerHTML={{ __html: mrkdwn(t) }} />
+          <div class={`${SLK_CLASS} rounded-[var(--radius-control)] bg-white/[0.04] p-3 max-h-60 overflow-y-auto`} dangerouslySetInnerHTML={{ __html: mrkdwn(t) }} />
         </div>
       ),
     });
@@ -648,7 +653,7 @@ function SlackComposer(props: {
 
   return (
     <div class="px-3 sm:px-4 pb-3 sm:pb-4">
-      <div class="flex items-end gap-2 rounded-[10px] bg-white/[0.04] focus-within:bg-white/[0.06] transition-colors">
+      <div class="flex items-end gap-2 rounded-[var(--radius-control)] bg-white/[0.04] focus-within:bg-white/[0.06] transition-colors">
         <textarea
           ref={(el) => {
             props.inputRef.current = el;

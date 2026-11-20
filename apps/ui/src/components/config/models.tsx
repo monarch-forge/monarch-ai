@@ -1,6 +1,6 @@
 /** Config → Models: engine choice, Claude Agent SDK options, pi provider/model + custom OpenAI-compatible models. */
 import { useState } from 'preact/hooks';
-import type { CustomModel, EngineId, ModelInfo, ProviderStatus, Settings, ThinkingLevel } from '@monarch/shared';
+import type { AgentRole, CustomModel, EngineId, ModelInfo, ProviderStatus, Settings, ThinkingLevel } from '@monarch/shared';
 import { Plus, Trash2 } from 'lucide-preact';
 import { qs } from '../../lib/api.ts';
 import { settings, useResource } from '../../lib/store.ts';
@@ -231,8 +231,9 @@ export function ModelsSection() {
         <SaveBar dirty={dirty} saving={saving} onSave={() => void save()} onReset={reset} />
       </Panel>
 
+      <RoleModelsPanel />
+
       <Disclosure label="Advanced" class="mt-1">
-        <WorkerModelPanel />
         <SmallModelPanel />
         <AutonomyPanel />
         <ContextPanel />
@@ -348,24 +349,35 @@ function AutonomyPanel() {
   );
 }
 
-/** Settings.agent.workerModel — default runtime/model for worker agents started by Monarch */
-function WorkerModelPanel() {
+const ROLES: { key: AgentRole; label: string }[] = [
+  { key: 'chat', label: 'Chat' },
+  { key: 'workshop', label: 'Workshop' },
+  { key: 'chatSub', label: 'Chat sub-agents' },
+  { key: 'workshopSub', label: 'Workshop sub-agents' },
+];
+
+/** Settings.agent.roleModels — default model per agent role (chatSub replaces the legacy workerModel) */
+function RoleModelsPanel() {
   const s = settings.value!;
-  const w = s.agent?.workerModel ?? null;
-  const save = async (c: ModelChoice | null) => {
-    await saveSettings({ agent: { ...(s.agent ?? {}), workerModel: c ? { engine: c.engine, model: c.model } : null } }, c ? `Worker agents: ${c.model}` : 'Worker agents use the default model');
+  const rm = s.agent?.roleModels ?? {};
+  const cur = (r: AgentRole) => (r in rm ? rm[r] : r === 'chatSub' ? s.agent?.workerModel : null) ?? null;
+  const save = async (r: AgentRole, c: ModelChoice | null) => {
+    const roleModels = { ...rm, [r]: c ? { engine: c.engine, model: c.model } : null };
+    const label = ROLES.find((x) => x.key === r)!.label;
+    await saveSettings({ agent: { ...(s.agent ?? {}), roleModels, ...(r === 'chatSub' ? { workerModel: null } : {}) } }, `${label}: ${c ? c.model : 'global default'}`);
   };
   return (
-    <Panel title="Worker agents" right={<Tag tone={w ? 'ok' : undefined}>{w ? w.model : 'same as default'}</Tag>}>
+    <Panel title="Default model per agent">
       <div class="flex flex-col gap-2 max-w-[560px]">
         <div class="text-[12.5px] text-fg-2 leading-relaxed">
-          Monarch does quick things itself and hands heavy work (code, full inbox triage, research, planning, long drafts) to worker agents in the Workshop. Give them a stronger model here so
-          your manager can stay on a fast one. Monarch still uses another model when you ask for one.
+          Used for new sessions of each kind. Sub-agents are the workers Chat or a Workshop session starts. The composer picker or an agent asking for a specific model still wins. “Default” = the global default above.
         </div>
-        <div class="flex items-center gap-3">
-          <ModelPicker value={w} onChange={(c) => void save(c)} placement="down" title="Default model for worker agents" />
-          <span class="text-[11px] text-fg-3">“Default” = the same engine and model as Monarch.</span>
-        </div>
+        {ROLES.map(({ key, label }) => (
+          <div key={key} class="flex items-center gap-3">
+            <span class="text-[12.5px] w-[150px] shrink-0">{label}</span>
+            <ModelPicker value={cur(key)} onChange={(c) => void save(key, c)} placement="down" title={`Default model for ${label}`} />
+          </div>
+        ))}
       </div>
     </Panel>
   );

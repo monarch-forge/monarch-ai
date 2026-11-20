@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { ProcessInfo, SystemInfo, SystemMetrics } from '@monarch/shared';
 import { conn, health, metrics, metricsHistory, phase, settings, useResource } from '../lib/store.ts';
-import { Panel, SegBar, Sparkline, Stat, Tag, fmt, useNow } from '../components/ui.tsx';
+import { DotText, Glyph, Panel, Sparkline, Stat, Tag, fmt, useNow } from '../components/ui.tsx';
 import { Gate, Offline, PanelNote, tone85 } from '../components/overview/common.tsx';
 
 export default function SystemsPage(_props: { params: string[] }) {
@@ -80,7 +80,7 @@ function BigNum(props: { label: string; value: string; hot: boolean }) {
   return (
     <div class="rounded-[10px] bg-surface px-5 py-4">
       <div class="text-[12.5px] text-fg-3">{props.label}</div>
-      <div class={`text-[28px] font-light tabular-nums leading-tight mt-1 ${props.hot ? 'text-red' : 'text-fg'}`}>{props.value}</div>
+      <DotText class={`block text-[28px] leading-tight mt-1 ${props.hot ? 'text-red' : 'text-fg'}`}>{props.value}</DotText>
     </div>
   );
 }
@@ -127,7 +127,7 @@ function CpuBody(props: { m: SystemMetrics; hist: SystemMetrics[] }) {
     <div class="flex flex-col gap-3">
       <div class="flex items-end justify-between gap-4">
         <div class="flex items-baseline gap-1">
-          <span class="font-mono font-light text-[34px] leading-none tabular-nums text-fg">{Math.round(m.cpu.load)}</span>
+          <DotText class="text-[34px] leading-none text-fg">{Math.round(m.cpu.load)}</DotText>
           <span class="font-mono text-[12px] text-fg-3">%</span>
         </div>
         <div class="flex gap-5">
@@ -198,7 +198,7 @@ function MeterRow(props: { label: string; pct: number; detail: string }) {
   return (
     <div class="grid grid-cols-[44px_1fr_auto] gap-3 items-center">
       <span class="hud-label text-[10px]">{props.label}</span>
-      <SegBar value={props.pct} segments={24} tone={tone85(props.pct)} />
+      <Glyph value={(props.pct / 100) * 24} of={24} tone={glyphTone(props.pct)} title={fmt.pct(props.pct)} />
       <span class={`hud-value text-[11px] text-right min-w-[150px] ${props.pct >= 85 ? 'text-red' : ''}`}>
         <span class="text-fg-2">{props.detail}</span> · {fmt.pct(props.pct)}
       </span>
@@ -245,11 +245,11 @@ function PowerBody(props: { m: SystemMetrics }) {
       {b ? (
         <>
           <div class="flex items-baseline gap-1">
-            <span class="font-mono font-light text-[34px] leading-none tabular-nums text-fg">{Math.round(b.percent)}</span>
+            <DotText class="text-[34px] leading-none text-fg">{Math.round(b.percent)}</DotText>
             <span class="font-mono text-[12px] text-fg-3">%</span>
             <span class="ml-auto text-[12px] text-fg-2">{b.charging ? 'On AC · charging' : 'Discharging'}</span>
           </div>
-          <SegBar value={b.percent} segments={24} tone={b.percent <= 15 && !b.charging ? 'red' : 'default'} />
+          <Glyph value={(b.percent / 100) * 24} of={24} tone={b.percent <= 15 && !b.charging ? 'red' : 'fg'} live={b.charging} title={fmt.pct(b.percent)} />
         </>
       ) : (
         <div class=" text-[12px] text-fg-3">No battery · mains power</div>
@@ -286,7 +286,7 @@ function DisksBody(props: { m: SystemMetrics }) {
                 {d.mount}
               </td>
               <td class="px-2 py-2">
-                <SegBar value={d.percent} segments={20} tone={tone85(d.percent)} />
+                <Glyph value={(d.percent / 100) * 20} of={20} tone={glyphTone(d.percent)} title={fmt.pct(d.percent)} />
               </td>
               <td class="px-2 py-2 hud-value text-right text-fg-2">{fmt.bytes(d.usedBytes)}</td>
               <td class="px-2 py-2 hud-value text-right text-fg-2">{fmt.bytes(d.totalBytes)}</td>
@@ -410,3 +410,5 @@ function ProcessesPanel(props: { class?: string }) {
     </Panel>
   );
 }
+
+const glyphTone = (pct: number) => (tone85(pct) === 'red' ? 'red' : 'fg');
