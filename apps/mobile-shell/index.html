@@ -30,10 +30,8 @@
   <h1><i></i>Monarch</h1>
   <p>Connect to Monarch on your laptop. Turn on Phone access there (Config → Phone access) and keep Tailscale running on both devices.</p>
   <form id="f" autocomplete="off">
-    <label for="link">Pairing link or laptop address</label>
+    <label for="link">Pairing link</label>
     <input id="link" inputmode="url" placeholder="http://100.x.y.z:7720/pair?code=…" required />
-    <label for="code">Pairing code (if you entered an address)</label>
-    <input id="code" inputmode="text" placeholder="Shown next to the QR on the laptop" />
     <button type="submit">Connect</button>
     <div class="err" id="err"></div>
   </form>
@@ -57,7 +55,7 @@
     if (!/^https?:\/\//i.test(raw)) raw = 'http://' + raw;
     let url;
     try { url = new URL(raw); } catch { $('err').textContent = 'That does not look like an address.'; return; }
-    const code = (url.searchParams.get('code') || $('code').value).trim();
+    const code = (url.searchParams.get('code') || '').trim();
     const host = url.origin;
     localStorage.setItem(KEY, host);
     sessionStorage.setItem('monarch.shown', '1');

@@ -120,6 +120,10 @@ html[data-text-size="l"] #app {
 html[data-text-size="xl"] #app {
   zoom: 1.2;
 }
+/* embedded pages (9Router) keep their own scale: undo the zoom and enlarge the box to fill the same area */
+html[data-text-size="s"] .unzoom { zoom: calc(1 / 0.92); width: 92% !important; height: 92% !important; }
+html[data-text-size="l"] .unzoom { zoom: calc(1 / 1.1); width: 110% !important; height: 110% !important; }
+html[data-text-size="xl"] .unzoom { zoom: calc(1 / 1.2); width: 120% !important; height: 120% !important; }
 
 /* ───────────── design system additions (components/ui.tsx) ───────────── */
 /* D · Glyph command: dashed rules and small uppercase labels */
@@ -546,4 +550,14 @@ details[open] > :not(summary) {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* no focus outline on buttons and links (Tab key); text fields keep their own focus styling */
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+[role='tab']:focus-visible,
+.btn:focus-visible {
+  outline: none !important;
+  box-shadow: none;
 }

@@ -98,7 +98,7 @@ export default function WorkshopPage(props: { params: string[] }) {
   }, [coding.sessions]);
 
   const wsSessions = useMemo(() => (coding.sessions ?? []).filter((x) => norm(x.cwd) === norm(selected)), [coding.sessions, selected]);
-  const otherCount = useMemo(() => (coding.sessions ?? []).filter((x) => !allWs.includes(norm(x.cwd))).length, [coding.sessions, allWs]);
+  const otherSessions = useMemo(() => (coding.sessions ?? []).filter((x) => !allWs.includes(norm(x.cwd))), [coding.sessions, allWs]);
 
   const addWorkspace = async (path: string) => {
     setBrowse(false);
@@ -275,7 +275,21 @@ export default function WorkshopPage(props: { params: string[] }) {
             />
           ))
         )}
-        {otherCount > 0 && <p class="px-5 pt-3 text-[11.5px] text-fg-3">{otherCount === 1 ? '1 session lives' : `${otherCount} sessions live`} in folders not on your list.</p>}
+        {otherSessions.length > 0 && (
+          <>
+            <div class="mx-3 mt-3 border-t border-dashed border-[var(--border-default)]" />
+            <SideLabel>Other folders</SideLabel>
+            {otherSessions.map((x) => (
+              <SessionRow
+                key={x.id}
+                s={x}
+                active={x.id === chat.sessionId}
+                href={`#/workshop/${encodeURIComponent(x.id)}`}
+                onDeleted={(id) => id === chat.sessionId && location.replace('#/workshop/new')}
+              />
+            ))}
+          </>
+        )}
       </div>
     </>
   );

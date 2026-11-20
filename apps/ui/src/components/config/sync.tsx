@@ -103,7 +103,9 @@ export function SyncSection() {
   const status = useSyncGet<SyncStatus>('/sync/status', ['sync', 'settings']);
   const providers = useSyncGet<SyncProviders>('/sync/providers', ['settings']);
   // history only exists once a remote is connected
-  const history = useSyncGet<SyncSnapshot[]>(status.data?.remoteReady ? '/sync/history?limit=30' : null, ['sync']);
+  // collapsed by default; fetched only once opened
+  const [histOpen, setHistOpen] = useState(false);
+  const history = useSyncGet<SyncSnapshot[]>(histOpen && status.data?.remoteReady ? '/sync/history?limit=30' : null, ['sync']);
   const [draft, set, dirty, reset] = useDraft<SyncSettings>(settings.value?.sync);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState<'' | 'pass' | 'connect' | 'push' | 'pull'>('');
@@ -410,9 +412,17 @@ export function SyncSection() {
       )}
 
       {ready && (
-        <Panel title="History" right={<History size={13} strokeWidth={1.5} class="text-fg-3" />} noPad>
-          {history.error && <div class="px-3.5"><ErrorLine error={history.error} /></div>}
-          {!history.data?.length ? (
+        <Panel
+          title="History"
+          right={
+            <Btn pill size="xs" variant="ghost" onClick={() => setHistOpen(!histOpen)} aria-expanded={histOpen}>
+              <History size={12} strokeWidth={1.5} /> {histOpen ? 'Hide' : 'Show'}
+            </Btn>
+          }
+          noPad
+        >
+          {histOpen && history.error && <div class="px-3.5"><ErrorLine error={history.error} /></div>}
+          {!histOpen ? null : !history.data?.length ? (
             <div class="text-[12px] text-fg-3 px-3.5 py-4">{history.loading ? 'Loading…' : 'No snapshots yet.'}</div>
           ) : (
             <ul class="divide-y divide-line">

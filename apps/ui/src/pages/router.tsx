@@ -105,14 +105,15 @@ export default function RouterPage(_props: { params: string[] }) {
           )}
         </span>
       </div>
-      <div class="flex-1 min-h-0 rounded-[10px] overflow-hidden bg-base-200">
+      {/* no rounded clip: a rounded overflow-hidden parent makes WebKitGTK repaint the iframe on every scroll */}
+      <div class="flex-1 min-h-0 bg-base-200">
         <iframe
           src={`${ROUTER_URL}/dashboard/usage`}
           title="9Router Dashboard"
           // 9Router follows prefers-color-scheme ("system" theme); the iframe element's color-scheme is
           // what the embedded page sees (WebKitGTK ignores the parent page's scheme), so force dark here
           style={{ colorScheme: 'dark' }}
-          class="w-full h-full border-0 bg-base-200"
+          class="unzoom w-full h-full border-0 bg-base-200"
         />
       </div>
     </div>

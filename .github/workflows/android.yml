@@ -84,6 +84,17 @@ jobs:
           if grep -q 'usesCleartextTraffic"\] = "false"' "$f"; then echo "::error::cleartext still disabled in $f"; exit 1; fi
           grep -q 'usesCleartextTraffic' "$f" || { m=src-tauri/gen/android/app/src/main/AndroidManifest.xml; sed -i 's/<application/<application android:usesCleartextTraffic="true"/' "$m"; grep -q 'usesCleartextTraffic="true"' "$m"; }
 
+      # Newer Android blocks LAN addresses (net::ERR_LOCAL_NETWORK_PERMISSION_MISSING) unless the app
+      # declares ACCESS_LOCAL_NETWORK and the user grants it at runtime; ask once on launch.
+      - name: Allow local network access
+        run: |
+          m=src-tauri/gen/android/app/src/main/AndroidManifest.xml
+          grep -q ACCESS_LOCAL_NETWORK "$m" || sed -i 's|<application|<uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />\n    <application|' "$m"
+          grep -q ACCESS_LOCAL_NETWORK "$m"
+          a=$(find src-tauri/gen/android/app/src/main -name MainActivity.kt | head -1)
+          sed -i 's|super.onCreate(savedInstanceState)|super.onCreate(savedInstanceState)\n    if (android.os.Build.VERSION.SDK_INT >= 36 \&\& checkSelfPermission("android.permission.ACCESS_LOCAL_NETWORK") != android.content.pm.PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf("android.permission.ACCESS_LOCAL_NETWORK"), 1)|' "$a"
+          grep -q 'requestPermissions(arrayOf("android.permission.ACCESS_LOCAL_NETWORK")' "$a" || { echo "::error::could not patch $a"; cat "$a"; exit 1; }
+
       - name: Build
         run: npx tauri android build --apk --target aarch64
 
