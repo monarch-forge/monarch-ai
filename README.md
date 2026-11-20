@@ -6,7 +6,15 @@ calendar, tasks and automations, and watch your machine. Risky actions go throug
 
 It runs as a local web app (`http://localhost:5173`) or as a native desktop app built with Tauri v2.
 
-![Monarch Overview Dashboard](docs/pictures/home.png)
+![Monarch Home](docs/pictures/home.png)
+
+### Demo
+
+A 45-second tour: Home, Chat, Workshop, Office, Inbox, Agenda, Ledger, System, Evolve, the Ctrl+K palette and Settings (demo data).
+
+![Monarch demo tour](docs/pictures/demo.gif)
+
+Full-quality video: [docs/pictures/demo.mp4](docs/pictures/demo.mp4)
 
 ## Features
 
