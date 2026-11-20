@@ -35,14 +35,14 @@ export function ExtensionsTab(props: { id?: string; sub?: string }) {
         right={
           <>
             {list.data && <Tag tone="plain">{list.data.length}</Tag>}
-            <Btn size="xs" variant="ghost" onClick={() => navigate('evolve/extensions/new')} title="Write a new extension">
+            <Btn pill size="xs" variant="ghost" onClick={() => navigate('evolve/extensions/new')} title="Write a new extension">
               <Plus size={12} /> New
             </Btn>
           </>
         }
       >
         {(list.data?.length ?? 0) > 5 && (
-          <div class="px-3 py-2 border-b border-line">
+          <div class="px-3 py-2 border-b border-dashed border-line">
             <label class="relative block">
               <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
               <input class="hud-input py-1.5! pl-7! text-[13px]!" placeholder="Filter extensions…" aria-label="Filter extensions" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
@@ -68,7 +68,7 @@ export function ExtensionsTab(props: { id?: string; sub?: string }) {
                   label="No extensions yet"
                   sub="Extensions add tools, panels and background jobs. Ask Monarch to forge one above, or write your own."
                   action={
-                    <Btn size="xs" onClick={() => navigate('evolve/extensions/new')}>
+                    <Btn pill size="xs" onClick={() => navigate('evolve/extensions/new')}>
                       <Plus size={11} /> New extension
                     </Btn>
                   }
@@ -182,7 +182,7 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
         {(d) => (
           <>
             {/* identity + actions */}
-            <div class="px-4 pt-3 pb-3 border-b border-line">
+            <div class="px-4 pt-3 pb-3 border-b border-dashed border-line">
               <div class="flex items-start gap-3 flex-wrap">
                 <button class="lg:hidden text-fg-3 hover:text-fg mt-0.5" onClick={() => navigate('evolve/extensions')} aria-label="Back to extensions">
                   <ArrowLeft size={14} />
@@ -206,14 +206,14 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
                     />
                     {d.enabled ? 'On' : 'Off'}
                   </label>
-                  <Btn size="xs" onClick={() => void act('reload')} loading={busy === 'reload'} disabled={busy !== null || !d.enabled} title="Restart the extension process">
+                  <Btn pill size="xs" onClick={() => void act('reload')} loading={busy === 'reload'} disabled={busy !== null || !d.enabled} title="Restart the extension process">
                     {busy !== 'reload' && <RotateCw size={11} />} Reload
                   </Btn>
-                  <Btn size="xs" onClick={() => navigate(`${base}/source`)} title="Edit source">
+                  <Btn pill size="xs" onClick={() => navigate(`${base}/source`)} title="Edit source">
                     <Pencil size={11} /> Edit
                   </Btn>
                   {d.origin !== 'builtin' && (
-                    <Btn size="xs" variant="ghost" class="hover:text-red!" onClick={() => void act('remove')} loading={busy === 'remove'} disabled={busy !== null} title="Remove extension">
+                    <Btn pill size="xs" variant="ghost" class="hover:text-red!" onClick={() => void act('remove')} loading={busy === 'remove'} disabled={busy !== null} title="Remove extension">
                       {busy !== 'remove' && <Trash2 size={11} />}
                     </Btn>
                   )}
@@ -233,7 +233,7 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
             </div>
 
             {/* sub-tabs */}
-            <nav class="flex items-stretch border-b border-line overflow-x-auto [scrollbar-width:none] shrink-0" aria-label="Extension sections">
+            <nav class="flex items-stretch border-b border-dashed border-line overflow-x-auto [scrollbar-width:none] shrink-0" aria-label="Extension sections">
               {SUB.map((s) => {
                 const count = s === 'panels' ? d.panels.length : s === 'history' ? d.history.length : s === 'logs' ? d.logs.length : undefined;
                 return (
@@ -258,7 +258,7 @@ function ExtDetailPane(props: { id: string; sub: Sub }) {
       </EvoGate>
       {!d && res.error && (
         <div class="px-4 pb-4 lg:hidden">
-          <Btn size="xs" variant="ghost" onClick={() => navigate('evolve/extensions')}>
+          <Btn pill size="xs" variant="ghost" onClick={() => navigate('evolve/extensions')}>
             <ArrowLeft size={11} /> Back
           </Btn>
         </div>

@@ -100,13 +100,13 @@ export default function ConfigPage(props: { params: string[] }) {
 
         <div class="lg:min-h-0 lg:overflow-y-auto">
           <div class="max-w-[760px] flex flex-col gap-7 pb-12">
-            <PageHeader class="pt-1 pb-2" title={tab.label} right={conn.value !== 'open' ? <Tag tone="warn">core offline</Tag> : undefined} />
+            <PageHeader class="pt-1 pb-2" title={<span class="ds-dot uppercase text-[30px] leading-none text-fg">{tab.label}</span>} right={conn.value !== 'open' ? <Tag tone="warn">core offline</Tag> : undefined} />
             {tab.sections.map((sec) => {
               const Page = sec.page;
               const SecIcon = sec.icon;
               return (
                 <section key={sec.id} id={`cfg-${sec.id}`} class="flex flex-col gap-3 scroll-mt-4">
-                  <h2 class="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.08em] text-fg-3 px-1">
+                  <h2 class="flex items-center gap-2 ds-label px-1">
                     <SecIcon size={15} strokeWidth={1.6} class="text-fg-3" />
                     {sec.label}
                   </h2>

@@ -56,13 +56,13 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
 
   return (
     <div class="modal modal-open" role="dialog" aria-modal="true" aria-label={props.title ?? 'Choose folder'}>
-      <div class="modal-box hud-panel p-0 max-w-xl w-[calc(100vw-2rem)] rounded-[var(--radius-control)] bg-surface flex flex-col max-h-[80vh]">
+      <div class="modal-box hud-panel p-0 max-w-xl w-[calc(100vw-2rem)] rounded-[var(--radius-control)] bg-base-200 flex flex-col max-h-[80vh]">
         <header class="hud-head">
           <span class="hud-code">FS.01</span>
           <h2 class="hud-title">{props.title ?? 'Choose folder'}</h2>
           {loading && <Spinner class="ml-auto" />}
         </header>
-        <div class="p-3 flex gap-2 border-b border-line">
+        <div class="p-3 flex gap-2 border-b border-dashed border-line">
           <button
             class="btn btn-sm btn-outline border-line rounded-[var(--radius-control)] text-fg-2 hover:bg-subtle px-2"
             disabled={!listing?.parent}
@@ -72,7 +72,7 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
             <ArrowUp size={13} />
           </button>
           <input
-            class="input input-sm flex-1 bg-[#121213] border-line font-mono text-[12px] focus:outline-none focus:border-fg-3"
+            class="input input-sm flex-1 bg-base-200 border-line font-mono text-[12px] focus:outline-none focus:border-fg-3"
             value={pathInput}
             onInput={(e) => setPathInput((e.target as HTMLInputElement).value)}
             onKeyDown={(e) => e.key === 'Enter' && void go(pathInput)}
@@ -85,7 +85,7 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
         </div>
         <div class="px-3 pt-2 flex items-center gap-3">
           <input
-            class="flex-1 bg-transparent outline-none text-[12px] placeholder:text-fg-3 border-b border-line py-1 focus:border-fg-3"
+            class="flex-1 bg-transparent outline-none text-[12px] placeholder:text-fg-3 border-b border-dashed border-line py-1 focus:border-fg-3"
             placeholder="Filter…"
             value={filter}
             onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
@@ -105,7 +105,7 @@ export function DirBrowser(props: { open: boolean; initialPath?: string; title?:
             </button>
           ))}
         </div>
-        <div class="flex items-center gap-2 p-3 border-t border-line">
+        <div class="flex items-center gap-2 p-3 border-t border-dashed border-line">
           <span class="font-mono text-[11px] text-fg-3 truncate flex-1" title={listing?.path}>
             {listing?.path ?? ''}
           </span>

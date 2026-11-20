@@ -40,7 +40,7 @@ export function ToolsTab() {
 
   return (
     <Panel title="Tool catalog" class="h-full" noPad bodyClass="flex flex-col" right={res.data && <Tag tone="plain">{shown === all.length ? all.length : `${shown}/${all.length}`}</Tag>}>
-      <div class="flex items-center gap-2 px-3 py-2 border-b border-line flex-wrap">
+      <div class="flex items-center gap-2 px-3 py-2 border-b border-dashed border-line flex-wrap">
         <label class="relative w-full sm:w-64">
           <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
           <input
@@ -73,7 +73,7 @@ export function ToolsTab() {
           </div>
         )}
       </div>
-      {defer === false && <div class="px-4 py-1.5 border-b border-line text-[11.5px] text-fg-3">Deferred loading is off in Config — every tool is sent with every prompt.</div>}
+      {defer === false && <div class="px-4 py-1.5 border-b border-dashed border-line text-[11.5px] text-fg-3">Deferred loading is off in Config — every tool is sent with every prompt.</div>}
       <div class="flex-1 min-h-0 overflow-y-auto">
         <EvoGate res={res} loadingLabel="Loading catalog">
           {() =>
@@ -81,7 +81,7 @@ export function ToolsTab() {
               <div class="p-3 grid grid-cols-1 2xl:grid-cols-2 gap-3 items-start">
                 {groups.map(({ g, items }) => (
                   <section key={g} class="border border-line min-w-0">
-                    <header class="flex items-center gap-2 px-3 py-1.5 border-b border-line bg-[#121213]/40">
+                    <header class="flex items-center gap-2 px-3 py-1.5 border-b border-dashed border-line bg-base-200/40">
                       <span class=" text-[12px] text-fg">{g}</span>
                       <span class="font-mono text-[10px] text-fg-3">{items.length}</span>
                     </header>

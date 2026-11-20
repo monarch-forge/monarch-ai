@@ -15,7 +15,7 @@ export default function SystemsPage(_props: { params: string[] }) {
   return (
     <div class="h-full overflow-y-auto">
       <div class="px-4 lg:px-6 pt-4 lg:pt-6">
-        <h1 class="text-[20px] font-semibold text-fg">Systems</h1>
+        <h1 class="ds-dot uppercase text-[30px] leading-none text-fg">Systems</h1>
         <p class="text-[13.5px] text-fg-2 mt-1">{m ? calmSummary(m) : 'Waiting for the first reading from your machine…'}</p>
         {m && (
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
@@ -78,7 +78,7 @@ function calmSummary(m: SystemMetrics): string {
 
 function BigNum(props: { label: string; value: string; hot: boolean }) {
   return (
-    <div class="rounded-[10px] bg-surface px-5 py-4">
+    <div class="rounded-[10px] bg-base-200 px-5 py-4">
       <div class="text-[12.5px] text-fg-3">{props.label}</div>
       <DotText class={`block text-[28px] leading-tight mt-1 ${props.hot ? 'text-red' : 'text-fg'}`}>{props.value}</DotText>
     </div>
@@ -106,7 +106,7 @@ function HostBody(props: { info: SystemInfo; m: SystemMetrics | null }) {
           {info.platform} {info.release} · {info.cpuModel}
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-3 border-t border-line pt-3">
+      <div class="grid grid-cols-3 gap-3 border-t border-dashed border-line pt-3">
         <Stat label="Cores" value={info.cpuCores} />
         <Stat label="Memory" value={fmt.bytes(info.totalMemBytes, 0)} />
         <Stat label="Uptime" value={m ? fmt.uptime(m.uptimeSec) : '—'} />
@@ -143,7 +143,7 @@ function CpuBody(props: { m: SystemMetrics; hist: SystemMetrics[] }) {
         </div>
       </div>
       {cores.length > 0 && (
-        <div class="border-t border-line pt-3">
+        <div class="border-t border-dashed border-line pt-3">
           <div class="hud-label text-[10px] mb-2">Per core</div>
           <div class="flex items-end gap-[3px] h-14">
             {cores.map((c, i) => (
@@ -183,7 +183,7 @@ function MemBody(props: { m: SystemMetrics; hist: SystemMetrics[] }) {
           <span class="font-mono text-[11px] text-fg-3">none</span>
         </div>
       )}
-      <div class="border-t border-line pt-3">
+      <div class="border-t border-dashed border-line pt-3">
         <Sparkline values={series.length > 1 ? series : [m.mem.percent, m.mem.percent]} height={44} min={0} max={100} />
         <div class="flex justify-between font-mono text-[9px] tracking-[0.1em] text-fg-3 mt-0.5">
           <span>RAM HISTORY</span>
@@ -254,7 +254,7 @@ function PowerBody(props: { m: SystemMetrics }) {
       ) : (
         <div class=" text-[12px] text-fg-3">No battery · mains power</div>
       )}
-      <div class="grid grid-cols-2 gap-3 border-t border-line pt-3">
+      <div class="grid grid-cols-2 gap-3 border-t border-dashed border-line pt-3">
         <Stat label="Uptime" value={fmt.uptime(m.uptimeSec)} />
         <Stat label="Sampled" value={fmt.timeSec(m.ts)} />
       </div>
@@ -281,7 +281,7 @@ function DisksBody(props: { m: SystemMetrics }) {
         </thead>
         <tbody>
           {disks.map((d) => (
-            <tr key={d.mount} class="border-t border-line/60">
+            <tr key={d.mount} class="border-t border-dashed border-line/60">
               <td class="px-3.5 py-2 font-mono text-fg-2 truncate max-w-[180px]" title={d.mount}>
                 {d.mount}
               </td>
@@ -317,7 +317,7 @@ function CoreBody() {
         <Stat label="Uptime" value={h ? fmt.uptime(up) : '—'} />
         <Stat label="Phase" value={<span class={phase.value !== 'idle' && c === 'open' ? 'text-red' : ''}>{c === 'open' ? phase.value.toUpperCase() : '—'}</span>} />
       </div>
-      <div class="border-t border-line pt-3 grid grid-cols-1 gap-3">
+      <div class="border-t border-dashed border-line pt-3 grid grid-cols-1 gap-3">
         <Stat label="Engine" value={s?.engine ?? h?.engine ?? '—'} />
         <Stat label="Model" value={<span class="truncate block" title={model}>{model ?? '—'}</span>} />
       </div>
@@ -381,7 +381,7 @@ function ProcessesPanel(props: { class?: string }) {
                   {rows.map((p) => {
                     const hot = p.cpu >= 85;
                     return (
-                      <tr key={p.pid} class="border-t border-line/60 hover:bg-white/[0.02]">
+                      <tr key={p.pid} class="border-t border-dashed border-line/60 hover:bg-white/[0.02]">
                         <td class="pl-1.5">
                           <span class={`block w-[2px] h-4 ${hot ? 'bg-red' : 'bg-transparent'}`} />
                         </td>

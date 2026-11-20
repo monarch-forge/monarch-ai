@@ -366,7 +366,7 @@ export function SyncSection() {
           <span class="text-[12px] text-fg-3 flex-1 min-w-[200px]">
             Stored only on this device. There is no recovery — use the same passphrase on every device.
           </span>
-          <Btn variant="primary" loading={busy === 'pass'} disabled={!passOk || !!busy} onClick={() => void setPassphrase()}>
+          <Btn pill variant="primary" loading={busy === 'pass'} disabled={!passOk || !!busy} onClick={() => void setPassphrase()}>
             <KeyRound size={12} /> {st?.passphraseSet ? 'Change passphrase' : 'Set passphrase'}
           </Btn>
         </div>
@@ -379,7 +379,7 @@ export function SyncSection() {
           <span class="text-[13px] text-fg-2 flex-1 min-w-[200px] break-all">
             {st?.remoteUrl ? <span class="font-mono text-[12px] text-fg">{st.remoteUrl}</span> : 'Creates the private repo if missing and verifies access.'}
           </span>
-          <Btn
+          <Btn pill
             variant={st?.remoteReady ? 'outline' : 'primary'}
             loading={busy === 'connect'}
             disabled={!!busy || (draft.provider === 'git' ? !draft.remoteUrl.trim() : !draft.account) || (pv ? !cliInstalled(PROVIDERS.find((p) => p.id === draft.provider)!.cli) : false)}
@@ -399,10 +399,10 @@ export function SyncSection() {
             <Info label="Remote snapshot" value={st!.remote ? `${relTime(st!.remote.createdAt)} · ${fmt.bytes(st!.remote.bytes)}` : 'none yet'} />
           </div>
           <div class="flex flex-wrap gap-2 mt-4">
-            <Btn variant="primary" loading={busy === 'push' || st!.busy === 'push'} disabled={!!busy || !!st!.busy} onClick={() => void push()}>
+            <Btn pill variant="primary" loading={busy === 'push' || st!.busy === 'push'} disabled={!!busy || !!st!.busy} onClick={() => void push()}>
               <CloudUpload size={12} /> Sync now
             </Btn>
-            <Btn loading={busy === 'pull'} disabled={!!busy || !!st!.busy || !st!.remote} onClick={() => void restore()}>
+            <Btn pill loading={busy === 'pull'} disabled={!!busy || !!st!.busy || !st!.remote} onClick={() => void restore()}>
               <RotateCcw size={12} /> Restore from remote
             </Btn>
           </div>
@@ -422,7 +422,7 @@ export function SyncSection() {
                   <span class="text-[12px] text-fg-2 flex-1 min-w-[100px] truncate">{h.device}</span>
                   <span class="font-mono text-[11px] text-fg-3">{fmt.bytes(h.bytes)}</span>
                   <span class="font-mono text-[11px] text-fg-3">{h.commit.slice(0, 7)}</span>
-                  <Btn size="xs" disabled={!!busy} onClick={() => void restore(h)}>
+                  <Btn pill size="xs" disabled={!!busy} onClick={() => void restore(h)}>
                     Restore this version
                   </Btn>
                 </li>
@@ -440,9 +440,9 @@ export function SyncSection() {
         width="max-w-md"
         footer={
           <>
-            <Btn variant="ghost" onClick={() => setConflict(false)}>Cancel</Btn>
-            <Btn onClick={() => void push(true)}>Force push</Btn>
-            <Btn variant="primary" data-autofocus onClick={() => void restore()}>Pull (restore)</Btn>
+            <Btn pill variant="ghost" onClick={() => setConflict(false)}>Cancel</Btn>
+            <Btn pill onClick={() => void push(true)}>Force push</Btn>
+            <Btn pill variant="primary" data-autofocus onClick={() => void restore()}>Pull (restore)</Btn>
           </>
         }
       >
@@ -456,7 +456,7 @@ export function SyncSection() {
 
       {restoring &&
         createPortal(
-          <div class="fixed inset-0 z-[1000] bg-[#121213]/95 flex flex-col items-center justify-center gap-4" role="alertdialog" aria-live="assertive">
+          <div class="fixed inset-0 z-[1000] bg-base-200/95 flex flex-col items-center justify-center gap-4" role="alertdialog" aria-live="assertive">
             <span class="loading loading-spinner loading-md text-red" />
             <div class=" text-[12px] text-fg">Restoring…</div>
             <div class=" text-[12px] text-fg-3">{conn.value === 'open' ? 'waiting for core restart' : 'reconnecting'}</div>

@@ -54,10 +54,10 @@ export function ProfilePanel() {
   return (
     <div class="flex flex-col min-h-0 h-full">
       <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
-        <Btn variant="ghost" size="xs" onClick={() => navigate('#/memory')} aria-label="Back">
+        <Btn pill variant="ghost" size="xs" onClick={() => navigate('#/memory')} aria-label="Back">
           <ArrowLeft size={14} />
         </Btn>
-        <h2 class="text-[14px] font-medium">What Monarch knows</h2>
+        <h2 class="ds-label">What Monarch knows</h2>
       </div>
       <div class="flex-1 overflow-y-auto px-4 py-3 space-y-5">
         <p class="text-[12px] text-fg-3">Learned from your chats. Edit or remove anything that is wrong.</p>
@@ -65,7 +65,7 @@ export function ProfilePanel() {
           <section key={name}>
             <div class="flex items-center justify-between mb-1">
               <h3 class="text-[12px] uppercase tracking-wide text-fg-3">{name}</h3>
-              <Btn variant="ghost" size="xs" aria-label={`Add to ${name}`} onClick={() => setEdit({ s, i: lines.length, text: '' })}>
+              <Btn pill variant="ghost" size="xs" aria-label={`Add to ${name}`} onClick={() => setEdit({ s, i: lines.length, text: '' })}>
                 <Plus size={13} />
               </Btn>
             </div>
@@ -74,7 +74,7 @@ export function ProfilePanel() {
                 edit?.s === s && edit.i === i ? (
                   <li key={i}>
                     <input
-                      class="w-full bg-[#121213] rounded-[var(--radius-control)] px-2 py-1 text-[13px] outline-none"
+                      class="w-full bg-base-200 rounded-[var(--radius-control)] px-2 py-1 text-[13px] outline-none"
                       value={edit.text}
                       autoFocus
                       aria-label="Fact"

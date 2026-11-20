@@ -36,7 +36,7 @@ function ConfirmRemove(props: { label: string; onConfirm: () => Promise<void> })
   const [busy, setBusy] = useState(false);
   if (!ask)
     return (
-      <Btn size="xs" onClick={() => setAsk(true)}>
+      <Btn pill size="xs" onClick={() => setAsk(true)}>
         {props.label}
       </Btn>
     );
@@ -159,7 +159,7 @@ function GoogleClient() {
         </Field>
       </div>
       <div class="flex justify-end mt-3">
-        <Btn size="sm" variant="primary" disabled={!dirty || saving || !clientId.trim() || (!configured && !secret.trim())} onClick={() => void save()}>
+        <Btn pill size="sm" variant="primary" disabled={!dirty || saving || !clientId.trim() || (!configured && !secret.trim())} onClick={() => void save()}>
           {saving && <span class="loading loading-spinner loading-xs" />}Save client
         </Btn>
       </div>
@@ -202,7 +202,7 @@ function GoogleAccounts() {
     <Panel
       title="Google accounts"
       right={
-        <Btn size="xs" variant="primary" disabled={!configured || busy || (!!flow && flow.status !== 'error' && flow.status !== 'done')} onClick={() => void connect()} title={configured ? 'Connect a Google account' : 'Configure the OAuth client first'}>
+        <Btn pill size="xs" variant="primary" disabled={!configured || busy || (!!flow && flow.status !== 'error' && flow.status !== 'done')} onClick={() => void connect()} title={configured ? 'Connect a Google account' : 'Configure the OAuth client first'}>
           {busy ? <span class="loading loading-spinner loading-xs" /> : <Plus size={11} />} Connect
         </Btn>
       }
@@ -232,7 +232,7 @@ function GoogleAccounts() {
       ) : (
         <div class="flex flex-col">
           {res.data.map((a) => (
-            <div key={a.id} class="flex items-center gap-3 py-2 border-b border-line last:border-b-0">
+            <div key={a.id} class="flex items-center gap-3 py-2 border-b border-dashed border-line last:border-b-0">
               {a.picture ? (
                 <img src={a.picture} alt="" class="w-7 h-7 rounded-full grayscale opacity-80" referrerpolicy="no-referrer" />
               ) : (
@@ -297,7 +297,7 @@ function SlackWorkspaces() {
       ) : res.data?.length ? (
         <div class="flex flex-col mb-4">
           {res.data.map((w) => (
-            <div key={w.id} class="flex items-center gap-3 py-2 border-b border-line last:border-b-0">
+            <div key={w.id} class="flex items-center gap-3 py-2 border-b border-dashed border-line last:border-b-0">
               <div class="w-7 h-7 border border-line flex items-center justify-center font-mono text-[12px] text-fg-2">#</div>
               <div class="flex-1 min-w-0">
                 <div class="text-[13px] text-fg truncate">{w.name}</div>
@@ -340,7 +340,7 @@ function SlackWorkspaces() {
             onInput={(e) => setToken((e.target as HTMLInputElement).value)}
             onKeyDown={(e) => e.key === 'Enter' && void add()}
           />
-          <Btn size="sm" variant="primary" disabled={busy || !token.trim()} onClick={() => void add()}>
+          <Btn pill size="sm" variant="primary" disabled={busy || !token.trim()} onClick={() => void add()}>
             {busy && <span class="loading loading-spinner loading-xs" />}Connect
           </Btn>
         </div>

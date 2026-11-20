@@ -62,23 +62,23 @@ export default function LedgerPage() {
         {dialog}
         <div class="flex flex-col gap-4 min-w-0 w-full lg:flex-1">
           <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-[20px] font-semibold tracking-[-0.01em] text-fg mr-2">Ledger</h1>
+            <h1 class="ds-dot uppercase text-[30px] leading-none text-fg mr-2">Ledger</h1>
             <div class="flex items-center gap-1">
-              <Btn variant="ghost" size="xs" title="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
+              <Btn pill variant="ghost" size="xs" title="Previous month" onClick={() => setMonth(addMonths(month, -1))}>
                 <ChevronLeft size={14} />
               </Btn>
               <span class="text-[13px] text-fg-2 min-w-[120px] text-center">{monthLabel}</span>
-              <Btn variant="ghost" size="xs" title="Next month" onClick={() => setMonth(addMonths(month, 1))}>
+              <Btn pill variant="ghost" size="xs" title="Next month" onClick={() => setMonth(addMonths(month, 1))}>
                 <ChevronRight size={14} />
               </Btn>
               {!isCurrent && (
-                <Btn variant="ghost" size="xs" class="text-fg-3" onClick={() => setMonth(monthStart(new Date()))}>
+                <Btn pill variant="ghost" size="xs" class="text-fg-3" onClick={() => setMonth(monthStart(new Date()))}>
                   Today
                 </Btn>
               )}
             </div>
             <div class="ml-auto">
-              <Btn variant="primary" onClick={() => setEditing('new')}>
+              <Btn pill variant="primary" onClick={() => setEditing('new')}>
                 <Plus size={13} /> Add entry
               </Btn>
             </div>
@@ -93,11 +93,11 @@ export default function LedgerPage() {
             title={`Transactions${entries.data ? ` · ${entries.data.length}` : ''}`}
             right={
               <div class="flex items-center gap-2">
-                <label class="flex items-center gap-1.5 h-7 px-2 rounded-[var(--radius-control)] bg-[#121213] border border-line">
+                <label class="flex items-center gap-1.5 h-7 px-3 rounded-full bg-base-200 border border-line">
                   <Search size={11} class="text-fg-3" />
                   <input class="bg-transparent outline-none text-[12px] w-24 sm:w-40" placeholder="Search" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
                 </label>
-                <select class="select select-xs bg-[#121213] border-line rounded-[var(--radius-control)] text-[12px]" value={type} onChange={(e) => setType((e.target as HTMLSelectElement).value as any)}>
+                <select class="select select-xs bg-base-200 border-line rounded-[var(--radius-control)] text-[12px]" value={type} onChange={(e) => setType((e.target as HTMLSelectElement).value as any)}>
                   <option value="">All</option>
                   <option value="expense">Expenses</option>
                   <option value="income">Income</option>
@@ -110,7 +110,7 @@ export default function LedgerPage() {
               <Skeleton lines={6} class="p-4" />
             ) : !shown.length ? (
               entries.data?.length ? (
-                <EmptyState title="No entries match" hint="Try another search or type filter." actions={<Btn onClick={() => { setQ(''); setType(''); }}>Clear filters</Btn>} />
+                <EmptyState title="No entries match" hint="Try another search or type filter." actions={<Btn pill onClick={() => { setQ(''); setType(''); }}>Clear filters</Btn>} />
               ) : (
                 <EmptyState
                   icon={<Bot size={18} strokeWidth={1.5} />}
@@ -118,10 +118,10 @@ export default function LedgerPage() {
                   hint="Add an entry by hand, or let Monarch pull transactions out of your email receipts."
                   actions={
                     <>
-                      <Btn variant="primary" onClick={() => setEditing('new')}>
+                      <Btn pill variant="primary" onClick={() => setEditing('new')}>
                         <Plus size={13} /> Add entry
                       </Btn>
-                      <Btn onClick={() => askMonarch(`Import my transactions for ${monthLabel} from my email (receipts, bank and card notifications) into the ledger. Skip duplicates.`)}>Import from email</Btn>
+                      <Btn pill onClick={() => askMonarch(`Import my transactions for ${monthLabel} from my email (receipts, bank and card notifications) into the ledger. Skip duplicates.`)}>Import from email</Btn>
                     </>
                   }
                 />
@@ -209,7 +209,7 @@ function EntryRow(props: { e: LedgerEntry; onEdit: () => void; onDelete: () => v
   const d = /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? new Date(`${e.date}T00:00:00`) : new Date(e.date);
   return (
     <li>
-      <ListRow
+      <ListRow outline
         class="px-3.5"
         lead={
           <span class="block w-10 text-center">
@@ -251,10 +251,10 @@ function EntryRow(props: { e: LedgerEntry; onEdit: () => void; onDelete: () => v
               {money(e.amount, e.currency)}
             </span>
             <span class="flex gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
-              <Btn variant="ghost" size="xs" class="px-1.5" title="Edit" onClick={props.onEdit}>
+              <Btn pill variant="ghost" size="xs" class="px-1.5" title="Edit" onClick={props.onEdit}>
                 <Pencil size={11} />
               </Btn>
-              <Btn variant="ghost" size="xs" class="px-1.5 hover:text-red" title="Delete" onClick={props.onDelete}>
+              <Btn pill variant="ghost" size="xs" class="px-1.5 hover:text-red" title="Delete" onClick={props.onDelete}>
                 <Trash2 size={11} />
               </Btn>
             </span>
@@ -314,7 +314,7 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
       title="Monthly budgets"
       right={
         !adding && (
-          <Btn variant="ghost" size="xs" class="text-fg-3 hover:text-fg" onClick={() => setAdding(true)}>
+          <Btn pill variant="ghost" size="xs" class="text-fg-3 hover:text-fg" onClick={() => setAdding(true)}>
             <Plus size={11} /> Add
           </Btn>
         )
@@ -334,10 +334,10 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
             <input class={`${INPUT} !w-24`} placeholder={props.meta?.defaultCurrency ?? 'USD'} value={cur} onInput={(e) => setCur((e.target as HTMLInputElement).value.toUpperCase())} />
           </div>
           <div class="flex gap-2 justify-end">
-            <Btn type="button" variant="ghost" size="xs" onClick={() => setAdding(false)}>
+            <Btn pill type="button" variant="ghost" size="xs" onClick={() => setAdding(false)}>
               Cancel
             </Btn>
-            <Btn type="submit" variant="primary" size="xs">
+            <Btn pill type="submit" variant="primary" size="xs">
               Save
             </Btn>
           </div>
@@ -349,7 +349,7 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
           title="No budgets yet"
           hint="Set a monthly limit per category and watch it fill up."
           actions={
-            <Btn size="xs" onClick={() => setAdding(true)}>
+            <Btn pill size="xs" onClick={() => setAdding(true)}>
               <Plus size={11} /> Add budget
             </Btn>
           }
@@ -360,7 +360,7 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
             const pct = b.limit ? (b.spent / b.limit) * 100 : 0;
             return (
               <li key={`${b.category}-${b.currency}`}>
-                <ListRow
+                <ListRow outline
                   class="py-2"
                   title={<span class="text-[12.5px] text-fg-2">{b.category}</span>}
                   sub={<Glyph value={Math.min(100, pct) / 10} of={10} tone={pct > 100 ? 'red' : pct > 80 ? 'warn' : 'fg'} class="mt-1" title={`${Math.round(pct)}% used`} />}
@@ -369,7 +369,7 @@ function Budgets(props: { summary?: LedgerSummary; meta?: LedgerMeta }) {
                       <span class="tabular-nums text-[12.5px]">
                         <span class={pct > 100 ? 'text-red' : 'text-fg'}>{money(b.spent, b.currency)}</span> / {money(b.limit, b.currency)}
                       </span>
-                      <Btn variant="ghost" size="xs" class="px-1 h-5 min-h-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red" title="Remove budget" aria-label={`Remove ${b.category} budget`} onClick={() => void save({ category: b.category, currency: b.currency, limit: 0 })}>
+                      <Btn pill variant="ghost" size="xs" class="px-1 h-5 min-h-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red" title="Remove budget" aria-label={`Remove ${b.category} budget`} onClick={() => void save({ category: b.category, currency: b.currency, limit: 0 })}>
                         <Trash2 size={10} />
                       </Btn>
                     </>
@@ -439,10 +439,10 @@ function EntryModal(props: { entry: LedgerEntry | null; meta?: LedgerMeta; onClo
       width="max-w-lg"
       footer={
         <>
-          <Btn variant="ghost" onClick={props.onClose}>
+          <Btn pill variant="ghost" onClick={props.onClose}>
             Cancel
           </Btn>
-          <Btn variant="primary" loading={busy} disabled={!f.amount || !(f.description || f.merchant)} onClick={() => void submit()}>
+          <Btn pill variant="primary" loading={busy} disabled={!f.amount || !(f.description || f.merchant)} onClick={() => void submit()}>
             {e ? 'Save' : 'Add'}
           </Btn>
         </>
@@ -567,7 +567,7 @@ function Charts(props: { month: Date; currency?: string }) {
       right={
         <div class="flex items-center gap-2">
           {currencies.length > 1 && (
-            <select class="select select-xs bg-[#121213] border-line rounded-[var(--radius-control)] text-[12px]" value={currency} onChange={(e) => setCur((e.target as HTMLSelectElement).value)}>
+            <select class="select select-xs bg-base-200 border-line rounded-[var(--radius-control)] text-[12px]" value={currency} onChange={(e) => setCur((e.target as HTMLSelectElement).value)}>
               {currencies.map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -697,7 +697,7 @@ function Accounts(props: { meta?: LedgerMeta }) {
     <Panel
       title="Accounts"
       right={
-        <Btn variant="ghost" size="xs" class="text-fg-3 hover:text-fg" onClick={() => setEditing('new')}>
+        <Btn pill variant="ghost" size="xs" class="text-fg-3 hover:text-fg" onClick={() => setEditing('new')}>
           <Plus size={11} /> Add
         </Btn>
       }
@@ -710,7 +710,7 @@ function Accounts(props: { meta?: LedgerMeta }) {
           title="No accounts yet"
           hint="Add your bank accounts and cards to track balances, card limits and due dates."
           actions={
-            <Btn size="xs" onClick={() => setEditing('new')}>
+            <Btn pill size="xs" onClick={() => setEditing('new')}>
               <Plus size={11} /> Add account
             </Btn>
           }
@@ -719,7 +719,7 @@ function Accounts(props: { meta?: LedgerMeta }) {
         <ul class="flex flex-col gap-0.5 -mx-3">
           {shown.map((a) => (
             <li key={a.id}>
-              <ListRow
+              <ListRow outline
                 top
                 class="py-2"
                 onClick={() => setEditing(a)}
@@ -775,7 +775,7 @@ function Accounts(props: { meta?: LedgerMeta }) {
         </ul>
       )}
       {shown.length > 1 && (
-        <div class="mt-3 pt-2.5 border-t border-line flex flex-col gap-0.5">
+        <div class="mt-3 pt-2.5 border-t border-dashed border-line flex flex-col gap-0.5">
           {[...net].map(([c, v]) => (
             <div key={c} class="flex justify-between text-[12px]">
               <span class="text-fg-3">Net {c}</span>
@@ -853,14 +853,14 @@ function AccountModal(props: { account: LedgerAccountView | null; meta?: LedgerM
       footer={
         <>
           {a && (
-            <Btn variant="ghost" class="mr-auto hover:!text-red" onClick={() => void remove()}>
+            <Btn pill variant="ghost" class="mr-auto hover:!text-red" onClick={() => void remove()}>
               <Trash2 size={12} /> Delete
             </Btn>
           )}
-          <Btn variant="ghost" onClick={props.onClose}>
+          <Btn pill variant="ghost" onClick={props.onClose}>
             Cancel
           </Btn>
-          <Btn variant="primary" loading={busy} disabled={!f.name.trim()} onClick={() => void save()}>
+          <Btn pill variant="primary" loading={busy} disabled={!f.name.trim()} onClick={() => void save()}>
             {a ? 'Save' : 'Add'}
           </Btn>
         </>

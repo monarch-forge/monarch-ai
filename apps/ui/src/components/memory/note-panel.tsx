@@ -74,14 +74,14 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
   return (
     <div class="flex flex-col h-full min-h-0">
       <div class="flex items-baseline gap-2 px-4 pt-4 pb-2">
-        <h2 class="text-[14.5px] font-semibold text-fg">Notes</h2>
+        <h2 class="ds-label">Notes</h2>
         <span class="text-[12px] text-fg-3">{notes.length}</span>
       </div>
       <div class="flex items-center gap-2 px-3 pb-2">
         <label class="relative flex-1">
           <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
           <input
-            class="w-full bg-white/[0.04] rounded-[var(--radius-control)] pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+            class="w-full bg-transparent border border-line rounded-full pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:border-[#6a6a70] transition-colors"
             placeholder="Search notes"
             title="↑↓ to move, Enter to open"
             value={q}
@@ -91,7 +91,7 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
             data-note-search
           />
         </label>
-        <Btn size="sm" variant="ghost" onClick={props.onNew} title="New note (n)">
+        <Btn pill size="sm" variant="ghost" onClick={props.onNew} title="New note (n)">
           <FilePlus size={13} /> New
         </Btn>
       </div>
@@ -110,10 +110,10 @@ export function NoteList(props: { demoNodes?: GNode[] | null; onNew: () => void 
               hint="Write a note, or tell Monarch about yourself. It writes notes here as it learns."
               actions={
                 <>
-                  <Btn variant="primary" size="sm" onClick={props.onNew}>
+                  <Btn pill variant="primary" size="sm" onClick={props.onNew}>
                     <FilePlus size={13} /> Write your first note
                   </Btn>
-                  <Btn size="sm" onClick={() => askMonarch('Interview me briefly about myself (work, routines, preferences) and save what you learn to my memory.')}>
+                  <Btn pill size="sm" onClick={() => askMonarch('Interview me briefly about myself (work, routines, preferences) and save what you learn to my memory.')}>
                     <Sparkles size={13} /> Tell Monarch about yourself
                   </Btn>
                 </>
@@ -333,10 +333,10 @@ export function NoteView(props: {
         </div>
         <div class="flex items-center gap-2 px-4 py-3">
           <span class="text-[11.5px] text-fg-3">Ctrl+S to save · Esc to cancel</span>
-          <Btn variant="ghost" size="xs" class="ml-auto" onClick={cancel}>
+          <Btn pill variant="ghost" size="xs" class="ml-auto" onClick={cancel}>
             Cancel
           </Btn>
-          <Btn variant="primary" size="xs" loading={saving} onClick={save}>
+          <Btn pill variant="primary" size="xs" loading={saving} onClick={save}>
             Save
           </Btn>
         </div>
@@ -355,7 +355,7 @@ export function NoteView(props: {
               <span class="font-mono text-fg-2">{props.id}</span> is linked but has no file.
             </div>
             <div class="mt-3">
-              <Btn size="xs" variant="primary" onClick={() => startEdit(null)}>
+              <Btn pill size="xs" variant="primary" onClick={() => startEdit(null)}>
                 <FilePlus size={12} /> Create it
               </Btn>
             </div>
@@ -473,7 +473,7 @@ export function NewNoteModal(props: { open: boolean; onClose: () => void; nodes:
       title="New note"
       footer={
         <>
-          <Btn variant="ghost" onClick={props.onClose}>
+          <Btn pill variant="ghost" onClick={props.onClose}>
             Cancel
           </Btn>
           <Button variant="primary" loading={busy} disabled={invalid || clash} onClick={create}>

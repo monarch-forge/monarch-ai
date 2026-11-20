@@ -1,20 +1,20 @@
 /**
- * Overview — the cozy home. One focus: a warm greeting and the command console.
- * Below it, at most three cards with what matters today (schedule, what is waiting on the user, inbox).
+ * Overview — Glyph command home. Left: presence line, dot-matrix greeting, headline, command console,
+ * the morning brief and the open threads of the latest chat. Right: Needs you, Agents, Next, Inbox.
  * Telemetry (status card, weather, vitals, model usage, uplinks, assistant log) lives behind "More".
  */
 import type { ComponentChildren } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 import { ChevronDown } from 'lucide-preact';
-import type { Briefing, UsageReport } from '@monarch/shared';
-import { approvals, conn, phase, settings, useResource } from '../lib/store.ts';
+import type { Briefing, ChatThread, SessionSummary, UsageReport } from '@monarch/shared';
+import { approvals, conn, phase, useResource } from '../lib/store.ts';
 import { DotText, fmt, Panel, Sparkline, Stat, Tag, useNow } from '../components/ui.tsx';
 import { focusApprovals } from '../components/approvals.tsx';
 import { RefreshHint } from '../components/mail/kit.tsx';
 import { CommandConsole } from '../components/overview/console.tsx';
-import { EnvPanel, SchedulePanel, VitalsPanel } from '../components/overview/left-panels.tsx';
+import { EnvPanel, VitalsPanel } from '../components/overview/left-panels.tsx';
 import { LogPanel, UplinksPanel, UsagePanel } from '../components/overview/right-panels.tsx';
-import { InboxCard, WaitingCard } from '../components/overview/today-cards.tsx';
+import { AgentsCard, InboxCard, NeedsYouCard, NextCard } from '../components/overview/today-cards.tsx';
 import { BriefCard } from '../components/overview/brief-card.tsx';
 
 const MORE_KEY = 'monarch.overview.more';
@@ -22,6 +22,7 @@ const MORE_KEY = 'monarch.overview.more';
 export default function OverviewPage(_props: { params: string[] }) {
   const briefing = useResource<Briefing>('/briefing', ['tasks', 'events', 'mail', 'notifications', 'settings', 'google', 'slack'], { intervalMs: 5 * 60_000 });
   const usage = useResource<UsageReport>('/usage?range=24h', ['sessions'], { intervalMs: 60_000 });
+  const sessions = useResource<SessionSummary[]>('/sessions', ['sessions'], { intervalMs: 30_000 });
   const [more, setMore] = useState(() => {
     try {
       // closed by default (calmer home); stays open only after the user opens it
@@ -39,33 +40,36 @@ export default function OverviewPage(_props: { params: string[] }) {
       /* ignore */
     }
   };
+  const agents = (sessions.data ?? []).filter((s) => s.running && (s.kind === 'coding' || s.parentSessionId)).length;
 
   return (
     <div class="ov h-full overflow-y-auto overflow-x-hidden">
-      <div class="mx-auto w-full max-w-[1080px] px-4 lg:px-6 pt-6 sm:pt-10 pb-24 flex flex-col gap-8">
-        <section class="flex flex-col items-center gap-5" aria-label="Home">
-          <Greeting briefing={briefing.data} error={briefing.error} hint={<RefreshHint res={briefing} />} />
-          <div class="w-full max-w-[720px]">
+      <div class="mx-auto w-full max-w-[1440px] px-4 sm:px-10 pt-6 sm:pt-10 pb-24 flex flex-col gap-10">
+        <div class="grid grid-cols-1 min-[1100px]:grid-cols-12 gap-8">
+          <section class="min-[1100px]:col-span-7 flex flex-col gap-[26px] min-w-0" aria-label="Home">
+            <Greeting briefing={briefing.data} error={briefing.error} agents={agents} hint={<RefreshHint res={briefing} />} />
             <CommandConsole />
-          </div>
-        </section>
+            <BriefCard />
+            <Threads />
+          </section>
+          <section class="min-[1100px]:col-span-5 flex flex-col gap-4 min-w-0" aria-label="Today">
+            <NeedsYouCard res={briefing} />
+            <AgentsCard res={sessions} />
+            <div class="grid grid-cols-2 gap-4">
+              <NextCard res={briefing} />
+              <InboxCard res={briefing} />
+            </div>
+          </section>
+        </div>
 
-        <BriefCard />
-
-        <section class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start" aria-label="Today">
-          <WaitingCard res={briefing} />
-          <SchedulePanel class="max-h-[320px]" />
-          <InboxCard res={briefing} />
-        </section>
-
-        <section aria-label="More">
+        <section aria-label="More" class="ds-rule pt-4">
           <button
             type="button"
-            class="mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] text-fg-3 hover:text-fg hover:bg-surface transition-colors duration-150"
+            class="mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full ds-label hover:text-fg transition-colors duration-150"
             onClick={toggleMore}
             aria-expanded={more}
           >
-            {more ? 'Less' : 'More — status, weather, system and usage'}
+            {more ? 'Less' : 'More · status, weather, system, usage'}
             <ChevronDown size={14} strokeWidth={1.6} class={`transition-transform duration-150 ${more ? 'rotate-180' : ''}`} />
           </button>
           {more && (
@@ -89,24 +93,66 @@ function partOfDay(d = new Date()): string {
   return h < 5 ? 'evening' : h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
 }
 
-function Greeting(props: { briefing?: Briefing; error?: string; hint?: ComponentChildren }) {
-  const s = settings.value;
+/** 5x3 presence matrix; centre dot is red and blinks while the agent works */
+function Presence(props: { live: boolean }) {
+  const lvl = [0, 1, 2, 1, 0, 1, 2, 3, 2, 1, 0, 1, 2, 1, 0];
+  const cls = ['bg-line', 'bg-fg-3', 'bg-fg', props.live ? 'bg-red hud-blink' : 'bg-fg'];
+  return (
+    <span class="grid grid-cols-[repeat(5,7px)] gap-[5px] shrink-0" aria-hidden="true">
+      {lvl.map((l, i) => (
+        <i key={i} class={`w-[7px] h-[7px] rounded-full ${cls[l]}`} />
+      ))}
+    </span>
+  );
+}
+
+function Greeting(props: { briefing?: Briefing; error?: string; agents: number; hint?: ComponentChildren }) {
   const now = useNow(30_000);
-  const honorific = s?.user.honorific?.trim() || 'sir';
-  const greeting = props.briefing?.greeting ?? `Good ${partOfDay()}, ${honorific}.`;
+  const pod = /good (morning|afternoon|evening|night)/i.exec(props.briefing?.greeting ?? '')?.[1] ?? partOfDay(now);
   const headline =
     props.briefing?.headline ??
     (conn.value === 'open' ? (props.error ? 'Everything is running. Your briefing will be back shortly.' : 'Putting your day together…') : conn.value === 'connecting' ? 'Waking up…' : 'Monarch is offline for the moment.');
+  const state = conn.value !== 'open' ? 'Offline' : phase.value === 'idle' ? (props.agents ? 'Working' : 'Ready') : phase.value === 'awaiting-approval' ? 'Waiting' : 'Working';
+  const date = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).replace(',', '');
+  const status = [state, props.agents ? `${props.agents} agent${props.agents === 1 ? '' : 's'}` : '', date].filter(Boolean).join(' · ');
   return (
-    <header class="relative text-center max-w-[640px]">
-      <DotText class="block mb-3 text-[13px] text-fg-3 tracking-[0.2em]" title={now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
-        {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </DotText>
-      <h1 class="text-[clamp(24px,3vw,30px)] font-medium tracking-[-0.015em] text-fg leading-tight">{greeting}</h1>
-      <p class="mt-2 text-[14px] text-fg-2 leading-relaxed">{headline}</p>
+    <header class="relative flex flex-col gap-[26px]">
+      <div class="flex items-center gap-4">
+        <Presence live={state === 'Working' || state === 'Waiting'} />
+        <span class="text-[11px] tracking-[0.16em] uppercase text-[#9e9ea4] truncate">{status}</span>
+      </div>
+      <h1 class="m-0">
+        <DotText class="block text-[48px] sm:text-[clamp(56px,6vw,84px)] leading-[0.95] tracking-[0.02em] text-fg uppercase">
+          Good
+          <br />
+          {pod}
+        </DotText>
+      </h1>
+      <p class="m-0 text-[18px] text-fg-2 max-w-[540px] leading-snug">{headline}</p>
       {/* out of flow so the refresh marker never shifts the layout */}
-      <div class="absolute left-0 right-0 -bottom-5 flex justify-center">{props.hint}</div>
+      <div class="absolute left-0 -bottom-5">{props.hint}</div>
     </header>
+  );
+}
+
+/** open threads of the most recent chat session */
+function Threads() {
+  const chats = useResource<SessionSummary[]>('/sessions?kind=chat', ['sessions']);
+  const latest = useMemo(() => [...(chats.data ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0], [chats.data]);
+  const threads = useResource<ChatThread[]>(latest ? `/sessions/${latest.id}/threads` : null, ['sessions']);
+  const open = (threads.data ?? []).filter((t) => t.status !== 'done');
+  if (!latest || open.length === 0) return null;
+  return (
+    <section class="mt-auto ds-rule pt-[18px] flex flex-col gap-3" aria-label="Threads">
+      <span class="ds-label">Threads</span>
+      {open.slice(0, 5).map((t) => (
+        <a key={t.id} href={`#/chat/${latest.id}`} class="flex items-center gap-3.5 text-[14px] min-w-0 group">
+          <span class={`w-[70px] shrink-0 text-[11px] uppercase tracking-[0.12em] ${t.status === 'waiting' ? 'text-warning' : 'text-fg-2'}`}>{t.status === 'waiting' ? 'Waiting' : 'Open'}</span>
+          <span class="flex-1 min-w-0 truncate text-fg group-hover:underline">{t.title}</span>
+          <span class="hidden sm:block max-w-[45%] truncate text-[12px] text-fg-3">{[t.area, t.next].filter(Boolean).join(' · ')}</span>
+        </a>
+      ))}
+    </section>
   );
 }
 

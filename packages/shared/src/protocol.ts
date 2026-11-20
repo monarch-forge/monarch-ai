@@ -1004,6 +1004,8 @@ export interface Briefing {
   flags: { tag: LogTag; text: string; href?: string; level: 'info' | 'warn' | 'error' }[];
   nextEvent?: CalendarEvent | null;
   unreadMail: number;
+  /** WhatsApp chats with unread messages (0 when not linked) */
+  unreadWhatsApp?: number;
   openTasks: number;
 }
 

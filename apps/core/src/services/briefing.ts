@@ -3,6 +3,7 @@ import type { Briefing, CalendarEvent } from '@monarch/shared';
 import { notifications } from '../kernel.ts';
 import { getSettings } from '../settings.ts';
 import { mailUnreadCount } from '../integrations/google/index.ts';
+import { unreadChats } from '../integrations/whatsapp/index.ts';
 import { listTasks } from './tasks.ts';
 import { listEvents } from './events.ts';
 import { getMetrics, lastMetrics } from './metrics.ts';
@@ -92,6 +93,7 @@ export async function buildBriefing(): Promise<Briefing> {
     flags,
     nextEvent,
     unreadMail,
+    unreadWhatsApp: unreadChats().length,
     openTasks: open.length,
   };
 }

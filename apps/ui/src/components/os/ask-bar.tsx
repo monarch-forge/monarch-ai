@@ -58,7 +58,7 @@ export function AskBar() {
         aria-label="Ask Monarch"
         onClick={(e) => e.stopPropagation()}
       >
-        <form onSubmit={submit} class="flex items-center gap-3 h-14 px-4 rounded-[18px] bg-[#1a1a1c] border border-line shadow-2xl">
+        <form onSubmit={submit} class="flex items-center gap-3 h-14 px-4 rounded-[20px] bg-black border border-[#2c2c30]">
           <Sparkles size={18} strokeWidth={1.5} class="text-fg-3 shrink-0" />
           <input
             ref={input}
@@ -73,7 +73,7 @@ export function AskBar() {
           </span>
         </form>
         {run && (
-          <div class="rounded-[18px] bg-[#1a1a1c] border border-line shadow-2xl overflow-hidden">
+          <div class="rounded-[20px] bg-black border border-[#2c2c30] overflow-hidden">
             <div class="flex items-center gap-2 px-4 h-10 border-b border-line text-[12px] text-fg-3">
               <span class={busy ? 'hud-blink' : ''}>{STATUS[run.status] ?? run.status}</span>
               <span class="truncate">· {run.prompt}</span>

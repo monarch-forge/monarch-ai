@@ -152,7 +152,7 @@ function LocationPicker() {
       </div>
       <ErrorLine error={error} />
       {results && (
-        <div class="mt-2 max-w-[520px] border border-line bg-[#121213]">
+        <div class="mt-2 max-w-[520px] border border-line bg-base-200">
           {results.length === 0 && <div class="px-3 py-2 text-[12px] text-fg-3">No places found.</div>}
           {results.map((g, i) => (
             <button key={`${g.lat},${g.lon},${i}`} class="hud-row w-full text-left" onClick={() => void pick(g)}>

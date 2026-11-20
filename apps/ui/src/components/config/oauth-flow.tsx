@@ -69,7 +69,7 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
   const tone = flow.status === 'done' ? 'border-success/40' : flow.status === 'error' ? 'border-red/50' : 'border-warning/40';
 
   return (
-    <div class={`border ${tone} bg-[#121213] p-3 flex flex-col gap-2.5`}>
+    <div class={`border ${tone} bg-base-200 p-3 flex flex-col gap-2.5`}>
       <div class="flex items-center gap-2">
         <span class={`inline-block w-1.5 h-1.5 ${flow.status === 'done' ? 'bg-success' : flow.status === 'error' ? 'bg-red' : 'bg-warning hud-blink'}`} />
         <span class=" text-[12px] text-fg">{STATUS_TEXT[flow.status]}</span>
@@ -91,7 +91,7 @@ export function OAuthFlowView(props: { initial: OAuthFlowState; autoOpen?: boole
       )}
       {flow.url && !terminal && (
         <div class="flex items-center gap-2 min-w-0">
-          <span class="font-mono text-[11px] text-fg-3 truncate flex-1 border border-line px-2 py-1 bg-surface" title={flow.url}>
+          <span class="font-mono text-[11px] text-fg-3 truncate flex-1 border border-line px-2 py-1 bg-base-200" title={flow.url}>
             {flow.url}
           </span>
           <button class="btn btn-xs btn-primary rounded-[var(--radius-control)] font-normal text-[12px]" onClick={() => void openExternal(flow.url!)}>

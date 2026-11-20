@@ -1,5 +1,5 @@
 /**
- * Calm chat log: user messages as soft bubbles on the right, replies as plain reading text, each tool group as one quiet summary line. Auto-scrolls while pinned to the bottom;
+ * Chat log: user messages as outlined bubbles on the right, replies as plain reading text, each tool group as a dashed step card. Auto-scrolls while pinned to the bottom;
  * shows "jump to latest" when the user scrolled up.
  */
 import type { ComponentChildren } from 'preact';
@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { ChatItem } from '@monarch/shared';
 import { ArrowDown, ChevronRight, AlertTriangle, Copy } from 'lucide-preact';
 import { settings } from '../../lib/store.ts';
-import { fmt, Glyph, useNow } from '../ui.tsx';
+import { fmt, Glyph, DotText, useNow } from '../ui.tsx';
 import { Markdown, copyText } from './markdown.tsx';
 import { ToolCard, toolFamily, toolHeadline } from './tool-card.tsx';
 
@@ -23,7 +23,7 @@ function Thinking(props: { text: string; live: boolean; ts?: string; endTs?: str
   const dur = Number.isFinite(secs) && secs >= 0 ? `${secs}s` : '';
   return (
     <div class="mb-2" onMouseEnter={() => setPeek(true)} onMouseLeave={() => setPeek(false)}>
-      <button class="flex items-center gap-1 text-[11.5px] text-fg-3 hover:text-fg-2 transition-colors" onClick={() => setPinned(!pinned)} aria-expanded={isOpen}>
+      <button class="flex items-center gap-1 text-[11px] tracking-[0.12em] uppercase text-fg-3 hover:text-fg-2 transition-colors" onClick={() => setPinned(!pinned)} aria-expanded={isOpen}>
         {props.live ? <span class="hud-blink">Thinking{dur ? ` · ${dur}` : '…'}</span> : dur ? `Thought for ${dur}` : 'Thought'}
         <ChevronRight size={12} strokeWidth={1.75} class={`transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
       </button>
@@ -55,7 +55,7 @@ function AssistantBody(props: { item: Assistant; endTs?: string }) {
           <Dots />
         </div>
       ) : item.text ? (
-        <Markdown text={item.text} caret={!!item.streaming} class="text-[14.5px] leading-[1.65]" />
+        <Markdown text={item.text} caret={!!item.streaming} class="max-w-[660px] text-[15.5px] leading-[1.7] text-[#e7e7ea]" />
       ) : null}
       {!item.streaming && item.text && (
         <div class="h-6 mt-1 flex items-center gap-3 text-[11.5px] text-fg-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
@@ -89,32 +89,52 @@ export function toolGroupSummary(items: ToolItem[]): string {
   return txt.charAt(0).toUpperCase() + txt.slice(1);
 }
 
-/** one quiet line per tool group; errors, denials, approvals (and edits when asked) always stay visible as cards */
+/** dashed step card per tool group: glyph strip + summary + total time, step chips; click expands to full cards. Errors, denials, approvals (and edits when asked) always stay visible */
 function ToolGroup(props: { items: ToolItem[]; sessionId?: string | null; expandEdits?: boolean }) {
   const [open, setOpen] = useState(false);
   const isEdit = (t: ToolItem) => toolFamily(t.name) === 'edit' || toolFamily(t.name) === 'write';
   const sticky = (t: ToolItem) => t.status === 'error' || t.status === 'denied' || t.status === 'pending-approval' || (!!props.expandEdits && isEdit(t));
   const running = props.items.some((t) => t.status === 'running');
   const n = props.items.length;
+  const ms = props.items.reduce((sum, t) => sum + (t.durationMs ?? 0), 0);
   const card = (t: ToolItem) => (
     <ToolCard key={t.id} item={t} sessionId={props.sessionId} defaultOpen={props.expandEdits && isEdit(t) && t.status !== 'error'} />
   );
+  const stickies = props.items.filter(sticky);
   return (
-    <div class="flex flex-col gap-0.5 -my-2">
-      <button
-        class="self-start flex items-center gap-2 rounded-[var(--radius-control)] px-1.5 -mx-1.5 py-1 text-[12px] text-fg-3 hover:text-fg-2 hover:bg-white/[0.03] transition-colors duration-150"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-      >
-        {running ? <Glyph value={3} of={5} live /> : <span aria-hidden="true">·</span>}
-        <span class="truncate">{toolGroupSummary(props.items)}</span>
-        <span aria-hidden="true">·</span>
-        <span class="tabular-nums shrink-0">
-          {n} tool{n === 1 ? '' : 's'}
-        </span>
-        <ChevronRight size={12} strokeWidth={1.75} class={`shrink-0 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
-      </button>
-      {open ? props.items.map(card) : props.items.filter(sticky).map(card)}
+    <div class="flex flex-col gap-2">
+      <div class="rounded-[18px] border border-dashed border-[var(--border-default)] px-4 py-3.5 flex flex-col gap-3">
+        <button class="flex items-center gap-3 text-left text-[11px] tracking-[0.14em] uppercase text-fg-2 hover:text-fg transition-colors" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <Glyph value={props.items.filter((t) => t.status !== 'running').length} of={Math.min(n, 12)} live={running} tone={stickies.some((t) => t.status === 'error') ? 'red' : 'fg'} class="shrink-0 [&>i]:w-[14px]" />
+          <span class="truncate">
+            {n} step{n === 1 ? '' : 's'} · {toolGroupSummary(props.items)}
+          </span>
+          <span class="ml-auto shrink-0 flex items-center gap-2">
+            {ms > 0 && <DotText class="text-[16px] text-fg-3 tracking-[0.02em]">{(ms / 1000).toFixed(1)}S</DotText>}
+            <ChevronRight size={12} strokeWidth={1.75} class={`text-fg-3 transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
+          </span>
+        </button>
+        {open ? (
+          <div class="flex flex-col gap-1">{props.items.map(card)}</div>
+        ) : (
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2 text-[12px] text-fg-2">
+            {props.items.map((t) => {
+              const h = toolHeadline(t.name, t.input, t.status);
+              return (
+                <span
+                  key={t.id}
+                  class={`truncate px-3 py-2 rounded-[12px] border ${t.status === 'running' ? 'border-[var(--border-default)] text-fg hud-blink' : t.status === 'error' || t.status === 'denied' ? 'border-red/40 text-red' : 'border-[var(--bg-subtle)]'}`}
+                  title={`${t.name} · ${h.object}`}
+                >
+                  {t.name}
+                  {h.object ? ` · ${h.object}` : ''}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {!open && stickies.map(card)}
     </div>
   );
 }
@@ -193,7 +213,7 @@ export function Transcript(props: {
         {props.items.length === 0 ? (
           props.empty
         ) : (
-          <div class="px-4 md:px-6 pt-2 pb-8 flex flex-col gap-6 max-w-[760px] mx-auto">
+          <div class="px-4 md:px-6 pt-2 pb-8 flex flex-col gap-6 max-w-[860px] mx-auto">
             {blocks.map((b, bi) => {
               if (b.type === 'tools') return <ToolGroup key={b.id} items={b.items} sessionId={props.sessionId} expandEdits={props.expandEdits} />;
               const it = b.item;
@@ -202,7 +222,7 @@ export function Transcript(props: {
                   return (
                     <div key={it.id} class="flex justify-end">
                       <div
-                        class={`max-w-[85%] rounded-[16px] rounded-br-[6px] bg-[var(--bg-raised,#202023)] px-4 py-2.5 text-[14.5px] leading-[1.6] text-fg whitespace-pre-wrap break-words ${
+                        class={`max-w-[min(85%,520px)] rounded-[22px_22px_6px_22px] border border-[var(--border-default)] px-[18px] py-3.5 text-[15px] leading-[1.6] text-fg whitespace-pre-wrap break-words ${
                           it.id.startsWith('local-') ? 'opacity-70' : ''
                         }`}
                         title={it.ts ? fmt.time(it.ts) : undefined}
@@ -222,14 +242,14 @@ export function Transcript(props: {
                   );
                 case 'system':
                   return (
-                    <div key={it.id} class="-my-2 truncate text-center text-[11.5px] text-fg-3" title={it.text}>
+                    <div key={it.id} class="-my-2 truncate text-center text-[11px] tracking-[0.12em] uppercase text-fg-3" title={it.text}>
                       {it.text.replace(/\s+/g, ' ')}
                     </div>
                   );
               }
             })}
             {props.running && lastItem && lastItem.kind !== 'assistant' && (
-              <div key="working-row" class="h-6 flex items-center gap-2.5 text-[12.5px] text-fg-3">
+              <div key="working-row" class="h-6 flex items-center gap-2.5 text-[11px] tracking-[0.12em] uppercase text-fg-3">
                 <Dots />
                 {lastItem.kind === 'tool' && lastItem.status === 'pending-approval' ? `${agentName} is waiting for your approval` : `${agentName} is working…`}
               </div>

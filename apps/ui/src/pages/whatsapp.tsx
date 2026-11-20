@@ -28,7 +28,7 @@ export default function WhatsAppPage(props: { params: string[] }) {
           icon={<MessageCircle size={18} strokeWidth={1.5} />}
           title="WhatsApp not linked"
           actions={
-            <Btn variant="primary" onClick={() => navigate('config/accounts')}>
+            <Btn pill variant="primary" onClick={() => navigate('config/accounts')}>
               Link WhatsApp
             </Btn>
           }
@@ -54,7 +54,7 @@ export default function WhatsAppPage(props: { params: string[] }) {
           {st.data.state !== 'open' && <span class="text-[11.5px] text-fg-3">{st.data.state}…</span>}
         </div>
         <input
-          class="mt-3 w-full bg-white/[0.04] rounded-[var(--radius-control)] px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+          class="mt-3 w-full bg-transparent border border-line rounded-full px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:border-[#6a6a70] transition-colors"
           placeholder="Jump to…"
           value={filter}
           onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
@@ -69,13 +69,13 @@ export default function WhatsAppPage(props: { params: string[] }) {
             <StateBlock
               icon={<MessageCircle size={18} strokeWidth={1.5} />}
               title={filter ? 'No match' : 'No chats yet'}
-              actions={filter ? <Btn onClick={() => setFilter('')}>Clear filter</Btn> : <Btn onClick={() => void chatsRes.reload()}>Refresh</Btn>}
+              actions={filter ? <Btn pill onClick={() => setFilter('')}>Clear filter</Btn> : <Btn pill onClick={() => void chatsRes.reload()}>Refresh</Btn>}
             >{filter ? `Nothing matches “${filter}”.` : 'New messages show up here as they arrive.'}</StateBlock>
           ) : (
             chats.map((c) => {
               const active = c.id === chatId;
               return (
-                <ListRow
+                <ListRow outline
                   key={c.id}
                   active={active}
                   marker
@@ -92,18 +92,18 @@ export default function WhatsAppPage(props: { params: string[] }) {
         </div>
       </aside>
 
-      <section class={`${chatId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
+      <section class={`${chatId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden`}>
         {!chatId ? (
           <div class="flex-1 flex items-center justify-center"><StateBlock icon={<MessageCircle size={18} strokeWidth={1.5} />} title="Pick a chat">Choose a conversation on the left to read and reply.</StateBlock></div>
         ) : (
           <>
             <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
-              <Btn variant="ghost" size="xs" class="lg:hidden -ml-1 btn-square" aria-label="Back to chats" onClick={() => navigate('whatsapp')}>
+              <Btn pill variant="ghost" size="xs" class="lg:hidden -ml-1 btn-square" aria-label="Back to chats" onClick={() => navigate('whatsapp')}>
                 <X size={15} />
               </Btn>
-              <h1 class="flex-1 min-w-0 text-[16px] font-semibold text-fg truncate">{chat?.name ?? chatId}</h1>
+              <h1 class="flex-1 min-w-0 text-[13px] font-medium uppercase tracking-[0.12em] text-fg truncate">{chat?.name ?? chatId}</h1>
               {!!chat?.unread && (
-                <Btn size="xs" variant="ghost" onClick={markRead} title="Mark read">
+                <Btn pill size="xs" variant="ghost" onClick={markRead} title="Mark read">
                   <CheckCheck size={13} /> Mark read
                 </Btn>
               )}

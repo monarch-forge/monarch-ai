@@ -352,7 +352,7 @@ export function CommandPalette() {
   let lastGroup = '';
   return (
     <div class="fixed inset-0 z-[60] flex justify-center items-start pt-[14vh] px-4 bg-black/45" onMouseDown={(e) => e.target === e.currentTarget && (paletteOpen.value = false)}>
-      <div class="hud-panel !rounded-[14px] w-full max-w-[600px] shadow-[0_12px_32px_rgb(0_0_0/0.45)]" role="dialog" aria-modal="true" aria-label="Command palette">
+      <div class="hud-panel !bg-black !border !border-[#2c2c30] !rounded-[20px] w-full max-w-[600px]" role="dialog" aria-modal="true" aria-label="Command palette">
         <div class="flex items-center gap-2.5 px-4">
           <Search size={15} strokeWidth={1.5} class="text-fg-3 shrink-0" />
           <input
@@ -410,7 +410,7 @@ export function CommandPalette() {
             );
           })}
         </div>
-        <div class="flex items-center gap-4 px-4 py-2.5 bg-[#161618] rounded-b-[14px] text-[11.5px] text-fg-3">
+        <div class="flex items-center gap-4 px-4 py-2.5 border-t border-dashed border-[#2c2c30] rounded-b-[20px] text-[11px] uppercase tracking-[0.12em] text-fg-3">
           <span>↑↓ select</span>
           <span>↵ run</span>
           <span class="ml-auto">{conn.value === 'open' ? '' : 'Monarch is offline'}</span>

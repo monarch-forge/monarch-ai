@@ -247,7 +247,7 @@ export default function WorkshopPage(props: { params: string[] }) {
             title="No workspace picked"
             hint="Choose a folder to code in. Monarch keeps its sessions per workspace."
             actions={
-              <Btn size="sm" variant="primary" disabled={conn.value !== 'open'} onClick={() => setBrowse(true)}>
+              <Btn pill size="sm" variant="primary" disabled={conn.value !== 'open'} onClick={() => setBrowse(true)}>
                 <FolderOpen size={13} /> Add folder
               </Btn>
             }
@@ -259,7 +259,7 @@ export default function WorkshopPage(props: { params: string[] }) {
             title="No sessions here yet"
             hint="Describe a task in the composer, or start a fresh session."
             actions={
-              <Btn size="sm" onClick={newSession}>
+              <Btn pill size="sm" onClick={newSession}>
                 <SquarePen size={13} /> New session
               </Btn>
             }
@@ -322,7 +322,7 @@ export default function WorkshopPage(props: { params: string[] }) {
           <div class="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
             <p class="text-[14px] text-fg-2">Couldn’t open this session.</p>
             <ErrorLine error={chat.error} />
-            <Btn variant="primary" onClick={newSession}>
+            <Btn pill variant="primary" onClick={newSession}>
               New session
             </Btn>
           </div>
@@ -387,7 +387,7 @@ function WorkshopEmpty(props: { cwd: string; engine: EngineId; onBrowse: () => v
         <FolderOpen size={26} strokeWidth={1.25} class="text-fg-3" />
         <h2 class="text-[18px] font-semibold text-fg">Pick a project to work on</h2>
         <p class="text-[13.5px] text-fg-3 max-w-[340px]">Add a folder and Monarch can read, edit and run code in it with you.</p>
-        <Btn variant="primary" class="mt-2" onClick={props.onBrowse}>
+        <Btn pill variant="primary" class="mt-2" onClick={props.onBrowse}>
           Add a workspace
         </Btn>
       </div>
@@ -430,7 +430,7 @@ function GitChip(props: { cwd: string; refreshKey: number }) {
     : (err ?? props.cwd);
   return (
     <button
-      class="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-[var(--bg-surface)] hover:bg-[var(--bg-raised,#202023)] text-[12px] text-fg-2 shrink-0 max-w-[240px] transition-colors duration-150"
+      class="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-[var(--bg-base-200)] hover:bg-[var(--bg-raised,#202023)] text-[12px] text-fg-2 shrink-0 max-w-[240px] transition-colors duration-150"
       title={tip}
       onClick={() => void git.reload()}
     >

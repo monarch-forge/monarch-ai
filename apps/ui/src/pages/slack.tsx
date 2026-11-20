@@ -115,7 +115,7 @@ export default function SlackPage(props: { params: string[] }) {
           icon={<Hash size={18} strokeWidth={1.5} />}
           title="No Slack workspace yet"
           actions={
-            <Btn variant="primary" onClick={() => navigate('config/accounts')}>
+            <Btn pill variant="primary" onClick={() => navigate('config/accounts')}>
               Connect Slack
             </Btn>
           }
@@ -157,7 +157,7 @@ export default function SlackPage(props: { params: string[] }) {
         {ws?.error && <div class="mt-2 px-2 text-[12px] text-red/90">{ws.error}</div>}
         <input
           ref={filterRef}
-          class="mt-3 w-full bg-white/[0.04] rounded-[var(--radius-control)] px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+          class="mt-3 w-full bg-transparent border border-line rounded-full px-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:border-[#6a6a70] transition-colors"
           placeholder="Jump to…"
           title="Filter channels (f)"
           value={filter}
@@ -179,7 +179,7 @@ export default function SlackPage(props: { params: string[] }) {
           ) : chRes.data === undefined ? (
             <Loading label="Listing channels" />
           ) : !grouped.length ? (
-            <StateBlock title={filter ? 'No match' : 'No conversations'} actions={filter ? <Btn size="xs" onClick={() => setFilter('')}>Clear filter</Btn> : <Btn size="xs" onClick={() => navigate('config/accounts')}>Check token</Btn>}>{filter ? `Nothing matches “${filter}”.` : 'This token can’t see any conversations.'}</StateBlock>
+            <StateBlock title={filter ? 'No match' : 'No conversations'} actions={filter ? <Btn pill size="xs" onClick={() => setFilter('')}>Clear filter</Btn> : <Btn pill size="xs" onClick={() => navigate('config/accounts')}>Check token</Btn>}>{filter ? `Nothing matches “${filter}”.` : 'This token can’t see any conversations.'}</StateBlock>
           ) : (
             grouped.map((g) => (
               <div key={g.id} class="mt-3 first:mt-1">
@@ -187,7 +187,7 @@ export default function SlackPage(props: { params: string[] }) {
                 {g.items.map((c) => {
                   const active = c.id === channelId;
                   return (
-                    <ListRow
+                    <ListRow outline
                       key={c.id}
                       active={active}
                       marker
@@ -207,15 +207,15 @@ export default function SlackPage(props: { params: string[] }) {
       </aside>
 
       {/* ── main ── */}
-      <section class={`${threadTs && !search ? 'hidden lg:flex' : channelId || search ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
+      <section class={`${threadTs && !search ? 'hidden lg:flex' : channelId || search ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden`}>
         <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
           {(channelId || search) && (
-            <Btn variant="ghost" size="xs" class="lg:hidden -ml-1 btn-square" aria-label="Back to channels" onClick={() => (search ? (setSearch(''), setSearchInput('')) : navigate(`slack/${enc(wsId!)}`))}>
+            <Btn pill variant="ghost" size="xs" class="lg:hidden -ml-1 btn-square" aria-label="Back to channels" onClick={() => (search ? (setSearch(''), setSearchInput('')) : navigate(`slack/${enc(wsId!)}`))}>
               <X size={15} />
             </Btn>
           )}
           <div class="min-w-0 flex-1">
-            <h1 class="text-[16px] font-semibold text-fg truncate">{search ? `Search: ${search}` : channel ? chanLabel(channel) : channelId ? channelId : ws?.name ?? 'Slack'}</h1>
+            <h1 class="text-[13px] font-medium uppercase tracking-[0.12em] text-fg truncate">{search ? `Search: ${search}` : channel ? chanLabel(channel) : channelId ? channelId : ws?.name ?? 'Slack'}</h1>
             {!search && channel?.topic && <div class="text-[12.5px] text-fg-3 truncate">{channel.topic}</div>}
           </div>
           {channelId && !search && <RefreshHint res={msgRes} />}
@@ -229,7 +229,7 @@ export default function SlackPage(props: { params: string[] }) {
             <Search size={13} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="w-28 sm:w-48 xl:w-60 bg-white/[0.04] rounded-[var(--radius-control)] pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+              class="w-28 sm:w-48 xl:w-60 bg-transparent border border-line rounded-full pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:border-[#6a6a70] transition-colors"
               placeholder="Search"
               title={`Search ${ws?.name ?? ''} (/)`}
               value={searchInput}
@@ -246,10 +246,10 @@ export default function SlackPage(props: { params: string[] }) {
           </form>
           {channelId && !search && (
             <>
-              <Btn variant="ghost" size="xs" class="btn-square" title="Refresh (auto every 20s)" aria-label="Refresh" onClick={() => void msgRes.reload()}>
+              <Btn pill variant="ghost" size="xs" class="btn-square" title="Refresh (auto every 20s)" aria-label="Refresh" onClick={() => void msgRes.reload()}>
                 <RefreshCw size={13} class={msgRes.loading ? 'animate-spin' : ''} />
               </Btn>
-              <Btn
+              <Btn pill
                 variant="ghost"
                 size="xs"
                 title="Ask Monarch to summarize this channel"
@@ -286,7 +286,7 @@ export default function SlackPage(props: { params: string[] }) {
               title="Pick a conversation"
               actions={
                 ws && (
-                  <Btn size="xs" onClick={() => askMonarch(`Give me a digest of what happened today across my Slack workspace "${ws.name}" (workspaceId ${ws.id}). Flag mentions, questions directed at me and anything urgent.`)}>
+                  <Btn pill size="xs" onClick={() => askMonarch(`Give me a digest of what happened today across my Slack workspace "${ws.name}" (workspaceId ${ws.id}). Flag mentions, questions directed at me and anything urgent.`)}>
                     <Sparkles size={12} /> Workspace digest
                   </Btn>
                 )
@@ -493,14 +493,14 @@ function ThreadPane(props: {
   }, [lastTs]);
 
   return (
-    <aside class="flex flex-1 lg:flex-none lg:w-[380px] xl:w-[420px] min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden" aria-label="Thread">
+    <aside class="flex flex-1 lg:flex-none lg:w-[380px] xl:w-[420px] min-w-0 flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden" aria-label="Thread">
       <header class="flex items-center gap-2 px-4 sm:px-5 pt-3.5 pb-2.5">
         <div class="min-w-0 flex-1">
-          <h2 class="text-[15px] font-semibold text-fg">Thread</h2>
+          <h2 class="ds-label">Thread</h2>
           <div class="text-[12px] text-fg-3 truncate">{props.label}</div>
         </div>
         <RefreshHint res={props.res} />
-        <Btn variant="ghost" size="xs" class="btn-square" title="Close thread (Esc)" aria-label="Close thread" onClick={props.onClose}>
+        <Btn pill variant="ghost" size="xs" class="btn-square" title="Close thread (Esc)" aria-label="Close thread" onClick={props.onClose}>
           <X size={14} />
         </Btn>
       </header>
@@ -561,7 +561,7 @@ function SearchResults(props: {
     <div class="flex-1 min-h-0 flex flex-col">
       <div class="flex items-center gap-2 px-5 pb-2 text-[12.5px] text-fg-3">
         <span>{props.res.data === undefined ? 'Searching…' : `${list.length} result${list.length === 1 ? '' : 's'}`}</span>
-        <Btn variant="ghost" size="xs" class="ml-auto" onClick={props.onClose}>
+        <Btn pill variant="ghost" size="xs" class="ml-auto" onClick={props.onClose}>
           <X size={12} /> Back to channel
         </Btn>
       </div>

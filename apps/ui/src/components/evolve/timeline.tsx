@@ -71,7 +71,7 @@ export function TimelineTab() {
 
   return (
     <Panel title="Timeline" class="h-full" noPad bodyClass="flex flex-col" right={res.data && <Tag tone="plain">{res.data.length} entries</Tag>}>
-      <div class="flex items-center gap-1.5 px-3 py-2 border-b border-line flex-wrap">
+      <div class="flex items-center gap-1.5 px-3 py-2 border-b border-dashed border-line flex-wrap">
         <div class="flex gap-1 flex-wrap" role="group" aria-label="Filter by kind">
           {FILTERS.map((f) => (
             <Chip key={f.id} on={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -94,8 +94,8 @@ export function TimelineTab() {
               <div class="px-4 py-3 max-w-[920px]">
                 {groups.map((g) => (
                   <section key={g.day} class="mb-4 last:mb-0">
-                    <div class="hud-label text-[10px] mb-2 sticky top-0 bg-surface py-1 z-[1]">{g.day}</div>
-                    <ol class="relative border-l border-line ml-[7px]">
+                    <div class="hud-label text-[10px] mb-2 sticky top-0 bg-base-200 py-1 z-[1]">{g.day}</div>
+                    <ol class="relative border-l border-dashed border-line ml-[7px]">
                       {g.items.map((e) => (
                         <TimelineItem key={e.id} e={e} />
                       ))}
@@ -120,7 +120,7 @@ function TimelineItem(props: { e: EvolutionEntry }) {
   const href = refHref(e);
   return (
     <li class="relative pl-6 pb-3.5 last:pb-1">
-      <span class={`absolute -left-[8px] top-0 w-[15px] h-[15px] flex items-center justify-center bg-surface border ${k.tone === 'red' ? 'border-red/60 text-red' : k.tone === 'fg' ? 'border-fg-3 text-fg' : 'border-line text-fg-3'}`}>
+      <span class={`absolute -left-[8px] top-0 w-[15px] h-[15px] flex items-center justify-center bg-base-200 border ${k.tone === 'red' ? 'border-red/60 text-red' : k.tone === 'fg' ? 'border-fg-3 text-fg' : 'border-line text-fg-3'}`}>
         <Icon size={9} strokeWidth={2} />
       </span>
       <div class="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">

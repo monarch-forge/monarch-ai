@@ -70,7 +70,7 @@ export default function RouterPage(_props: { params: string[] }) {
   if (!available) {
     return (
       <div class="h-full flex items-center justify-center p-6">
-        <div class="max-w-sm w-full bg-surface rounded-[14px] px-6 py-7 text-center">
+        <div class="max-w-sm w-full bg-base-200 rounded-[14px] px-6 py-7 text-center">
           <div class="text-[15px] font-semibold text-fg">9Router isn’t running</div>
           <div class="mt-2 text-[13px] text-fg-2 leading-relaxed">
             Start it on this device and we’ll pick it up. Monarch looks for it at <code class="font-mono text-[12px] text-fg">{ROUTER_URL}</code>.
@@ -105,14 +105,14 @@ export default function RouterPage(_props: { params: string[] }) {
           )}
         </span>
       </div>
-      <div class="flex-1 min-h-0 rounded-[10px] overflow-hidden bg-[#121213]">
+      <div class="flex-1 min-h-0 rounded-[10px] overflow-hidden bg-base-200">
         <iframe
           src={`${ROUTER_URL}/dashboard/usage`}
           title="9Router Dashboard"
           // 9Router follows prefers-color-scheme ("system" theme); the iframe element's color-scheme is
           // what the embedded page sees (WebKitGTK ignores the parent page's scheme), so force dark here
           style={{ colorScheme: 'dark' }}
-          class="w-full h-full border-0 bg-[#121213]"
+          class="w-full h-full border-0 bg-base-200"
         />
       </div>
     </div>

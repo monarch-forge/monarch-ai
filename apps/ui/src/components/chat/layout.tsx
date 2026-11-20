@@ -67,8 +67,8 @@ export function ChatLayout(props: {
       {/* sidebar: column on md+, drawer below */}
       {side && <div class="sm:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setSide(false)} />}
       <aside
-        class={`flex-col min-h-0 bg-[var(--bg-surface)] w-[264px] shrink-0 ${
-          side ? 'flex fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[300px] shadow-[0_12px_32px_rgb(0_0_0/.45)]' : 'hidden sm:flex sm:m-3 sm:mr-0 sm:rounded-[var(--radius-card)]'
+        class={`flex-col min-h-0 bg-[var(--bg-surface)] w-[260px] shrink-0 ${
+          side ? 'flex fixed inset-y-0 left-0 z-50 w-[86vw] max-w-[300px] shadow-[0_12px_32px_rgb(0_0_0/.45)]' : 'hidden sm:flex sm:border-r sm:border-dashed sm:border-[var(--border-default)] sm:bg-transparent'
         }`}
       >
         {side && (
@@ -112,8 +112,8 @@ export function ChatLayout(props: {
       {/* rail: column from 1100px, right drawer below */}
       {props.rail !== undefined &&
         (railWide ? (
-          <aside class="w-[300px] shrink-0 m-3 ml-0 rounded-[var(--radius-card)] bg-[var(--bg-surface)] flex flex-col min-h-0">
-            <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-6">{props.rail}</div>
+          <aside class="w-[320px] shrink-0 border-l border-dashed border-[var(--border-default)] flex flex-col min-h-0">
+            <div class="flex-1 min-h-0 overflow-y-auto px-[22px] py-[26px] flex flex-col gap-6">{props.rail}</div>
           </aside>
         ) : (
           <Drawer open={railOpen} onClose={() => setRailOpen(false)} side="right" title={props.railTitle ?? 'Threads'}>
@@ -125,7 +125,7 @@ export function ChatLayout(props: {
       {props.details !== undefined && open && (
         <>
           <div class="xl:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setOpen(false)} />
-          <aside class="fixed xl:static inset-y-0 right-0 z-50 w-[86vw] max-w-[320px] xl:w-[300px] shrink-0 bg-[var(--bg-surface)] xl:m-3 xl:ml-0 xl:rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/.45)] xl:shadow-none flex flex-col min-h-0">
+          <aside class="fixed xl:static inset-y-0 right-0 z-50 w-[86vw] max-w-[320px] xl:w-[300px] shrink-0 bg-[var(--bg-surface)] xl:bg-transparent xl:border-l xl:border-dashed xl:border-[var(--border-default)] shadow-[0_12px_32px_rgb(0_0_0/.45)] xl:shadow-none flex flex-col min-h-0">
             <div class="flex items-center h-12 px-4 shrink-0">
               <span class="text-[13px] font-semibold text-fg">Details</span>
               <button class={`${ICON_BTN} ml-auto -mr-1.5`} onClick={() => setOpen(false)} aria-label="Close details">

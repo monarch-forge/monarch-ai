@@ -3,7 +3,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { speak, stopSpeaking } from '../lib/voice.ts';
-import { Search, SquarePen, MessageCircle } from 'lucide-preact';
+import { Search, SquarePen } from 'lucide-preact';
 import { Tag, ErrorLine, Btn, Skeleton, Disclosure, EmptyState } from '../components/ui.tsx';
 import { ChatLayout, LiveBadge, Suggestions, ICON_BTN } from '../components/chat/layout.tsx';
 import { Transcript } from '../components/chat/transcript.tsx';
@@ -14,7 +14,7 @@ import { ModelPicker, type ModelChoice } from '../components/chat/model-picker.t
 import { ThreadsPanel } from '../components/chat/threads-panel.tsx';
 import { useChatSession, useSessions, renameSession, totalTokens } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast } from '../lib/store.ts';
-import { fmt } from '../components/ui.tsx';
+import { fmt, DotText } from '../components/ui.tsx';
 
 const SUGGESTED = [
   { title: 'Brief me on my day', text: 'Give me a brief of my day: calendar, important unread email, open tasks and the weather.' },
@@ -141,7 +141,8 @@ export default function CommsPage(props: { params: string[] }) {
           <SquarePen size={16} strokeWidth={1.75} />
         </button>
       </div>
-      <div class="flex-1 min-h-0 overflow-y-auto py-2">
+      <div class="ds-label px-[22px] pt-5 pb-2">Sessions</div>
+      <div class="flex-1 min-h-0 overflow-y-auto pb-2 flex flex-col gap-1">
         {list.loading && !list.sessions ? (
           <Skeleton lines={5} class="px-4 py-3" />
         ) : list.error && !list.sessions ? (
@@ -283,11 +284,10 @@ function ChatEmpty(props: { name?: string; honorific?: string; assistant?: strin
   return (
     <EmptyState
       class="min-h-full"
-      icon={<MessageCircle size={18} strokeWidth={1.5} />}
       title={
-        <span class="text-[20px] font-semibold tracking-tight">
-          Good {part}
-          {who ? <>, {who}</> : null}.
+        <span class="flex flex-col items-center gap-2">
+          <DotText class="text-[40px] leading-none tracking-[0.04em] uppercase">Good {part}</DotText>
+          {who ? <span class="ds-label">{who}</span> : null}
         </span>
       }
       hint={`What can ${props.assistant || 'Monarch'} help you with?`}

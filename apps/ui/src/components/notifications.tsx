@@ -63,7 +63,7 @@ export function NotificationDrawer() {
       <div class="fixed inset-0 top-12 z-40 bg-black/25" onClick={() => (notificationsOpen.value = false)} aria-hidden="true" />
       <aside
         ref={panelRef}
-        class="hud-panel !rounded-[14px] fixed right-3 top-[56px] bottom-3 z-40 w-[min(400px,calc(100vw-24px))] shadow-[0_12px_32px_rgb(0_0_0/0.45)]"
+        class="hud-panel !bg-black !border !border-[#2c2c30] !rounded-[20px] fixed right-3 top-[72px] bottom-3 z-40 w-[min(400px,calc(100vw-24px))]"
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"

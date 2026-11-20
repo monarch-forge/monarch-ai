@@ -31,7 +31,7 @@ export function WhatsAppAccount() {
           <div class="flex-1 text-[13px] text-fg">
             {s.me?.name ?? 'Linked'} <span class="font-mono text-[10px] text-fg-3">+{s.me?.id.split('@')[0]}</span>
           </div>
-          <Btn size="xs" loading={busy} onClick={() => run('/whatsapp/logout', 'WhatsApp unlinked')}>
+          <Btn pill size="xs" loading={busy} onClick={() => run('/whatsapp/logout', 'WhatsApp unlinked')}>
             Unlink
           </Btn>
         </div>
@@ -41,7 +41,7 @@ export function WhatsAppAccount() {
           <img src={s.qr} alt="WhatsApp pairing QR code" class="w-[200px] h-[200px] bg-white p-1 rounded" />
           <div class="text-[12px] text-fg-2 flex flex-col gap-2">
             <div>On your phone: WhatsApp → Settings → Linked devices → Link a device, then scan.</div>
-            <Btn size="xs" variant="ghost" loading={busy} onClick={() => run('/whatsapp/logout')}>
+            <Btn pill size="xs" variant="ghost" loading={busy} onClick={() => run('/whatsapp/logout')}>
               Cancel
             </Btn>
           </div>
@@ -54,11 +54,11 @@ export function WhatsAppAccount() {
             Links your personal number as a device via an unofficial bridge. WhatsApp may restrict accounts that use it.
           </div>
           <div class="flex gap-2">
-            <Btn size="xs" variant="primary" loading={busy || s.state === 'connecting'} onClick={() => run('/whatsapp/pair')}>
+            <Btn pill size="xs" variant="primary" loading={busy || s.state === 'connecting'} onClick={() => run('/whatsapp/pair')}>
               {s.state === 'unlinked' ? 'Link via QR' : 'Reconnect'}
             </Btn>
             {s.state !== 'unlinked' && (
-              <Btn size="xs" loading={busy} onClick={() => run('/whatsapp/logout', 'WhatsApp unlinked')}>
+              <Btn pill size="xs" loading={busy} onClick={() => run('/whatsapp/logout', 'WhatsApp unlinked')}>
                 Unlink
               </Btn>
             )}

@@ -103,9 +103,9 @@ export function AutomationsPanel(props: { class?: string }) {
   };
 
   return (
-    <section class={`flex flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden ${props.class ?? ''}`}>
+    <section class={`flex flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden ${props.class ?? ''}`}>
       <header class="flex items-baseline gap-2 px-4 pt-4 pb-2">
-        <h2 class="text-[14.5px] font-semibold text-fg">Automations</h2>
+        <h2 class="ds-label">Automations</h2>
         {list.length > 0 && <span class="text-[12px] text-fg-3">{list.filter((a) => a.enabled).length} running on a schedule</span>}
         <button
           class="ml-auto self-center p-1 rounded-[var(--radius-control)] text-fg-3 hover:text-fg hover:bg-subtle transition-colors"
@@ -126,7 +126,7 @@ export function AutomationsPanel(props: { class?: string }) {
             icon={<Play size={18} strokeWidth={1.5} />}
             title="Nothing scheduled"
             actions={EXAMPLES.map((x) => (
-              <Btn key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
+              <Btn pill key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
                 <Plus size={12} /> {x.name}
               </Btn>
             ))}
@@ -244,11 +244,11 @@ export function AutomationModal(props: { value: Partial<Automation> | null; onCl
         footer={
           <>
             {editing && (
-              <Btn variant="ghost" class="mr-auto hover:text-red!" onClick={remove}>
+              <Btn pill variant="ghost" class="mr-auto hover:text-red!" onClick={remove}>
                 <Trash size={12} /> Delete
               </Btn>
             )}
-            <Btn variant="ghost" onClick={props.onClose}>
+            <Btn pill variant="ghost" onClick={props.onClose}>
               Cancel
             </Btn>
             <Button variant="primary" loading={busy} disabled={!valid} onClick={save}>
@@ -402,7 +402,7 @@ export function ActiveAutomations(props: { selected: string | null; onSelect: (a
           Nothing scheduled yet. Ask Monarch (“remind me every morning…”) or start from a template:
           <div class="flex flex-wrap gap-1.5 mt-2">
             {EXAMPLES.map((x) => (
-              <Btn key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
+              <Btn pill key={x.name} size="xs" onClick={() => setEdit({ ...x, enabled: true })}>
                 <Plus size={11} /> {x.name}
               </Btn>
             ))}

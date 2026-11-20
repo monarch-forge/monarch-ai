@@ -83,7 +83,7 @@ export function ApprovalDock() {
       aria-label="Pending approvals"
       class={`fixed left-1/2 -translate-x-1/2 bottom-[124px] z-40 w-[min(560px,calc(100vw-2rem))] flex flex-col gap-2 max-h-[60vh] overflow-y-auto ${flashing ? 'outline outline-1 outline-red/60 outline-offset-4 rounded-[14px]' : ''}`}
     >
-      <div class="flex items-center gap-2 px-3 py-1.5 bg-surface/95 backdrop-blur rounded-full text-[12px] text-fg-2 shadow-[0_12px_32px_rgb(0_0_0/0.45)]">
+      <div class="flex items-center gap-2 px-3 py-1.5 bg-black border border-[#2c2c30] rounded-full text-[11px] uppercase tracking-[0.12em] text-fg-2">
         <span class="inline-block w-1.5 h-1.5 rounded-full bg-red hud-blink" />
         <span>
           {list.length === 1 ? 'One thing needs your OK' : `${list.length} things need your OK`}
@@ -98,7 +98,7 @@ export function ApprovalDock() {
         <ApprovalCard key={a.id} req={a} />
       ))}
       {hidden > 0 && (
-        <button class="self-center text-[12px] text-fg-2 hover:text-fg bg-surface rounded-full px-3 py-1" onClick={() => setShowAll(true)}>
+        <button class="self-center text-[11px] uppercase tracking-[0.12em] text-fg-2 hover:text-fg bg-black border border-[#2c2c30] rounded-full px-3 py-1" onClick={() => setShowAll(true)}>
           +{hidden} more
         </button>
       )}
@@ -140,7 +140,7 @@ function ApprovalCard(props: { req: ApprovalRequest }) {
       tabIndex={0}
       data-approval-card
       onKeyDown={onKey}
-      class={`hud-panel !rounded-[14px] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none border focus-visible:border-line ${dangerous ? 'border-red/40' : 'border-transparent'}`}
+      class={`hud-panel !bg-black !rounded-[20px] outline-none border focus-visible:border-fg-3 ${dangerous ? '!border-red/60' : '!border-[#2c2c30]'}`}
     >
       <div class="flex items-start gap-3 px-4 pt-3.5 pb-2">
         <div class="flex-1 min-w-0">

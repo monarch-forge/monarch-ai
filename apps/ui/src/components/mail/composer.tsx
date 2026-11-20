@@ -146,7 +146,7 @@ export function Composer(props: {
       />
       <div class="flex items-center gap-2 px-5 py-3">
         <span class="text-[11.5px] text-fg-3 hidden md:inline">Ctrl+Enter to send</span>
-        <Btn variant="ghost" size="xs" class="ml-auto" onClick={() => props.onDone(false)}>
+        <Btn pill variant="ghost" size="xs" class="ml-auto" onClick={() => props.onDone(false)}>
           Discard
         </Btn>
         <Button size="xs" loading={busy === 'draft'} disabled={!d.accountId || !!busy} onClick={saveDraft} title="Save as Gmail draft">

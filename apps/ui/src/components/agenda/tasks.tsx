@@ -115,9 +115,9 @@ export function TasksPanel(props: { class?: string }) {
   const open = tasks.filter((t) => !t.done).length;
 
   return (
-    <section class={`flex flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden ${props.class ?? ''}`}>
+    <section class={`flex flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden ${props.class ?? ''}`}>
       <header class="flex items-baseline gap-2 px-4 pt-4 pb-2">
-        <h2 class="text-[14.5px] font-semibold text-fg">Tasks</h2>
+        <h2 class="ds-label">Tasks</h2>
         <span class="text-[12px] text-fg-3">{open ? `${open} open` : 'all done'}</span>
         {groups.overdue.length > 0 && <span class="ml-auto text-[12px] text-red/90">{groups.overdue.length} overdue</span>}
       </header>
@@ -131,14 +131,14 @@ export function TasksPanel(props: { class?: string }) {
         <div class="flex gap-2">
           <input
             ref={inputRef}
-            class="flex-1 min-w-0 bg-white/[0.04] rounded-[var(--radius-control)] px-3 py-2 text-[13.5px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+            class="flex-1 min-w-0 bg-transparent border border-line rounded-full px-3 py-2 text-[13.5px] text-fg placeholder:text-fg-3 outline-none focus:border-[#6a6a70] transition-colors"
             placeholder="Add a task…"
             title="Use #tags inline, e.g. “Call Pepper #home”"
             value={title}
             onInput={(e) => setTitle((e.target as HTMLInputElement).value)}
             aria-label="New task title"
           />
-          <Btn size="sm" variant={title.trim() ? 'primary' : 'ghost'} type="submit" loading={adding} class="h-auto!" aria-label="Add task">
+          <Btn pill size="sm" variant={title.trim() ? 'primary' : 'ghost'} type="submit" loading={adding} class="h-auto!" aria-label="Add task">
             <Plus size={12} />
           </Btn>
         </div>
@@ -160,10 +160,10 @@ export function TasksPanel(props: { class?: string }) {
             title="Nothing to do"
             actions={
               <>
-                <Btn variant="primary" onClick={() => inputRef.current?.focus()}>
+                <Btn pill variant="primary" onClick={() => inputRef.current?.focus()}>
                   <Plus size={12} /> Add a task
                 </Btn>
-                <Btn onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')}>Ask Monarch to plan my day</Btn>
+                <Btn pill onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')}>Ask Monarch to plan my day</Btn>
               </>
             }
           >
@@ -321,7 +321,7 @@ function TaskEditor(props: { t: Task; onPatch: (p: Partial<Task>) => void; onDel
             Clear reminder
           </button>
         )}
-        <Btn size="xs" variant="ghost" class="ml-auto hover:text-red!" onClick={props.onDelete}>
+        <Btn pill size="xs" variant="ghost" class="ml-auto hover:text-red!" onClick={props.onDelete}>
           <Trash size={11} /> Delete
         </Btn>
       </div>

@@ -192,7 +192,7 @@ export function Composer(props: {
             ))}
           </div>
         )}
-        <div class="flex items-end gap-1.5 rounded-[var(--radius-modal)] bg-[var(--bg-surface)] border border-[var(--border-default)] focus-within:border-fg-3/60 transition-colors duration-150 pl-4 pr-2 py-2.5">
+        <div class="flex items-end gap-2 rounded-[29px] border border-[var(--border-default)] focus-within:border-fg-3/60 transition-colors duration-150 pl-5 pr-[10px] py-[9px] min-h-[58px]">
           <textarea
             ref={ta}
             rows={1}
@@ -204,9 +204,12 @@ export function Composer(props: {
             onKeyDown={onKey}
             placeholder={offline ? 'Reconnecting to Monarch…' : listening.value && props.onVoiceSend ? 'Listening… tap the square when you’re done' : (props.placeholder ?? 'Message Monarch…')}
             disabled={offline}
-            class="flex-1 resize-none bg-transparent outline-none text-[14.5px] leading-[1.55] text-fg placeholder:text-fg-3 py-1.5 max-h-[260px] min-h-[34px] disabled:opacity-60"
+            class="flex-1 resize-none bg-transparent outline-none text-[15px] leading-[1.55] text-fg placeholder:text-fg-3 py-[8px] max-h-[260px] min-h-[38px] disabled:opacity-60"
             aria-label="Message"
           />
+          {props.tools && (
+            <div class="self-center shrink-0 min-w-0 text-fg-3 [&>div>button]:uppercase [&>div>button]:tracking-[0.12em] [&>div>button]:text-[11px] [&>div>div.absolute]:left-auto [&>div>div.absolute]:right-0">{props.tools}</div>
+          )}
           {props.onVoiceSend && <MicButton disabled={disabled || !!props.running} onText={(t) => void props.onVoiceSend!(t)} />}
           {props.running ? (
             <button
@@ -219,7 +222,7 @@ export function Composer(props: {
             </button>
           ) : (
             <button
-              class="w-9 h-9 shrink-0 rounded-full flex items-center justify-center bg-red text-fg hover:bg-red-hover disabled:bg-[var(--bg-subtle)] disabled:text-fg-3 transition-colors duration-150"
+              class="w-[38px] h-[38px] shrink-0 rounded-full flex items-center justify-center bg-red text-fg hover:bg-red-hover disabled:bg-[var(--bg-subtle)] disabled:text-fg-3 transition-colors duration-150"
               onClick={submit}
               disabled={disabled || !text.trim()}
               title="Send (Enter)"
@@ -229,9 +232,8 @@ export function Composer(props: {
             </button>
           )}
         </div>
-        <div class="flex items-center gap-3 px-1 pt-2 text-[11.5px] text-fg-3 min-h-7">
-          <div class="flex items-center gap-3 min-w-0">{props.tools}</div>
-          <div class="flex items-center gap-3 min-w-0 truncate">{props.meta}</div>
+        <div class="flex items-center gap-3 px-5 pt-2 text-[11px] tracking-[0.08em] uppercase text-fg-3 min-h-7">
+                    <div class="flex items-center gap-3 min-w-0 truncate">{props.meta}</div>
           {props.commands?.length ? (
             <span class="ml-auto hidden md:inline shrink-0">
               Type <span class="font-mono text-fg-2">/</span> for commands

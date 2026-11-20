@@ -14,9 +14,9 @@ export function CodeView(props: { code: string; label?: string; maxH?: string })
   const lines = useMemo(() => props.code.replace(/\n$/, '').split('\n'), [props.code]);
   const w = String(lines.length).length;
   return (
-    <div class={`overflow-auto border border-line bg-[#121213] ${props.maxH ?? 'max-h-[60vh]'}`} role="region" aria-label={props.label ?? 'Source'} tabIndex={0}>
+    <div class={`overflow-auto border border-line bg-base-200 ${props.maxH ?? 'max-h-[60vh]'}`} role="region" aria-label={props.label ?? 'Source'} tabIndex={0}>
       <div class="flex min-w-max font-mono text-[12px] leading-[1.6]">
-        <pre class="select-none text-right text-fg-3 px-3 py-3 border-r border-line bg-surface/40 sticky left-0" aria-hidden="true" style={{ minWidth: `${w + 2.5}ch` }}>
+        <pre class="select-none text-right text-fg-3 px-3 py-3 border-r border-dashed border-line bg-base-200 sticky left-0" aria-hidden="true" style={{ minWidth: `${w + 2.5}ch` }}>
           {lines.map((_, i) => `${i + 1}\n`).join('')}
         </pre>
         <pre class="text-fg-2 px-3 py-3 whitespace-pre">{lines.join('\n')}</pre>
@@ -55,10 +55,10 @@ export function ExtSource(props: { d: ExtensionDetail; onSaved: () => Promise<vo
           {d.source.split('\n').length} lines · rev {d.revision}
         </span>
         <span class="ml-auto flex gap-1.5">
-          <Btn size="xs" variant="ghost" onClick={() => setShowManifest(!showManifest)} aria-expanded={showManifest}>
+          <Btn pill size="xs" variant="ghost" onClick={() => setShowManifest(!showManifest)} aria-expanded={showManifest}>
             {showManifest ? <ChevronDown size={11} /> : <ChevronRight size={11} />} extension.json
           </Btn>
-          <Btn size="xs" onClick={() => setEditing(true)}>
+          <Btn pill size="xs" onClick={() => setEditing(true)}>
             <Pencil size={11} /> Edit
           </Btn>
         </span>
@@ -158,7 +158,7 @@ function ExtEditor(props: {
           onKeyDown={(e) => tabIndentHandler(e, setSource)}
         />
       </div>
-      <div class="flex items-center gap-2 flex-wrap border-t border-line pt-3">
+      <div class="flex items-center gap-2 flex-wrap border-t border-dashed border-line pt-3">
         <input
           class="hud-input py-1.5! text-[12.5px]! flex-1 min-w-[200px]"
           placeholder="Revision note (optional) — what changed and why"
@@ -166,10 +166,10 @@ function ExtEditor(props: {
           value={note}
           onInput={(e) => setNote((e.target as HTMLInputElement).value)}
         />
-        <Btn size="sm" variant="ghost" onClick={props.onCancel}>
+        <Btn pill size="sm" variant="ghost" onClick={props.onCancel}>
           <X size={11} /> Cancel
         </Btn>
-        <Btn size="sm" variant="primary" onClick={() => void save()} loading={saving} disabled={!parsed.m || (!dirty && props.lockId)} title="Save and reload (Ctrl+S)">
+        <Btn pill size="sm" variant="primary" onClick={() => void save()} loading={saving} disabled={!parsed.m || (!dirty && props.lockId)} title="Save and reload (Ctrl+S)">
           {!saving && <Save size={11} />} Save
         </Btn>
       </div>
@@ -235,7 +235,7 @@ export function NewExtension() {
         class="flex-1"
         bodyClass="overflow-y-auto"
         right={
-          <Btn size="xs" variant="ghost" onClick={() => navigate('evolve/extensions')}>
+          <Btn pill size="xs" variant="ghost" onClick={() => navigate('evolve/extensions')}>
             <ArrowLeft size={11} /> Back
           </Btn>
         }

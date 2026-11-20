@@ -80,9 +80,9 @@ export default function WelcomePage(_props: { params: string[] }) {
     <div class="h-full overflow-y-auto">
       <div class="mx-auto max-w-[960px] px-4 sm:px-6 py-8 flex flex-col gap-7">
         <PageHeader
-          title="Welcome to Monarch"
+          title={<span class="ds-dot uppercase text-[30px] leading-none text-fg">Welcome to Monarch</span>}
           description="Your personal workspace for work and life: chat with one agent that manages mail, Slack, calendar, tasks, money and code for you."
-          right={<Btn variant="primary" onClick={() => navigate('chat')}>Start chatting <ArrowRight size={14} /></Btn>}
+          right={<Btn pill variant="primary" onClick={() => navigate('chat')}>Start chatting <ArrowRight size={14} /></Btn>}
         />
 
         <Panel title="Get started">
@@ -98,7 +98,7 @@ export default function WelcomePage(_props: { params: string[] }) {
                 </div>
                 <div class="flex shrink-0 flex-wrap justify-end gap-1.5">
                   {s.actions.map(([label, path]) => (
-                    <Btn key={path} size="xs" onClick={() => navigate(path)}>{label}</Btn>
+                    <Btn pill key={path} size="xs" onClick={() => navigate(path)}>{label}</Btn>
                   ))}
                 </div>
               </li>

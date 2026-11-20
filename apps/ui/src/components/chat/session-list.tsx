@@ -49,10 +49,10 @@ export function SessionRow(props: { s: SessionSummary; active: boolean; href: st
     }
   };
 
-  const rowBase = `relative flex items-center gap-2 mx-2 px-3 py-2.5 rounded-[var(--radius-control)] transition-colors duration-150 ${
-    props.active ? 'bg-[var(--bg-raised,#202023)]' : 'hover:bg-[var(--bg-raised,#202023)]'
+  const rowBase = `relative flex items-center gap-2 mx-2 px-3.5 py-3 rounded-[16px] border transition-colors duration-150 ${
+    props.active ? 'border-[var(--border-default)]' : 'border-transparent hover:border-[var(--bg-subtle)]'
   }`;
-  const bar = props.active ? <span class="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-red" /> : null;
+  const bar = null;
 
   if (mode === 'rename') {
     return (
@@ -109,11 +109,12 @@ export function SessionRow(props: { s: SessionSummary; active: boolean; href: st
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           {s.running && <span class="w-1.5 h-1.5 rounded-full bg-red hud-blink shrink-0" title="Working" />}
-          <span class={`truncate text-[13.5px] ${props.active ? 'text-fg' : 'text-fg-2 group-hover:text-fg'}`}>{s.title || 'Untitled'}</span>
+          <span class={`truncate text-[13px] ${props.active ? 'text-fg' : 'text-fg-2 group-hover:text-fg'}`}>{s.title || 'Untitled'}</span>
         </div>
-        {props.sub && <div class="text-[11.5px] text-fg-3 mt-0.5 truncate">{props.sub}</div>}
+        <div class="text-[11px] tracking-[0.08em] uppercase text-fg-3 mt-1 truncate">
+          {[s.running ? 'working' : null, props.sub, fmt.ago(s.updatedAt)].filter(Boolean).join(' · ')}
+        </div>
       </div>
-      <span class="shrink-0 text-[11px] text-fg-3 tabular-nums group-hover:hidden group-focus-within:hidden">{fmt.ago(s.updatedAt)}</span>
       <span class="shrink-0 hidden group-hover:flex group-focus-within:flex items-center gap-0.5 text-[11px] text-fg-3">
         {ctx && <span class="mr-1">{ctx}</span>}
         <button

@@ -110,9 +110,9 @@ export function Dot(props: { tone?: 'red' | 'ok' | 'warn' | 'muted'; pulse?: boo
 
 /** generic button styles (daisyUI btn, tuned) */
 export function Btn(
-  props: JSX.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'outline' | 'danger'; size?: 'xs' | 'sm' | 'md'; loading?: boolean },
+  props: JSX.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'outline' | 'danger'; size?: 'xs' | 'sm' | 'md'; loading?: boolean; pill?: boolean },
 ) {
-  const { variant = 'outline', size = 'sm', loading, class: cls, children, ...rest } = props as any;
+  const { variant = 'outline', size = 'sm', loading, pill, class: cls, children, ...rest } = props as any;
   const v =
     variant === 'primary'
       ? 'btn-primary border-transparent hover:bg-red-hover'
@@ -124,7 +124,7 @@ export function Btn(
   return (
     <button
       {...rest}
-      class={`btn btn-${size} ${v} text-[12.5px] font-medium rounded-md shadow-none transition-colors duration-150 ${cls ?? ''}`}
+      class={`btn btn-${size} ${v} ${pill ? 'rounded-full uppercase text-[11px] tracking-[0.12em]' + (variant === 'outline' ? ' !bg-transparent !border-line hover:!border-fg-3' : '') : 'text-[12.5px] rounded-md'} font-medium shadow-none transition-colors duration-150 ${cls ?? ''}`}
       disabled={rest.disabled || loading}
     >
       {loading && <span class="loading loading-spinner loading-xs" />}
@@ -297,10 +297,12 @@ export function ListRow(props: {
   marker?: boolean;
   /** top-align lead/trail for multi-line rows */
   top?: boolean;
+  /** D style: active/focused rows outlined instead of filled */
+  outline?: boolean;
   /** extra attributes (role, aria-*, data-*, title) for the row element */
   attrs?: Record<string, unknown>;
 }) {
-  const cls = `group relative flex ${props.top ? 'items-start' : 'items-center'} gap-3 px-3 py-2.5 rounded-[var(--radius-control)] transition-colors ${props.active ? 'bg-raised' : props.focused ? 'bg-white/[0.035]' : 'hover:bg-white/[0.03]'} ${props.onClick || props.href ? 'cursor-pointer' : ''} ${props.class ?? ''}`;
+  const cls = `group relative flex ${props.top ? 'items-start' : 'items-center'} gap-3 px-3 py-2.5 transition-colors ${props.outline ? `rounded-[14px] border ${props.active ? 'border-line' : props.focused ? 'border-line/60' : 'border-transparent hover:bg-white/[0.02]'}` : props.active ? 'rounded-[var(--radius-control)] bg-raised' : props.focused ? 'rounded-[var(--radius-control)] bg-white/[0.035]' : 'rounded-[var(--radius-control)] hover:bg-white/[0.03]'} ${props.onClick || props.href ? 'cursor-pointer' : ''} ${props.class ?? ''}`;
   const body = (
     <>
       {props.marker && props.active && <span class="absolute left-0 top-3 bottom-3 w-[2px] rounded-full bg-red" />}

@@ -54,7 +54,7 @@ export function ProjectsSection() {
       <Panel
         title="Projects"
         right={
-          <Btn variant="primary" size="xs" loading={busy === 'add'} onClick={() => setPicking(true)}>
+          <Btn pill variant="primary" size="xs" loading={busy === 'add'} onClick={() => setPicking(true)}>
             <FolderOpen size={12} /> Add folder
           </Btn>
         }
@@ -72,7 +72,7 @@ export function ProjectsSection() {
             title="No projects yet"
             hint="Point Monarch at a folder with your repos. It learns how to build, test and run each one."
             actions={
-              <Btn variant="primary" size="sm" onClick={() => setPicking(true)}>
+              <Btn pill variant="primary" size="sm" onClick={() => setPicking(true)}>
                 <FolderOpen size={13} /> Add folder
               </Btn>
             }
@@ -81,7 +81,7 @@ export function ProjectsSection() {
           <div class="flex flex-col gap-4">
             {list.data.map((p) => (
               <div key={p.id} class="border border-line rounded-[var(--radius-control)]">
-                <div class="flex items-center gap-2 px-3 py-2 border-b border-line">
+                <div class="flex items-center gap-2 px-3 py-2 border-b border-dashed border-line">
                   <FolderGit2 size={14} class="text-fg-3" />
                   <span class="text-[13px] text-fg">{p.name}</span>
                   <span class="font-mono text-[11px] text-fg-3 truncate">{p.root}</span>
@@ -168,7 +168,7 @@ function RepoRow(props: { repo: RepoProfile; root: string }) {
           <div class="flex items-center gap-2 mt-1">
             <span class="text-fg-3 shrink-0">Check before done</span>
             <input class={`${INPUT} !h-7 font-mono !text-[12px]`} placeholder={r.checkSource === 'detected' ? r.check : 'e.g. npm run typecheck && npm test'} value={check} onInput={(e) => setCheck((e.target as HTMLInputElement).value)} />
-            <Btn size="xs" onClick={() => void saveCheck()}>
+            <Btn pill size="xs" onClick={() => void saveCheck()}>
               Save
             </Btn>
           </div>

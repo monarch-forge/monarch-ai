@@ -125,7 +125,7 @@ export function RemoteSection() {
       </Panel>
 
       {st.running && (
-        <Panel title="Pair a phone" right={<Btn size="xs" onClick={() => void newCode()}>{pair ? 'New code' : 'Show pairing code'}</Btn>}>
+        <Panel title="Pair a phone" right={<Btn pill size="xs" onClick={() => void newCode()}>{pair ? 'New code' : 'Show pairing code'}</Btn>}>
           {pair ? (
             <div class="flex flex-col sm:flex-row gap-4 items-start animate-monarch-fade">
               <div class="w-44 h-44 rounded-[var(--radius-control)] overflow-hidden bg-white p-1 shrink-0" dangerouslySetInnerHTML={{ __html: pair.qrSvg }} />
@@ -148,7 +148,7 @@ export function RemoteSection() {
               <li class="flex items-center gap-3 py-2 text-[13px]">
                 <span class="flex-1 min-w-0 truncate text-fg">{d.name}</span>
                 <span class="text-fg-3 text-[12px]">{d.lastSeen ? `seen ${fmt.ago(d.lastSeen)}` : 'never seen'}</span>
-                <Btn size="xs" variant="ghost" onClick={() => void revoke(d.id, d.name)}>
+                <Btn pill size="xs" variant="ghost" onClick={() => void revoke(d.id, d.name)}>
                   Revoke
                 </Btn>
               </li>

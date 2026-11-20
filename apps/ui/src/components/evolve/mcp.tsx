@@ -69,10 +69,10 @@ export function McpSection() {
             MCP servers are local commands or remote endpoints that give Monarch extra tools. Their tools are deferred behind tool search and follow your approval policy by risk.
           </p>
           <div class="flex gap-2">
-            <Btn size="xs" onClick={() => setImporting(true)} disabled={unavailable}>
+            <Btn pill size="xs" onClick={() => setImporting(true)} disabled={unavailable}>
               <FileJson size={11} /> Import JSON
             </Btn>
-            <Btn size="xs" variant="primary" onClick={() => setEditor({})} disabled={unavailable}>
+            <Btn pill size="xs" variant="primary" onClick={() => setEditor({})} disabled={unavailable}>
               <Plus size={11} /> Add server
             </Btn>
           </div>
@@ -93,10 +93,10 @@ export function McpSection() {
               hint="Servers give Monarch extra tools. Add one, paste a config you already use, or start from a preset below."
               actions={
                 <>
-                  <Btn variant="primary" size="sm" onClick={() => setEditor({})}>
+                  <Btn pill variant="primary" size="sm" onClick={() => setEditor({})}>
                     <Plus size={13} /> Add server
                   </Btn>
-                  <Btn size="sm" onClick={() => setImporting(true)}>
+                  <Btn pill size="sm" onClick={() => setImporting(true)}>
                     <FileJson size={13} /> Import JSON
                   </Btn>
                 </>
@@ -277,7 +277,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
           </span>
         </div>
         {s.authRequired && s.enabled && (
-          <Btn size="xs" variant="primary" class="shrink-0"
+          <Btn pill size="xs" variant="primary" class="shrink-0"
             disabled={busy === 'auth'}
             onClick={(e) => {
               e.stopPropagation();
@@ -300,12 +300,12 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
       </div>
 
       {authUrl && s.authRequired && (
-        <div class="mx-3.5 mb-2.5 flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-line bg-[#121213] px-3 py-2 text-[12px] text-fg-2">
+        <div class="mx-3.5 mb-2.5 flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-line bg-base-200 px-3 py-2 text-[12px] text-fg-2">
           <span class="flex-1 min-w-[180px]">Finish signing in to {s.name} in your browser. If no tab opened, use the button.</span>
-          <Btn size="xs" variant="primary" onClick={() => void openExternal(authUrl)}>
+          <Btn pill size="xs" variant="primary" onClick={() => void openExternal(authUrl)}>
             <KeyRound size={10} /> Open sign-in page
           </Btn>
-          <Btn size="xs"
+          <Btn pill size="xs"
             onClick={() => {
               void navigator.clipboard?.writeText(authUrl).then(
                 () => toast('Sign-in link copied', 'success'),
@@ -315,7 +315,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
           >
             Copy link
           </Btn>
-          <Btn size="xs" title="Dismiss" onClick={() => setAuthUrl(null)}>
+          <Btn pill size="xs" title="Dismiss" onClick={() => setAuthUrl(null)}>
             <X size={10} />
           </Btn>
         </div>
@@ -349,7 +349,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
               <button class="hud-label text-[10px] flex items-center gap-1 hover:text-fg-2" onClick={() => setShowInstr(!showInstr)}>
                 <ChevronRight size={10} class={showInstr ? 'rotate-90' : ''} /> Server instructions
               </button>
-              {showInstr && <div class="mt-1.5 text-[12px] text-fg-2 whitespace-pre-wrap leading-relaxed border-l border-line pl-3">{s.instructions}</div>}
+              {showInstr && <div class="mt-1.5 text-[12px] text-fg-2 whitespace-pre-wrap leading-relaxed border-l border-dashed border-line pl-3">{s.instructions}</div>}
             </div>
           )}
 
@@ -415,14 +415,14 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                             </select>
                           </td>
                           <td class="text-right">
-                            <Btn size="xs" disabled={s.status !== 'connected'} onClick={() => setTesting(testing === t.name ? null : t.name)}>
+                            <Btn pill size="xs" disabled={s.status !== 'connected'} onClick={() => setTesting(testing === t.name ? null : t.name)}>
                               <Play size={10} /> Test
                             </Btn>
                           </td>
                         </tr>
                         {testing === t.name && (
                           <tr class="border-line">
-                            <td colSpan={4} class="bg-[#121213]/60">
+                            <td colSpan={4} class="bg-base-200/60">
                               <ToolTester serverId={s.id} tool={t} onClose={() => setTesting(null)} />
                             </td>
                           </tr>
@@ -441,7 +441,7 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
                 <ChevronRight size={10} class={showLogs ? 'rotate-90' : ''} /> Stderr ({s.logs.length})
               </button>
               {showLogs && (
-                <pre class="mt-1.5 max-h-48 overflow-auto bg-[#121213] border border-line rounded-[var(--radius-control)] p-2 font-mono text-[10.5px] text-fg-2 whitespace-pre-wrap break-all">
+                <pre class="mt-1.5 max-h-48 overflow-auto bg-base-200 border border-line rounded-[var(--radius-control)] p-2 font-mono text-[10.5px] text-fg-2 whitespace-pre-wrap break-all">
                   {s.logs.join('\n')}
                 </pre>
               )}
@@ -449,22 +449,22 @@ function ServerRow(props: { server: McpServer; open: boolean; onToggle: () => vo
           )}
 
           <div class="flex flex-wrap gap-2 pt-1">
-            <Btn size="xs" disabled={!s.enabled || busy === 'reconnect'} onClick={() => void reconnect()}>
+            <Btn pill size="xs" disabled={!s.enabled || busy === 'reconnect'} onClick={() => void reconnect()}>
               {busy === 'reconnect' ? <span class="loading loading-spinner loading-xs" /> : <RefreshCw size={10} />} Reconnect
             </Btn>
             {s.transport !== 'stdio' && (s.oauth ? (
-              <Btn size="xs" disabled={busy === 'auth'} onClick={() => void signOut()}>
+              <Btn pill size="xs" disabled={busy === 'auth'} onClick={() => void signOut()}>
                 <LogOut size={10} /> Sign out
               </Btn>
             ) : (
-              <Btn size="xs" disabled={!s.enabled || busy === 'auth'} onClick={() => void signIn()}>
+              <Btn pill size="xs" disabled={!s.enabled || busy === 'auth'} onClick={() => void signIn()}>
                 {busy === 'auth' ? <span class="loading loading-spinner loading-xs" /> : <KeyRound size={10} />} Sign in
               </Btn>
             ))}
-            <Btn size="xs" onClick={props.onEdit}>
+            <Btn pill size="xs" onClick={props.onEdit}>
               <Pencil size={10} /> Edit
             </Btn>
-            <Btn size="xs" class="hover:!text-red hover:!border-red ml-auto" onClick={() => void remove()}>
+            <Btn pill size="xs" class="hover:!text-red hover:!border-red ml-auto" onClick={() => void remove()}>
               <Trash2 size={10} /> Remove
             </Btn>
           </div>
@@ -548,13 +548,13 @@ function ToolTester(props: { serverId: string; tool: McpToolInfo; onClose: () =>
       />
       <div class="flex items-center gap-2">
         {parseErr ? <span class="text-[11px] font-mono text-red flex-1">{parseErr}</span> : <span class="text-[11px] text-fg-3 flex-1">Runs the tool directly, without approval. Ctrl+Enter to run.</span>}
-        <Btn size="xs" variant="primary" disabled={!!parseErr || running} onClick={() => void run()}>
+        <Btn pill size="xs" variant="primary" disabled={!!parseErr || running} onClick={() => void run()}>
           {running ? <span class="loading loading-spinner loading-xs" /> : <Play size={10} />} Run
         </Btn>
       </div>
       {result && (
         <div class="border border-line rounded-[var(--radius-control)]">
-          <div class="flex items-center gap-2 px-2 py-1 border-b border-line">
+          <div class="flex items-center gap-2 px-2 py-1 border-b border-dashed border-line">
             <Tag tone={result.ok ? 'ok' : 'red'}>{result.ok ? 'ok' : 'error'}</Tag>
             {result.durationMs > 0 && <span class="font-mono text-[10px] text-fg-3">{result.durationMs} ms</span>}
           </div>
@@ -665,10 +665,10 @@ function ServerEditor(props: { server?: McpServer; preset?: Partial<Draft>; onCl
       width="max-w-xl"
       footer={
         <>
-          <Btn variant="ghost" onClick={props.onClose}>
+          <Btn pill variant="ghost" onClick={props.onClose}>
             Cancel
           </Btn>
-          <Btn variant="primary" loading={saving} onClick={() => void save()}>
+          <Btn pill variant="primary" loading={saving} onClick={() => void save()}>
             {editing ? 'Save' : 'Add server'}
           </Btn>
         </>
@@ -694,7 +694,7 @@ function ServerEditor(props: { server?: McpServer; preset?: Partial<Draft>; onCl
                 key={t}
                 role="radio"
                 aria-checked={d.transport === t}
-                class={`px-3 py-1 text-[12px] border-r border-line last:border-r-0 ${d.transport === t ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2'}`}
+                class={`px-3 py-1 text-[12px] border-r border-dashed border-line last:border-r-0 ${d.transport === t ? 'bg-subtle text-fg' : 'text-fg-3 hover:text-fg-2'}`}
                 onClick={() => set({ transport: t })}
               >
                 {t}
@@ -784,7 +784,7 @@ function KVRows(props: { label: string; addLabel: string; keyPlaceholder: string
             </button>
           </div>
         ))}
-        <Btn type="button" size="xs" class="w-fit" onClick={() => props.onChange([...props.rows, { key: '', value: '', stored: false }])}>
+        <Btn pill type="button" size="xs" class="w-fit" onClick={() => props.onChange([...props.rows, { key: '', value: '', stored: false }])}>
           <Plus size={10} /> {props.addLabel}
         </Btn>
         <FieldErr text={props.error} />
@@ -842,10 +842,10 @@ function ImportModal(props: { onClose: () => void; onDone: () => void }) {
       width="max-w-xl"
       footer={
         <>
-          <Btn variant="ghost" onClick={props.onClose}>
+          <Btn pill variant="ghost" onClick={props.onClose}>
             Cancel
           </Btn>
-          <Btn variant="primary" loading={busy} disabled={!text.trim() || !!err} onClick={() => void run()}>
+          <Btn pill variant="primary" loading={busy} disabled={!text.trim() || !!err} onClick={() => void run()}>
             Import
           </Btn>
         </>

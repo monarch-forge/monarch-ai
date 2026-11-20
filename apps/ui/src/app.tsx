@@ -147,27 +147,27 @@ function TopBar(props: { active: string }) {
   const now = useNow(15_000);
   const unread = unreadNotifications.value;
   return (
-    <header class="relative z-40 h-12 shrink-0 flex items-center gap-2 px-3 sm:px-4 bg-[#121213]/85 backdrop-blur-md" data-tauri-drag-region>
-      <div class="flex items-center gap-1.5 pr-2 sm:pr-3 shrink-0">
+    <header class="relative z-40 h-16 shrink-0 flex items-center gap-3 sm:gap-6 px-3 sm:px-6 bg-black border-b border-dashed border-[#2c2c30]" data-tauri-drag-region>
+      <div class="flex items-center gap-2.5 shrink-0">
         <Presence />
-        <a href="#/overview" class="hidden sm:inline text-[14px] font-semibold tracking-[-0.01em] text-fg" title={statusTitle()}>
-          Monarch
+        <a href="#/overview" class="hidden sm:inline ds-dot text-[22px] font-black tracking-[0.06em] text-fg leading-none" title={statusTitle()}>
+          MONARCH
         </a>
       </div>
-      <nav class="flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none]" aria-label="Sections">
+      <nav class="flex items-stretch self-stretch gap-1 sm:gap-5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none]" aria-label="Sections">
         {PRIMARY.map((id) => {
           const r = GROUPS[id] ?? byId(id);
           const Icon = r.icon;
           const on = props.active === id;
           return (
-            <a key={id} href={`#/${GROUPS[id] ? lastTab(id) : id}`} class="hud-nav shrink-0" aria-current={on ? 'page' : undefined}>
+            <a key={id} href={`#/${GROUPS[id] ? lastTab(id) : id}`} class={`shrink-0 flex items-center gap-2 px-1.5 sm:px-0 border-b-2 text-[12px] uppercase tracking-[0.14em] transition-colors ${on ? 'text-fg border-red' : 'text-[#9e9ea4] border-transparent hover:text-fg'}`} aria-current={on ? 'page' : undefined}>
               <Icon size={15} strokeWidth={1.6} class="sm:hidden" />
               <span class="hidden sm:inline">{r.label}</span>
             </a>
           );
         })}
       </nav>
-      <div class="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" data-tauri-drag-region>
+      <div class="ml-auto flex items-center gap-1 sm:gap-3 shrink-0" data-tauri-drag-region>
         <StatusStrip />
         <AutoSwitch />
         <button
@@ -199,7 +199,7 @@ function TopBar(props: { active: string }) {
           <SlidersHorizontal size={16} strokeWidth={1.6} />
         </a>
         <div
-          class="hidden sm:block pl-1 text-[13px] tabular-nums text-fg-2"
+          class="hidden sm:block pl-1 text-[22px] leading-none tabular-nums text-fg"
           title={now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           data-tauri-drag-region
         >
@@ -213,13 +213,13 @@ function TopBar(props: { active: string }) {
 /** tab bar of a nav group (Chat, Inbox, Planner, System) */
 function GroupTabs(props: { group: string; active: string }) {
   return (
-    <div class="shrink-0 flex items-center gap-1 px-3 sm:px-4 h-9 border-b border-line">
+    <div class="shrink-0 flex items-center gap-1.5 px-3 sm:px-6 h-11 overflow-x-auto [scrollbar-width:none] border-b border-dashed border-[#2c2c30]">
       {GROUPS[props.group].tabs.map((id) => {
         const r = byId(id);
         const Icon = r.icon;
         const on = props.active === id;
         return (
-          <a key={id} href={`#/${id}`} class={`flex items-center gap-1.5 px-2.5 h-7 rounded-[9px] text-[12.5px] transition-colors ${on ? 'bg-raised text-fg' : 'text-fg-3 hover:text-fg-2'}`} aria-current={on ? 'page' : undefined}>
+          <a key={id} href={`#/${id}`} class={`shrink-0 flex items-center gap-1.5 px-3 h-7 rounded-full border text-[11px] uppercase tracking-[0.12em] transition-colors ${on ? 'border-fg text-fg' : 'border-[#2c2c30] text-[#9e9ea4] hover:text-fg'}`} aria-current={on ? 'page' : undefined}>
             <Icon size={13} strokeWidth={1.7} /> {r.label}
           </a>
         );
@@ -250,7 +250,7 @@ function OfflineBanner() {
   }, [c]);
   if (!show || c === 'open') return null;
   return (
-    <div class="fixed left-1/2 -translate-x-1/2 bottom-4 z-30 flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface shadow-[0_12px_32px_rgb(0_0_0/0.45)] text-[12.5px] text-fg-2 animate-monarch-fade" role="status">
+    <div class="fixed left-1/2 -translate-x-1/2 bottom-4 z-30 flex items-center gap-2 px-3.5 py-2 rounded-full bg-black border border-[#2c2c30] text-[11px] uppercase tracking-[0.12em] text-fg-2 animate-monarch-fade" role="status">
       <span class={`inline-block w-1.5 h-1.5 rounded-full ${c === 'connecting' ? 'bg-fg-3 hud-blink' : 'bg-warning'}`} />
       {c === 'connecting' ? 'Reconnecting to Monarch…' : 'Monarch is offline — things will catch up once it is back.'}
     </div>
@@ -281,10 +281,10 @@ function AutoSwitch() {
       disabled={busy}
       onClick={() => void toggle()}
       title={on ? 'Auto mode on: hands-off, only send/post/delete need approval. Click to turn off.' : 'Turn on Auto mode: Monarch works on its own and notifies you only when it needs you.'}
-      class={`flex items-center gap-1.5 h-7 px-2 rounded-[9px] text-[12px] transition-colors ${on ? 'text-fg bg-raised' : 'text-fg-3 hover:text-fg hover:bg-raised'}`}
+      class={`flex items-center gap-1.5 h-7 px-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors ${on ? 'text-fg' : 'text-[#9e9ea4] hover:text-fg'}`}
     >
-      <Zap size={13} strokeWidth={1.75} class={on ? 'text-red' : ''} />
-      <span class="hidden sm:inline">Auto</span>
+      <Zap size={13} strokeWidth={1.75} class={`sm:hidden ${on ? 'text-red' : ''}`} />
+      <span class="hidden sm:inline">Auto · {on ? 'On' : 'Off'}</span>
     </button>
   );
 }
@@ -295,7 +295,7 @@ function Toasts() {
   return (
     <div class="toast toast-end toast-bottom z-50 p-4 gap-2">
       {toasts.value.map((t) => (
-        <div key={t.id} class="flex items-start gap-2.5 bg-surface rounded-[10px] px-3.5 py-2.5 text-[13px] text-fg max-w-sm shadow-[0_12px_32px_rgb(0_0_0/0.45)] animate-monarch-fade">
+        <div key={t.id} class="flex items-start gap-2.5 bg-black border border-[#2c2c30] rounded-[20px] px-4 py-3 text-[13px] text-fg max-w-sm animate-monarch-fade">
           <span
             class={`mt-[7px] inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
               t.level === 'error' ? 'bg-red' : t.level === 'warn' ? 'bg-warning' : t.level === 'success' ? 'bg-success' : 'bg-fg-3'

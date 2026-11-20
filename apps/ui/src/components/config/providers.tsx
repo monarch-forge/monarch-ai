@@ -111,7 +111,7 @@ export function ProvidersSection() {
       <Panel
         title="Add a provider"
         right={
-          <Btn size="xs" onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
+          <Btn pill size="xs" onClick={() => void addCustom()} disabled={adding} title="Add an OpenAI-compatible provider (OpenAI, OpenRouter, Together, Groq, vLLM, Ollama, LM Studio…)">
             {adding ? <span class="loading loading-spinner loading-xs" /> : <Plus size={12} />} Custom provider
           </Btn>
         }
@@ -121,7 +121,7 @@ export function ProvidersSection() {
             <p class="text-[13px] text-fg-2 flex-1 min-w-[220px]">
               {catalog.length} more providers are available, from Anthropic and OpenAI to local servers.
             </p>
-            <Btn size="xs" onClick={() => setBrowsing(true)}>
+            <Btn pill size="xs" onClick={() => setBrowsing(true)}>
               <Search size={12} /> Browse providers
             </Btn>
           </div>
@@ -277,11 +277,11 @@ function ProviderDetail(props: { p: ProviderStatus; onChanged: (p?: ProviderStat
               onInput={(e) => setKey((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => e.key === 'Enter' && void saveKey()}
             />
-            <Btn size="sm" variant="primary" disabled={!key.trim() || busy === 'key'} onClick={() => void saveKey()}>
+            <Btn pill size="sm" variant="primary" disabled={!key.trim() || busy === 'key'} onClick={() => void saveKey()}>
               {busy === 'key' && <span class="loading loading-spinner loading-xs" />}Save
             </Btn>
             {p.source === 'stored-key' && (
-              <Btn size="sm" disabled={busy === 'clear'} onClick={() => void clearKey()}>
+              <Btn pill size="sm" disabled={busy === 'clear'} onClick={() => void clearKey()}>
                 Clear
               </Btn>
             )}
@@ -297,15 +297,15 @@ function ProviderDetail(props: { p: ProviderStatus; onChanged: (p?: ProviderStat
             {p.source === 'oauth' ? (
               <>
                 <span class="text-[12.5px] text-fg-2">Logged in{p.account ? ` as ${p.account}` : ''}.</span>
-                <Btn size="xs" disabled={busy === 'logout'} onClick={() => void logout()}>
+                <Btn pill size="xs" disabled={busy === 'logout'} onClick={() => void logout()}>
                   <LogOut size={11} /> Logout
                 </Btn>
-                <Btn size="xs" disabled={busy === 'login' || !!flow} onClick={() => void login()}>
+                <Btn pill size="xs" disabled={busy === 'login' || !!flow} onClick={() => void login()}>
                   Re-login
                 </Btn>
               </>
             ) : (
-              <Btn size="xs" variant="primary" disabled={busy === 'login' || (!!flow && flow.status !== 'error')} onClick={() => void login()}>
+              <Btn pill size="xs" variant="primary" disabled={busy === 'login' || (!!flow && flow.status !== 'error')} onClick={() => void login()}>
                 {busy === 'login' ? <span class="loading loading-spinner loading-xs" /> : <LogIn size={11} />} Login with {p.name}
               </Btn>
             )}
@@ -349,19 +349,19 @@ function RemoveCustom(props: { p: ProviderStatus; onRemoved: () => void }) {
     }
   };
   return (
-    <div class="flex items-center gap-2 pt-1 border-t border-line/60">
+    <div class="flex items-center gap-2 pt-1 border-t border-dashed border-line/60">
       {armed ? (
         <>
           <span class="text-[12px] text-fg-2">Remove {props.p.name}, its models and its stored key?</span>
-          <Btn size="xs" variant="danger" disabled={busy} onClick={() => void remove()}>
+          <Btn pill size="xs" variant="danger" disabled={busy} onClick={() => void remove()}>
             {busy && <span class="loading loading-spinner loading-xs" />}Remove
           </Btn>
-          <Btn size="xs" onClick={() => setArmed(false)}>
+          <Btn pill size="xs" onClick={() => setArmed(false)}>
             Cancel
           </Btn>
         </>
       ) : (
-        <Btn size="xs" class="hover:!text-red hover:!border-red/60" onClick={() => setArmed(true)}>
+        <Btn pill size="xs" class="hover:!text-red hover:!border-red/60" onClick={() => setArmed(true)}>
           <Trash2 size={11} /> Remove provider
         </Btn>
       )}
@@ -451,10 +451,10 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
         </div>
       </div>
       <div class="flex gap-2 items-center">
-        <Btn size="sm" variant="primary" disabled={!dirty || busy === 'save'} onClick={() => void save()}>
+        <Btn pill size="sm" variant="primary" disabled={!dirty || busy === 'save'} onClick={() => void save()}>
           {busy === 'save' && <span class="loading loading-spinner loading-xs" />}Save
         </Btn>
-        <Btn size="sm" disabled={!clean || busy === 'discover'} onClick={() => void discover()} title="List the models this endpoint serves (uses the API key below)">
+        <Btn pill size="sm" disabled={!clean || busy === 'discover'} onClick={() => void discover()} title="List the models this endpoint serves (uses the API key below)">
           {busy === 'discover' ? <span class="loading loading-spinner loading-xs" /> : <Search size={11} />} Discover models
         </Btn>
         <span class="text-[11px] text-fg-3">
@@ -464,11 +464,11 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
       {err && <div class="font-mono text-[11.5px] text-red">{err}</div>}
       {found && (
         <div class="border border-line">
-          <div class="flex items-center gap-2 px-2.5 py-1.5 border-b border-line">
+          <div class="flex items-center gap-2 px-2.5 py-1.5 border-b border-dashed border-line">
             <span class=" text-[12px] text-fg-3">{found.length} available</span>
             {found.length > 8 && <input class={`${INPUT} input-xs font-mono max-w-[220px]`} placeholder="Filter…" value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />}
             {shown.some((m) => !have.has(m.id)) && shown.length <= 50 && (
-              <Btn size="xs" class="ml-auto" disabled={busy === 'models'} onClick={() => add(shown.map((m) => m.id))}>
+              <Btn pill size="xs" class="ml-auto" disabled={busy === 'models'} onClick={() => add(shown.map((m) => m.id))}>
                 <Plus size={11} /> Add all{filter ? ' shown' : ''}
               </Btn>
             )}
@@ -479,7 +479,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
           <div class="max-h-[220px] overflow-y-auto">
             {shown.length === 0 && <div class="px-2.5 py-2 text-[12px] text-fg-3">No models.</div>}
             {shown.map((m) => (
-              <div key={m.id} class="flex items-center gap-2 px-2.5 py-1 border-b border-line/50 last:border-b-0">
+              <div key={m.id} class="flex items-center gap-2 px-2.5 py-1 border-b border-dashed border-line/50 last:border-b-0">
                 <span class="font-mono text-[12px] text-fg truncate">{m.id}</span>
                 {m.ownedBy && <span class="font-mono text-[10px] text-fg-3 truncate">{m.ownedBy}</span>}
                 {have.has(m.id) ? (
@@ -487,7 +487,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
                     <Check size={11} /> Added
                   </span>
                 ) : (
-                  <Btn size="xs" class="ml-auto" disabled={busy === 'models'} onClick={() => add([m.id])}>
+                  <Btn pill size="xs" class="ml-auto" disabled={busy === 'models'} onClick={() => add([m.id])}>
                     <Plus size={11} /> Add
                   </Btn>
                 )}
@@ -502,7 +502,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
         <div class="border border-line">
           {models.length === 0 && <div class="px-2.5 py-2 text-[12px] text-fg-3">No models yet — discover them or add an id below.</div>}
           {models.map((m) => (
-            <div key={m.id} class="flex items-center gap-2 px-2.5 py-1 border-b border-line/50 last:border-b-0">
+            <div key={m.id} class="flex items-center gap-2 px-2.5 py-1 border-b border-dashed border-line/50 last:border-b-0">
               <span class="font-mono text-[12px] text-fg truncate flex-1 min-w-0" title={m.baseUrl ? `own URL: ${m.baseUrl}` : undefined}>
                 {m.id}
                 {m.baseUrl && <span class="text-fg-3"> · own URL</span>}
@@ -526,7 +526,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
               </button>
             </div>
           ))}
-          <div class="flex items-center gap-2 px-2.5 py-1.5 border-t border-line/50">
+          <div class="flex items-center gap-2 px-2.5 py-1.5 border-t border-dashed border-line/50">
             <input
               class={`${INPUT} input-xs font-mono`}
               placeholder="model id, e.g. gpt-4.1-mini or llama3.1:8b"
@@ -540,7 +540,7 @@ function CustomProviderEditor(props: { p: ProviderStatus; onChanged: (p?: Provid
                 }
               }}
             />
-            <Btn size="xs"
+            <Btn pill size="xs"
               disabled={!manual.trim() || busy === 'models'}
               onClick={() => {
                 add([manual]);

@@ -14,8 +14,8 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: #1a1a1c; /* surface */
-  --color-base-200: #121213; /* app background */
+  --color-base-100: #0a0a0b; /* surface */
+  --color-base-200: #000000; /* app background */
   --color-base-300: #202023; /* subtle */
   --color-base-content: #f4f4f6;
   --color-primary: #d71921;
@@ -46,10 +46,10 @@
 }
 
 :root {
-  --bg-primary: #121213;
-  --bg-surface: #1a1a1c;
-  --bg-raised: #202023;
-  --bg-subtle: #262629;
+  --bg-primary: #000000;
+  --bg-surface: #0a0a0b;
+  --bg-raised: #161618;
+  --bg-subtle: #1f1f22;
   --border-default: #2c2c30;
   --text-primary: #f4f4f6;
   --text-secondary: #a3a3a9;
@@ -58,7 +58,7 @@
   --accent-hover: #b8141b;
   --accent-dim: rgb(215 25 33 / 0.12);
   --radius-control: 9px;
-  --radius-card: 14px;
+  --radius-card: 20px;
   --radius-modal: 18px;
   --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
   --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
@@ -70,9 +70,9 @@
   --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
   /* Nothing-style dot matrix, for numbers and short headlines only */
   --font-dot: "Doto", "Geist Mono Variable", ui-monospace, monospace;
-  --color-surface: #1a1a1c;
-  --color-raised: #202023;
-  --color-subtle: #262629;
+  --color-surface: #0a0a0b;
+  --color-raised: #161618;
+  --color-subtle: #1f1f22;
   --color-line: #2c2c30;
   --color-fg: #f4f4f6;
   --color-fg-2: #a3a3a9;
@@ -90,7 +90,6 @@ body,
 body {
   background-color: var(--bg-primary);
   /* a single, very soft warm glow at the top — no grid */
-  background-image: radial-gradient(1200px 520px at 50% -180px, rgb(255 255 255 / 0.035), transparent 70%);
   background-repeat: no-repeat;
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -123,6 +122,18 @@ html[data-text-size="xl"] #app {
 }
 
 /* ───────────── design system additions (components/ui.tsx) ───────────── */
+/* D · Glyph command: dashed rules and small uppercase labels */
+.ds-rule {
+  border: 0;
+  border-top: 1px dashed var(--border-default);
+}
+.ds-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
 .ds-dot {
   font-family: var(--font-dot);
   font-weight: 700;
@@ -204,7 +215,8 @@ html[data-text-size="xl"] #app {
   /* soft card: surface background, no outline, no brackets */
   .hud-panel {
     position: relative;
-    background: var(--bg-surface);
+    background: transparent;
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-card);
     display: flex;
     flex-direction: column;
@@ -224,10 +236,11 @@ html[data-text-size="xl"] #app {
   }
   .hud-title {
     font-family: var(--font-sans);
-    font-size: 14.5px;
-    font-weight: 600;
-    letter-spacing: -0.005em;
-    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

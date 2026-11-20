@@ -150,25 +150,25 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
   const chip = (color: string) => ({ background: `color-mix(in srgb, ${color} 16%, transparent)`, color: `color-mix(in srgb, ${color} 55%, #f4f4f6)` });
 
   return (
-    <section class="flex-1 min-w-0 flex flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden">
+    <section class="flex-1 min-w-0 flex flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden">
       <header class="flex items-center gap-2 px-4 sm:px-5 pt-4 pb-3">
         <div class="min-w-0">
-          <h1 class="text-[17px] font-semibold text-fg truncate">{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
+          <h1 class="ds-dot uppercase text-[24px] leading-none text-fg truncate">{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</h1>
           <div class="text-[12.5px] text-fg-3 truncate">{thisWeek ? 'This week' : rangeLabel}</div>
         </div>
         {res.loading && <Glyph value={3} of={3} live class="ml-1" title="Syncing" />}
         <div class="ml-auto flex items-center gap-0.5">
-          <Btn variant="ghost" size="xs" class="btn-square" title="Previous week ([)" aria-label="Previous week" onClick={() => setAnchor(addDays(anchor, -7))}>
+          <Btn pill variant="ghost" size="xs" class="btn-square" title="Previous week ([)" aria-label="Previous week" onClick={() => setAnchor(addDays(anchor, -7))}>
             <ChevronLeft size={15} />
           </Btn>
-          <Btn variant="ghost" size="xs" title="This week (.)" onClick={() => setAnchor(startOfWeek(new Date()))}>
+          <Btn pill variant="ghost" size="xs" title="This week (.)" onClick={() => setAnchor(startOfWeek(new Date()))}>
             Today
           </Btn>
-          <Btn variant="ghost" size="xs" class="btn-square" title="Next week (])" aria-label="Next week" onClick={() => setAnchor(addDays(anchor, 7))}>
+          <Btn pill variant="ghost" size="xs" class="btn-square" title="Next week (])" aria-label="Next week" onClick={() => setAnchor(addDays(anchor, 7))}>
             <ChevronRight size={15} />
           </Btn>
         </div>
-        <Btn size="sm" variant="primary" onClick={() => setCreate({ start: defaultStart(now) })} title="New event">
+        <Btn pill size="sm" variant="primary" onClick={() => setCreate({ start: defaultStart(now) })} title="New event">
           <Plus size={13} /> <span class="hidden sm:inline">Event</span>
         </Btn>
       </header>
@@ -191,10 +191,10 @@ export function WeekCalendar(props: { accounts: GoogleAccount[] }) {
             hint="Nothing on the calendar today."
             actions={
               <>
-                <Btn variant="primary" onClick={() => setCreate({ start: defaultStart(now) })}>
+                <Btn pill variant="primary" onClick={() => setCreate({ start: defaultStart(now) })}>
                   <Plus size={12} /> Add event
                 </Btn>
-                <Btn onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')}>Plan my day</Btn>
+                <Btn pill onClick={() => askMonarch('Plan my day: look at my calendar, open tasks and unread mail, and suggest what to do and when.')}>Plan my day</Btn>
               </>
             }
           />
@@ -404,11 +404,11 @@ function EventPopover(props: { ev: CalendarEvent; x: number; y: number; accounts
 
   return (
     <>
-      <div ref={ref} tabIndex={-1} role="dialog" aria-label={ev.title} class="fixed z-30 w-80 bg-surface rounded-[var(--radius-card)] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none" style={{ left: `${pos.left}px`, top: `${pos.top}px` }}>
+      <div ref={ref} tabIndex={-1} role="dialog" aria-label={ev.title} class="fixed z-30 w-80 bg-base-200 rounded-[var(--radius-card)] shadow-[0_12px_32px_rgb(0_0_0/0.45)] outline-none" style={{ left: `${pos.left}px`, top: `${pos.top}px` }}>
         <header class="flex items-center gap-2.5 px-4 pt-4">
           {ev.source === 'google' ? <AccountMark id={ev.accountId} size={8} /> : <span class="w-2 h-2 rounded-full bg-fg-2 shrink-0" />}
           <h2 class="text-[14.5px] font-semibold text-fg truncate">{ev.title || '(untitled)'}</h2>
-          <Btn variant="ghost" size="xs" class="ml-auto -mr-1 btn-square" onClick={props.onClose} aria-label="Close">
+          <Btn pill variant="ghost" size="xs" class="ml-auto -mr-1 btn-square" onClick={props.onClose} aria-label="Close">
             <X size={14} />
           </Btn>
         </header>
@@ -423,11 +423,11 @@ function EventPopover(props: { ev: CalendarEvent; x: number; y: number; accounts
           {ev.notes && <div class="text-fg-2 whitespace-pre-wrap break-words max-h-40 overflow-y-auto border-l-2 border-subtle pl-2.5">{ev.notes}</div>}
           <div class="flex items-center gap-2 mt-1">
             {ev.link && (
-              <Btn size="xs" variant="primary" onClick={() => void openExternal(ev.link!)}>
+              <Btn pill size="xs" variant="primary" onClick={() => void openExternal(ev.link!)}>
                 <Video size={12} /> Join
               </Btn>
             )}
-            <Btn size="xs" variant="ghost" class="ml-auto hover:text-red!" onClick={del}>
+            <Btn pill size="xs" variant="ghost" class="ml-auto hover:text-red!" onClick={del}>
               <Trash size={12} /> Delete
             </Btn>
           </div>
@@ -492,7 +492,7 @@ function NewEventModal(props: { open: boolean; start: Date | null; accounts: Goo
       title="New event"
       footer={
         <>
-          <Btn variant="ghost" onClick={props.onClose}>
+          <Btn pill variant="ghost" onClick={props.onClose}>
             Cancel
           </Btn>
           <Button variant="primary" loading={busy} disabled={invalid} onClick={submit}>

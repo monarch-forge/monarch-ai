@@ -26,7 +26,7 @@ export function ProposalsTab() {
           <>
             <Tag tone={open.length ? 'red' : 'plain'}>{open.length} open</Tag>
             {closed.length > 0 && (
-              <Btn size="xs" variant="ghost" onClick={() => setShowClosed(!showClosed)} aria-pressed={showClosed}>
+              <Btn pill size="xs" variant="ghost" onClick={() => setShowClosed(!showClosed)} aria-pressed={showClosed}>
                 {showClosed ? 'Hide' : 'Show'} closed · {closed.length}
               </Btn>
             )}
@@ -49,7 +49,7 @@ export function ProposalsTab() {
                 title="No open proposals"
                 hint="Reflection reviews recent sessions for friction and suggests what Monarch could build. Or describe a capability yourself and Monarch builds it."
                 actions={
-                  <Btn variant="primary" size="sm" onClick={() => document.getElementById('evolve-forge')?.focus()}>
+                  <Btn pill variant="primary" size="sm" onClick={() => document.getElementById('evolve-forge')?.focus()}>
                     <Hammer size={13} /> Ask Monarch to build a capability
                   </Btn>
                 }
@@ -99,7 +99,7 @@ function ProposalCard(props: { p: EvolutionProposal; onChanged: () => Promise<vo
   };
 
   return (
-    <article class={`border bg-[#121213]/40 flex flex-col min-w-0 ${isOpen ? 'border-line' : 'border-line/60 opacity-70'}`}>
+    <article class={`border bg-base-200/40 flex flex-col min-w-0 ${isOpen ? 'border-line' : 'border-line/60 opacity-70'}`}>
       <header class="flex items-start gap-2.5 px-3.5 pt-3">
         <Icon size={14} strokeWidth={1.5} class={`mt-0.5 shrink-0 ${isOpen ? 'text-fg-2' : 'text-fg-3'}`} />
         <h3 class="flex-1 min-w-0 text-[14px] text-fg leading-snug">{p.title}</h3>
@@ -112,12 +112,12 @@ function ProposalCard(props: { p: EvolutionProposal; onChanged: () => Promise<vo
           {planOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} Plan
         </button>
         {planOpen && (
-          <div class="border-l border-line ml-1.5 pl-3 mt-1 mb-1 text-[12.5px]">
+          <div class="border-l border-dashed border-line ml-1.5 pl-3 mt-1 mb-1 text-[12.5px]">
             <Markdown text={p.plan} class="text-[12.5px]!" />
           </div>
         )}
       </div>
-      <footer class="mt-auto flex items-center gap-2 px-3.5 py-2.5 border-t border-line/70 mt-3 flex-wrap">
+      <footer class="mt-auto flex items-center gap-2 px-3.5 py-2.5 border-t border-dashed border-line/70 mt-3 flex-wrap">
         <span class="font-mono text-[10px] text-fg-3" title={stamp(p.ts)}>
           {ago(p.ts)}
         </span>
@@ -133,10 +133,10 @@ function ProposalCard(props: { p: EvolutionProposal; onChanged: () => Promise<vo
         )}
         {isOpen && (
           <span class="ml-auto flex gap-1.5">
-            <Btn size="xs" variant="ghost" onClick={() => void act('dismiss')} loading={busy === 'dismiss'} disabled={busy !== null}>
+            <Btn pill size="xs" variant="ghost" onClick={() => void act('dismiss')} loading={busy === 'dismiss'} disabled={busy !== null}>
               {busy !== 'dismiss' && <X size={11} />} Dismiss
             </Btn>
-            <Btn size="xs" variant="primary" onClick={() => void act('accept')} loading={busy === 'accept'} disabled={busy !== null} title="Start a build session for this proposal">
+            <Btn pill size="xs" variant="primary" onClick={() => void act('accept')} loading={busy === 'accept'} disabled={busy !== null} title="Start a build session for this proposal">
               {busy !== 'accept' && <Hammer size={11} />} Build
             </Btn>
           </span>

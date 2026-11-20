@@ -34,7 +34,7 @@ export function EvolveHeader(props: { stats: Resource<EvolutionStats> }) {
     <section class="shrink-0 flex flex-col gap-4" aria-label="Evolution status">
       <div class="flex flex-col lg:flex-row lg:items-start gap-4">
         <div class="flex-1 min-w-0">
-          <h1 class="text-[20px] font-semibold text-fg flex items-center gap-2.5">
+          <h1 class="ds-dot uppercase text-[30px] leading-none text-fg flex items-center gap-2.5">
             Evolve
             {evo && (
               <span class="text-[12px] font-normal text-fg-3 flex items-center gap-1.5">
@@ -73,7 +73,7 @@ export function EvolveHeader(props: { stats: Resource<EvolutionStats> }) {
         <div class="flex flex-col gap-2 w-full lg:w-[420px] shrink-0">
           <ForgeInput />
           <div class="flex items-center gap-3">
-            <Btn size="xs" variant="ghost" onClick={() => void reflect()} loading={reflecting} disabled={conn.value !== 'open' || missing} title="Review recent sessions for friction and turn it into proposals">
+            <Btn pill size="xs" variant="ghost" onClick={() => void reflect()} loading={reflecting} disabled={conn.value !== 'open' || missing} title="Review recent sessions for friction and turn it into proposals">
               {!reflecting && <RefreshCcw size={12} />} Reflect now
             </Btn>
             <span class="text-[12px] text-fg-3 truncate">
@@ -101,7 +101,7 @@ export function ToolSplit(props: { always: number; deferred: number }) {
       </div>
       <div class="flex h-[3px] mt-2 bg-subtle" role="img" aria-label={`${props.always} tools always loaded, ${props.deferred} discovered on demand`}>
         <span class="h-full bg-fg-2" style={{ width: `${pct}%` }} />
-        <span class="h-full w-px bg-[#121213]" />
+        <span class="h-full w-px bg-base-200" />
       </div>
     </div>
   );
@@ -128,7 +128,7 @@ function ForgeInput() {
   };
   return (
     <form
-      class="flex items-stretch border border-line bg-[#121213] rounded-[8px] overflow-hidden focus-within:border-fg-3 transition-colors"
+      class="flex items-stretch border border-line bg-base-200 rounded-[8px] overflow-hidden focus-within:border-fg-3 transition-colors"
       onSubmit={(e) => {
         e.preventDefault();
         void submit();

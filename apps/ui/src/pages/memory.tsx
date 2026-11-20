@@ -76,14 +76,14 @@ export default function MemoryPage(props: { params: string[] }) {
 
   return (
     <div class="h-full flex flex-col lg:flex-row gap-4 min-h-0 p-3 sm:p-4 lg:p-5">
-      <section class={`${noteId ? 'hidden lg:flex' : 'flex'} flex-1 min-w-0 min-h-[320px] flex-col bg-surface rounded-[10px] overflow-hidden relative`}>
+      <section class={`${noteId ? 'hidden lg:flex' : 'flex'} flex-1 min-w-0 min-h-[320px] flex-col bg-base-200 rounded-[10px] overflow-hidden relative`}>
         {/* floating toolbar over the graph */}
         <div class="absolute top-3 left-3 right-3 z-10 flex items-start gap-2 flex-wrap pointer-events-none">
           <label class="relative w-56 max-w-full pointer-events-auto">
             <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="w-full bg-[#121213]/80 backdrop-blur rounded-[var(--radius-control)] pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-[#121213]"
+              class="w-full bg-base-200/80 backdrop-blur rounded-[var(--radius-control)] pl-8 pr-3 py-1.5 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-base-200"
               placeholder="Find in graph"
               title="Highlight matching notes; #tag works too. Enter to focus, Shift+Enter to open."
               value={search}
@@ -106,7 +106,7 @@ export default function MemoryPage(props: { params: string[] }) {
               {matches.length} match{matches.length === 1 ? '' : 'es'}
             </span>
           )}
-          <div class="ml-auto flex items-center gap-1 pointer-events-auto bg-[#121213]/70 backdrop-blur rounded-[var(--radius-control)] p-0.5">
+          <div class="ml-auto flex items-center gap-1 pointer-events-auto bg-base-200/70 backdrop-blur rounded-[var(--radius-control)] p-0.5">
             <Toggle on={noteId === '~profile'} onClick={() => openNote('~profile')} title="Facts Monarch learned about you">
               What Monarch knows
             </Toggle>
@@ -157,7 +157,7 @@ export default function MemoryPage(props: { params: string[] }) {
                 handle={(h) => (handle.current = h)}
               />
               {localUnavailable && (
-                <div class="absolute top-14 left-3 text-[12px] text-fg-3 bg-[#121213]/80 rounded-[var(--radius-control)] px-2.5 py-1">
+                <div class="absolute top-14 left-3 text-[12px] text-fg-3 bg-base-200/80 rounded-[var(--radius-control)] px-2.5 py-1">
                   {noteId ? 'That note isn’t in the graph, so here’s everything' : 'Open a note to see its neighbourhood'}
                 </div>
               )}
@@ -166,7 +166,7 @@ export default function MemoryPage(props: { params: string[] }) {
         </div>
       </section>
 
-      <section class={`flex w-full lg:w-[400px] xl:w-[460px] shrink-0 flex-col min-h-0 ${noteId ? 'flex-1 lg:flex-none' : 'max-h-[45%] lg:max-h-none'} bg-surface rounded-[10px] overflow-hidden`}>
+      <section class={`flex w-full lg:w-[400px] xl:w-[460px] shrink-0 flex-col min-h-0 ${noteId ? 'flex-1 lg:flex-none' : 'max-h-[45%] lg:max-h-none'} bg-base-200 rounded-[10px] overflow-hidden`}>
         {noteId === '~profile' ? (
           <ProfilePanel />
         ) : noteId ? (

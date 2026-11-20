@@ -170,7 +170,7 @@ export default function MailPage(props: { params: string[] }) {
           icon={<MailIcon size={18} strokeWidth={1.5} />}
           title="No mail connected yet"
           actions={
-            <Btn variant="primary" onClick={() => navigate('config/accounts')}>
+            <Btn pill variant="primary" onClick={() => navigate('config/accounts')}>
               Connect Gmail
             </Btn>
           }
@@ -193,7 +193,7 @@ export default function MailPage(props: { params: string[] }) {
     <div class="h-full flex gap-4 min-h-0 p-3 sm:p-4 lg:p-5">
       {/* ── mailboxes (quiet sidebar, lg+) ── */}
       <aside class="hidden lg:flex w-52 shrink-0 flex-col min-h-0 overflow-y-auto">
-        <Btn variant="primary" class="w-full mb-5" onClick={() => setComposeOpen(true)} title="Compose (c)">
+        <Btn pill variant="primary" class="w-full mb-5" onClick={() => setComposeOpen(true)} title="Compose (c)">
           <PenSquare size={13} /> Compose
         </Btn>
         <div class="px-3 pb-1.5 text-[11px] text-fg-3">Accounts</div>
@@ -204,7 +204,7 @@ export default function MailPage(props: { params: string[] }) {
             ))}
           </span>
           <span class="truncate">All inboxes</span>
-          {view === 'all' && labelId === 'INBOX' && !q && unreadCount > 0 && <span class="ml-auto font-mono text-[11px] text-fg-3">{unreadCount}</span>}
+          {view === 'all' && labelId === 'INBOX' && !q && unreadCount > 0 && <span class="ml-auto ds-dot text-[13px] text-fg-3">{unreadCount}</span>}
         </button>
         {accounts.map((a) => (
           <button key={a.id} class={navRow(view === a.id)} onClick={() => navigate(`mail/${enc(a.id)}`)} title={a.error ?? a.email}>
@@ -233,7 +233,7 @@ export default function MailPage(props: { params: string[] }) {
       </aside>
 
       {/* ── thread list ── */}
-      <section class={`${threadId ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 w-full lg:w-[360px] xl:w-[400px] shrink-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
+      <section class={`${threadId ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 w-full lg:w-[360px] xl:w-[400px] shrink-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden`}>
         {/* narrow-screen mailbox switcher */}
         <div class="lg:hidden flex items-center gap-2 px-3 pt-3">
           <select
@@ -261,15 +261,15 @@ export default function MailPage(props: { params: string[] }) {
               </option>
             ))}
           </select>
-          <Btn variant="primary" size="sm" onClick={() => setComposeOpen(true)} title="Compose (c)" aria-label="Compose">
+          <Btn pill variant="primary" size="sm" onClick={() => setComposeOpen(true)} title="Compose (c)" aria-label="Compose">
             <PenSquare size={13} />
           </Btn>
         </div>
         <div class="flex items-baseline gap-2 px-4 pt-4 pb-2">
-          <h1 class="text-[16px] font-semibold text-fg truncate">{labelName}</h1>
+          <h1 class="text-[13px] font-medium uppercase tracking-[0.12em] text-fg truncate">{labelName}</h1>
           <span class="text-[12.5px] text-fg-3 truncate">{viewAccount ? viewAccount.label || viewAccount.email : 'all inboxes'}</span>
           <RefreshHint res={listRes} class="self-center" />
-          <Btn variant="ghost" size="xs" class="ml-auto btn-square" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
+          <Btn pill variant="ghost" size="xs" class="ml-auto btn-square" title="Refresh" aria-label="Refresh" onClick={() => void listRes.reload()}>
             <RefreshCw size={13} class={listRes.loading ? 'animate-spin' : ''} />
           </Btn>
         </div>
@@ -284,7 +284,7 @@ export default function MailPage(props: { params: string[] }) {
             <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
             <input
               ref={searchRef}
-              class="w-full bg-white/[0.04] rounded-[var(--radius-control)] pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:bg-white/[0.06] transition-colors"
+              class="w-full bg-transparent border border-line rounded-full pl-8 pr-3 py-2 text-[13px] text-fg placeholder:text-fg-3 outline-none focus:border-[#6a6a70] transition-colors"
               placeholder="Search mail"
               title="Gmail search syntax works: from:pepper is:unread newer_than:7d"
               value={qInput}
@@ -302,7 +302,7 @@ export default function MailPage(props: { params: string[] }) {
           {q && (
             <div class="flex items-center gap-2 mt-2 px-1 text-[12px] text-fg-3">
               Results for <span class="text-fg-2 truncate">“{q}”</span>
-              <Btn
+              <Btn pill
                 type="button"
                 variant="ghost"
                 size="xs"
@@ -328,11 +328,11 @@ export default function MailPage(props: { params: string[] }) {
               title={q ? 'Nothing matches that search' : 'All clear'}
               actions={
                 q ? (
-                  <Btn onClick={() => { setQ(''); setQInput(''); }}>Clear search</Btn>
+                  <Btn pill onClick={() => { setQ(''); setQInput(''); }}>Clear search</Btn>
                 ) : (
                   <>
-                    <Btn onClick={() => void listRes.reload()}>Check again</Btn>
-                    <Btn variant="ghost" onClick={() => askMonarch('Summarise what needs my attention in my email today.')}>Ask Monarch</Btn>
+                    <Btn pill onClick={() => void listRes.reload()}>Check again</Btn>
+                    <Btn pill variant="ghost" onClick={() => askMonarch('Summarise what needs my attention in my email today.')}>Ask Monarch</Btn>
                   </>
                 )
               }
@@ -344,7 +344,7 @@ export default function MailPage(props: { params: string[] }) {
               const active = t.id === threadId;
               const starred = t.labels?.includes('STARRED');
               return (
-                <ListRow
+                <ListRow outline
                   key={`${t.accountId}:${t.id}`}
                   attrs={{ 'data-idx': i, role: 'option', 'aria-selected': active }}
                   active={active}
@@ -380,7 +380,7 @@ export default function MailPage(props: { params: string[] }) {
       </section>
 
       {/* ── reader ── */}
-      <section class={`${threadId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-surface rounded-[var(--radius-card)] overflow-hidden`}>
+      <section class={`${threadId ? 'flex' : 'hidden lg:flex'} flex-1 min-w-0 flex-col min-h-0 bg-base-200 rounded-[var(--radius-card)] overflow-hidden`}>
         {threadId && threadAcct ? (
           <ThreadReader
             accountId={threadAcct}

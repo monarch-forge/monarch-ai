@@ -7,7 +7,11 @@ import { Markdown } from '../chat/markdown.tsx';
 import { Tag } from '../ui.tsx';
 import { activeConversation, consoleConversation, consoleHistory, consoleRun, dismissConsoleRun, newConsoleConversation, runConsoleCommand } from './console-store.ts';
 
-const QUICK = ['Brief me on today', 'Triage my inbox', 'Plan my afternoon'];
+const QUICK = [
+  { label: 'Brief me', prompt: 'Brief me on today' },
+  { label: 'Triage inbox', prompt: 'Triage my inbox' },
+  { label: "What's blocked", prompt: "What's blocked or waiting on me?" },
+];
 
 export function CommandConsole() {
   const [text, setText] = useState('');
@@ -73,18 +77,14 @@ export function CommandConsole() {
   const shown = isListening ? interimTranscript.value : text;
 
   return (
-    <div class="flex flex-col gap-2.5 w-full">
-      <div class={`flex items-stretch gap-1 p-1.5 rounded-[var(--radius-card)] border bg-surface transition-colors duration-150 focus-within:border-line ${isListening ? 'border-red/50' : 'border-transparent'}`}>
-        {isListening && (
-          <span class="flex items-center pl-3 select-none" aria-hidden="true">
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-red hud-blink" />
-          </span>
-        )}
+    <div class="flex flex-col gap-[26px] w-full">
+      <div class={`flex items-center gap-3 h-[60px] pl-[22px] pr-2 rounded-full border transition-colors duration-150 focus-within:border-fg-3 ${isListening ? 'border-red/60' : 'border-line'}`}>
+        <span class={`inline-block w-2 h-2 rounded-full bg-red shrink-0 ${isListening || (run && run.status !== 'done' && run.status !== 'error') ? 'hud-blink' : ''}`} aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
-          class="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-[15px] text-fg placeholder:text-fg-3 outline-none"
-          placeholder={isListening ? 'Listening…' : conv ? `Continue, ${honorific}… (/new to start over)` : `What can I do for you, ${honorific}?`}
+          class="flex-1 min-w-0 bg-transparent text-[16px] text-fg placeholder:text-fg-3 outline-none"
+          placeholder={isListening ? 'Listening…' : conv ? `Continue, ${honorific}… (/new to start over)` : 'Command or question…'}
           value={shown}
           onInput={(e) => {
             histIdx.current = -1;
@@ -99,7 +99,7 @@ export function CommandConsole() {
         {conv && (
           <button
             type="button"
-            class="flex items-center gap-1.5 px-2.5 rounded-[var(--radius-control)] text-[12.5px] text-fg-2 hover:text-fg hover:bg-raised transition-colors"
+            class="flex items-center gap-1.5 h-9 px-3 rounded-full ds-label hover:text-fg transition-colors"
             onClick={() => {
               newConsoleConversation();
               inputRef.current?.focus();
@@ -110,10 +110,24 @@ export function CommandConsole() {
             <Plus size={12} strokeWidth={1.75} /> New
           </button>
         )}
+        {text.trim() ? (
+          <button
+            type="button"
+            class="flex items-center gap-2 h-11 px-4 rounded-full bg-red text-fg hover:bg-red-hover text-[12px] font-semibold uppercase tracking-[0.08em] transition-colors duration-150"
+            onClick={() => submit(text)}
+            aria-label="Send command"
+          >
+            Send <CornerDownLeft size={12} strokeWidth={1.75} />
+          </button>
+        ) : (
+          <span class="hidden sm:inline text-[11px] tracking-[0.12em] text-fg-3 select-none whitespace-nowrap" aria-hidden="true">
+            CTRL SPACE
+          </span>
+        )}
         <div class={voiceSupport.listen ? 'flex' : 'tooltip tooltip-top flex'} data-tip={voiceSupport.listen ? undefined : UNSUPPORTED_LISTEN}>
           <button
             type="button"
-            class={`w-10 flex items-center justify-center rounded-[var(--radius-control)] transition-colors ${
+            class={`w-11 h-11 flex items-center justify-center rounded-full transition-colors ${
               !voiceSupport.listen ? 'text-fg-3/60 hover:text-fg-2' : isListening ? 'text-red bg-red/10' : 'text-fg-2 hover:text-fg hover:bg-raised'
             }`}
             onClick={onMic}
@@ -124,31 +138,20 @@ export function CommandConsole() {
             {isListening ? <Square size={12} strokeWidth={1.75} /> : <Mic size={15} strokeWidth={1.5} />}
           </button>
         </div>
-        <button
-          type="button"
-          class={`flex items-center gap-2 px-3.5 rounded-[var(--radius-control)] text-[13px] font-medium transition-colors duration-150 ${
-            text.trim() ? 'bg-red text-fg hover:bg-red-hover' : 'bg-raised text-fg-3'
-          }`}
-          onClick={() => submit(text)}
-          disabled={!text.trim()}
-          aria-label="Send command"
-        >
-          Send <CornerDownLeft size={12} strokeWidth={1.75} />
-        </button>
       </div>
 
       {run ? (
         <ReplyPreview />
       ) : (
-        <div class="flex flex-wrap justify-center gap-1.5">
+        <div class="flex flex-wrap gap-2.5">
           {QUICK.map((q) => (
             <button
               type="button"
-              key={q}
-              class="text-[12.5px] text-fg-2 bg-surface rounded-full px-3 py-1 hover:text-fg hover:bg-raised outline-none transition-colors duration-150"
-              onClick={() => submit(q)}
+              key={q.label}
+              class="h-[34px] px-4 rounded-full border border-dashed border-[#3a3a3f] text-[12px] uppercase tracking-[0.08em] text-fg-2 hover:text-fg hover:border-fg-3 outline-none transition-colors duration-150"
+              onClick={() => submit(q.prompt)}
             >
-              {q}
+              {q.label}
             </button>
           ))}
         </div>
@@ -170,7 +173,7 @@ function ReplyPreview() {
     run.status === 'sending' ? 'Sending' : run.status === 'thinking' ? 'Thinking' : run.status === 'tool' ? 'Tool' : run.status === 'streaming' ? 'Responding' : run.status === 'done' ? 'Done' : 'Error';
   const reply = run.reply.trim();
   return (
-    <div class="rounded-[var(--radius-card)] bg-surface flex flex-col min-h-0 animate-monarch-fade" role="region" aria-label="Assistant reply" aria-live="polite">
+    <div class="rounded-[20px] border border-line flex flex-col min-h-0 animate-monarch-fade" role="region" aria-label="Assistant reply" aria-live="polite">
       <div class="flex items-center gap-2 px-4 pt-3 pb-1">
         {(run.turn ?? 1) > 1 && <span class="text-[11px] text-fg-3" title="Turn in this conversation">#{run.turn}</span>}
         <span class="flex-1 min-w-0 truncate text-[12px] text-fg-2" title={run.prompt}>

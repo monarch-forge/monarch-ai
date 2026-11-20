@@ -163,11 +163,11 @@ function KeyField(props: { provider: VoiceKeyProvider; status?: VoiceSideStatus 
           onInput={(e) => setKey((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => e.key === 'Enter' && void save()}
         />
-        <Btn size="sm" variant="primary" disabled={!key.trim() || busy} onClick={() => void save()}>
+        <Btn pill size="sm" variant="primary" disabled={!key.trim() || busy} onClick={() => void save()}>
           Save
         </Btn>
         {src === 'voice' && (
-          <Btn size="sm" disabled={busy} onClick={() => void clear()}>
+          <Btn pill size="sm" disabled={busy} onClick={() => void clear()}>
             Clear
           </Btn>
         )}
@@ -247,7 +247,7 @@ function SttPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
               </Field>
             </div>
             <div class="flex items-center gap-3">
-              <Btn size="sm" variant={listening.value ? 'primary' : 'outline'} disabled={!props.status?.ready} onClick={() => void test()}>
+              <Btn pill size="sm" variant={listening.value ? 'primary' : 'outline'} disabled={!props.status?.ready} onClick={() => void test()}>
                 {listening.value ? <Square size={11} /> : <Mic size={11} />} {listening.value ? 'Stop' : 'Test mic'}
               </Btn>
               {listening.value && (
@@ -355,7 +355,7 @@ function TtsPanel(props: { v: Voice; status?: VoiceSideStatus; onPatch: (p: Part
               />
             </Field>
             <div>
-              <Btn size="sm" variant={speaking.value ? 'primary' : 'outline'} disabled={!ready} onClick={() => void test()}>
+              <Btn pill size="sm" variant={speaking.value ? 'primary' : 'outline'} disabled={!ready} onClick={() => void test()}>
                 {speaking.value ? <Square size={11} /> : <Play size={11} />} {speaking.value ? 'Stop' : 'Test voice'}
               </Btn>
             </div>

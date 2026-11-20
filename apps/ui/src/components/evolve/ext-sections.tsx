@@ -145,20 +145,20 @@ function SecretRow(props: { extId: string; name: string; set: boolean; onSaved: 
             onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
             ref={(el) => el?.focus()}
           />
-          <Btn size="xs" type="submit" variant="primary" disabled={!value} loading={busy}>
+          <Btn pill size="xs" type="submit" variant="primary" disabled={!value} loading={busy}>
             Save
           </Btn>
-          <Btn size="xs" variant="ghost" type="button" onClick={() => setEditing(false)}>
+          <Btn pill size="xs" variant="ghost" type="button" onClick={() => setEditing(false)}>
             Cancel
           </Btn>
         </form>
       ) : (
         <span class="ml-auto flex gap-1.5">
-          <Btn size="xs" onClick={() => setEditing(true)}>
+          <Btn pill size="xs" onClick={() => setEditing(true)}>
             {props.set ? 'Replace' : 'Set'}
           </Btn>
           {props.set && (
-            <Btn size="xs" variant="ghost" onClick={() => void save('')} loading={busy} title="Clear this secret">
+            <Btn pill size="xs" variant="ghost" onClick={() => void save('')} loading={busy} title="Clear this secret">
               Clear
             </Btn>
           )}
@@ -221,12 +221,12 @@ function ToolRow(props: { extId: string; tool: ExtensionToolInfo; disabled: bool
           </div>
           {tool.description && <div class="text-[12px] text-fg-3 mt-1 leading-snug">{tool.description}</div>}
         </div>
-        <Btn size="xs" variant={open ? 'outline' : 'ghost'} onClick={() => setOpen(!open)} aria-expanded={open} title="Call this tool with test arguments">
+        <Btn pill size="xs" variant={open ? 'outline' : 'ghost'} onClick={() => setOpen(!open)} aria-expanded={open} title="Call this tool with test arguments">
           <FlaskConical size={11} /> Test
         </Btn>
       </div>
       {open && (
-        <div class="border-t border-line px-3 py-3 flex flex-col gap-2 bg-[#121213]/40">
+        <div class="border-t border-dashed border-line px-3 py-3 flex flex-col gap-2 bg-base-200/40">
           <label class="hud-label text-[10px]" for={`args-${tool.name}`}>
             Arguments · JSON
           </label>
@@ -246,7 +246,7 @@ function ToolRow(props: { extId: string; tool: ExtensionToolInfo; disabled: bool
           />
           {parseErr && <div class="font-mono text-[11px] text-red">{parseErr}</div>}
           <div class="flex items-center gap-2">
-            <Btn size="xs" variant="primary" onClick={() => void run()} loading={busy} disabled={props.disabled}>
+            <Btn pill size="xs" variant="primary" onClick={() => void run()} loading={busy} disabled={props.disabled}>
               {!busy && <Play size={10} />} Run
             </Btn>
             <span class="font-mono text-[10px] text-fg-3">{props.disabled ? 'extension must be active' : tool.risk !== 'safe' ? `runs for real · ${tool.risk}` : 'Ctrl+Enter'}</span>
@@ -286,8 +286,8 @@ function ExtPanelView(props: { extId: string; panelId: string; title: string; ac
   const res = useResource<PanelContent>(props.active ? `/extensions/${encodeURIComponent(props.extId)}/panels/${encodeURIComponent(props.panelId)}` : null, ['extensions']);
   const c = res.data;
   return (
-    <section class="border border-line bg-[#121213]/40 min-w-0">
-      <header class="flex items-center gap-2 px-3 py-2 border-b border-line">
+    <section class="border border-line bg-base-200/40 min-w-0">
+      <header class="flex items-center gap-2 px-3 py-2 border-b border-dashed border-line">
         <span class=" text-[12px] text-fg truncate">{c?.title || props.title}</span>
         <span class="ml-auto font-mono text-[10px] text-fg-3">{c ? ago(c.updatedAt) : ''}</span>
         <button class="text-fg-3 hover:text-fg disabled:opacity-40" onClick={() => void res.reload()} disabled={!props.active || res.loading} aria-label={`Refresh ${props.title}`} title="Refresh">
@@ -315,7 +315,7 @@ export function PanelBody(props: { c: PanelContent }) {
       {c.stats && c.stats.length > 0 && (
         <div class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-px bg-line border border-line">
           {c.stats.map((s, i) => (
-            <div key={i} class="bg-surface px-3 py-2 min-w-0" title={s.hint}>
+            <div key={i} class="bg-base-200 px-3 py-2 min-w-0" title={s.hint}>
               <div class="hud-label text-[10px] truncate">{s.label}</div>
               <div class="hud-value text-[16px] font-light mt-0.5 truncate">{s.value}</div>
               {s.hint && <div class="font-mono text-[10px] text-fg-3 truncate">{s.hint}</div>}
@@ -375,7 +375,7 @@ export function ExtLogs(props: { d: ExtensionDetail }) {
   }, [logs.length, follow, level]);
   return (
     <div class="flex flex-col h-full min-h-[320px]">
-      <div class="flex items-center gap-2 px-4 py-2 border-b border-line flex-wrap">
+      <div class="flex items-center gap-2 px-4 py-2 border-b border-dashed border-line flex-wrap">
         <span class="flex items-center gap-1.5 text-[12px] text-fg-3">
           <span class="inline-block w-1.5 h-1.5 bg-fg-2 hud-blink" /> live · 3s
         </span>
@@ -396,7 +396,7 @@ export function ExtLogs(props: { d: ExtensionDetail }) {
           </label>
         </div>
       </div>
-      <div ref={box} class="flex-1 min-h-0 overflow-auto bg-[#121213]/60 font-mono text-[11.5px] leading-[1.65] px-4 py-2" role="log" aria-live="off">
+      <div ref={box} class="flex-1 min-h-0 overflow-auto bg-base-200/60 font-mono text-[11.5px] leading-[1.65] px-4 py-2" role="log" aria-live="off">
         {shown.length ? (
           shown.map((l, i) => (
             <div key={i} class="flex gap-3 min-w-0">
@@ -441,12 +441,12 @@ export function ExtHistory(props: { d: ExtensionDetail; onChanged: () => Promise
   if (!hist.length) return <EvoNote label="No revisions recorded" />;
   return (
     <div class="p-4">
-      <ol class="relative border-l border-line ml-1.5">
+      <ol class="relative border-l border-dashed border-line ml-1.5">
         {hist.map((h) => {
           const current = h.revision === d.revision;
           return (
             <li key={h.revision} class="relative pl-5 pb-4 last:pb-0">
-              <span class={`absolute -left-[4px] top-1.5 w-[7px] h-[7px] ${current ? 'bg-red' : 'bg-surface border border-fg-3'}`} />
+              <span class={`absolute -left-[4px] top-1.5 w-[7px] h-[7px] ${current ? 'bg-red' : 'bg-base-200 border border-fg-3'}`} />
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-mono text-[12px] text-fg">rev {h.revision}</span>
                 <Tag tone="plain">{h.actor}</Tag>
@@ -459,7 +459,7 @@ export function ExtHistory(props: { d: ExtensionDetail; onChanged: () => Promise
                   {ago(h.ts)}
                 </span>
                 {!current && (
-                  <Btn size="xs" variant="ghost" class="ml-auto" onClick={() => void rollback(h.revision)} loading={busy === h.revision} disabled={busy !== null}>
+                  <Btn pill size="xs" variant="ghost" class="ml-auto" onClick={() => void rollback(h.revision)} loading={busy === h.revision} disabled={busy !== null}>
                     {busy !== h.revision && <Undo2 size={11} />} Rollback
                   </Btn>
                 )}

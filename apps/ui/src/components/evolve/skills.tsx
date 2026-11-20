@@ -29,14 +29,14 @@ export function SkillsTab(props: { id?: string }) {
         right={
           <>
             {list.data && <Tag tone="plain">{list.data.length}</Tag>}
-            <Btn size="xs" variant="ghost" onClick={() => navigate('evolve/skills/new')} title="Write a new skill">
+            <Btn pill size="xs" variant="ghost" onClick={() => navigate('evolve/skills/new')} title="Write a new skill">
               <Plus size={12} /> New
             </Btn>
           </>
         }
       >
         {(list.data?.length ?? 0) > 5 && (
-          <div class="px-3 py-2 border-b border-line">
+          <div class="px-3 py-2 border-b border-dashed border-line">
             <label class="relative block">
               <Search size={12} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
               <input class="hud-input py-1.5! pl-7! text-[13px]!" placeholder="Filter skills…" aria-label="Filter skills" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
@@ -73,7 +73,7 @@ export function SkillsTab(props: { id?: string }) {
                   label="No skills yet"
                   sub="Skills are procedures Monarch learned — how you like things done. It writes them as it goes; you can add your own."
                   action={
-                    <Btn size="xs" onClick={() => navigate('evolve/skills/new')}>
+                    <Btn pill size="xs" onClick={() => navigate('evolve/skills/new')}>
                       <Plus size={11} /> New skill
                     </Btn>
                   }
@@ -156,7 +156,7 @@ function SkillDetail(props: { id: string }) {
       <EvoGate res={res} loadingLabel="Loading skill">
         {(s) => (
           <>
-            <div class="px-4 py-3 border-b border-line flex items-start gap-3 flex-wrap">
+            <div class="px-4 py-3 border-b border-dashed border-line flex items-start gap-3 flex-wrap">
               <button class="lg:hidden text-fg-3 hover:text-fg mt-0.5" onClick={() => navigate('evolve/skills')} aria-label="Back to skills">
                 <ArrowLeft size={14} />
               </button>
@@ -167,19 +167,19 @@ function SkillDetail(props: { id: string }) {
               </div>
               <div class="flex gap-1.5">
                 {s.draft && (
-                  <Btn size="xs" variant="primary" onClick={() => void approve()} loading={busy} title="Approve: Monarch starts using this skill">
+                  <Btn pill size="xs" variant="primary" onClick={() => void approve()} loading={busy} title="Approve: Monarch starts using this skill">
                     {!busy && <Check size={11} />} Approve
                   </Btn>
                 )}
-                <Btn size="xs" onClick={() => setEditing(true)}>
+                <Btn pill size="xs" onClick={() => setEditing(true)}>
                   <Pencil size={11} /> Edit
                 </Btn>
-                <Btn size="xs" variant="ghost" class="hover:text-red!" onClick={() => void remove()} loading={busy} aria-label={s.draft ? 'Discard draft' : 'Delete skill'} title={s.draft ? 'Discard draft' : 'Delete skill'}>
+                <Btn pill size="xs" variant="ghost" class="hover:text-red!" onClick={() => void remove()} loading={busy} aria-label={s.draft ? 'Discard draft' : 'Delete skill'} title={s.draft ? 'Discard draft' : 'Delete skill'}>
                   {!busy && <Trash2 size={11} />}
                 </Btn>
               </div>
             </div>
-            {s.draft && <div class="px-4 py-2 border-b border-line text-[12px] text-fg-2">Drafted by Monarch from a task you repeated. It stays hidden from the agent until you approve it — edit it first if needed, or discard it.</div>}
+            {s.draft && <div class="px-4 py-2 border-b border-dashed border-line text-[12px] text-fg-2">Drafted by Monarch from a task you repeated. It stays hidden from the agent until you approve it — edit it first if needed, or discard it.</div>}
             <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4">
               <div class="max-w-[78ch]">{s.body.trim() ? <Markdown text={s.body} /> : <EvoNote label="Empty skill" />}</div>
             </div>
@@ -234,7 +234,7 @@ function SkillEditorPanel(props: { skill?: Skill; onDone?: () => void }) {
       noPad
       bodyClass="flex flex-col"
       right={
-        <Btn size="xs" variant="ghost" onClick={() => setPreview(!preview)} aria-pressed={preview}>
+        <Btn pill size="xs" variant="ghost" onClick={() => setPreview(!preview)} aria-pressed={preview}>
           {preview ? <Pencil size={11} /> : <Eye size={11} />} {preview ? 'Write' : 'Preview'}
         </Btn>
       }
@@ -276,7 +276,7 @@ function SkillEditorPanel(props: { skill?: Skill; onDone?: () => void }) {
             Body · markdown
           </label>
           {preview ? (
-            <div class="border border-line bg-[#121213] p-4 flex-1 overflow-y-auto">{body.trim() ? <Markdown text={body} /> : <EvoNote label="Nothing to preview" />}</div>
+            <div class="border border-line bg-base-200 p-4 flex-1 overflow-y-auto">{body.trim() ? <Markdown text={body} /> : <EvoNote label="Nothing to preview" />}</div>
           ) : (
             <textarea
               id="skill-body"
@@ -294,12 +294,12 @@ function SkillEditorPanel(props: { skill?: Skill; onDone?: () => void }) {
           )}
         </div>
       </div>
-      <div class="flex items-center gap-2 px-4 py-2.5 border-t border-line">
+      <div class="flex items-center gap-2 px-4 py-2.5 border-t border-dashed border-line">
         <span class=" text-[12px] text-fg-3 flex-1">{isNew ? 'saved as skills/' + (effId || '…') + '.md' : 'Ctrl+S saves'}</span>
-        <Btn size="sm" variant="ghost" onClick={cancel}>
+        <Btn pill size="sm" variant="ghost" onClick={cancel}>
           <X size={11} /> Cancel
         </Btn>
-        <Btn size="sm" variant="primary" onClick={() => void save()} loading={saving} disabled={!valid}>
+        <Btn pill size="sm" variant="primary" onClick={() => void save()} loading={saving} disabled={!valid}>
           {!saving && <Save size={11} />} Save
         </Btn>
       </div>

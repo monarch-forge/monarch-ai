@@ -5,13 +5,13 @@ import type { Settings } from '@monarch/shared';
 import { api } from '../../lib/api.ts';
 import { settings, toast } from '../../lib/store.ts';
 
-export const INPUT = 'input input-sm h-9 w-full bg-[#121213] border-line text-[13.5px] rounded-[var(--radius-control)] focus-within:outline-none focus-within:border-fg-3 transition-colors ';
-export const SELECT = 'select select-sm h-9 w-full bg-[#121213] border-line text-[13.5px] rounded-[var(--radius-control)] focus:border-fg-3 ';
-export const TEXTAREA = 'textarea textarea-sm w-full bg-[#121213] border-line text-[13.5px] rounded-[var(--radius-control)] leading-relaxed focus:border-fg-3 ';
+export const INPUT = 'input input-sm h-9 w-full bg-base-200 border-line text-[13.5px] rounded-[12px] focus-within:outline-none focus-within:border-[#6a6a70] transition-colors ';
+export const SELECT = 'select select-sm h-9 w-full bg-base-200 border-line text-[13.5px] rounded-[12px] focus:border-[#6a6a70] ';
+export const TEXTAREA = 'textarea textarea-sm w-full bg-base-200 border-line text-[13.5px] rounded-[12px] leading-relaxed focus:border-[#6a6a70] ';
 /** shared compact button classes, matching <Btn> (use <Btn> for new code) */
 export const BTN = 'btn btn-xs rounded-[var(--radius-control)] font-medium text-[12px] shadow-none transition-colors duration-150';
 export const BTN_OUT = `${BTN} btn-ghost bg-raised border-transparent text-fg-2 hover:bg-subtle hover:text-fg`;
-export const SEL_XS = 'select select-xs bg-[#121213] border-line rounded-[var(--radius-control)] text-[12px]';
+export const SEL_XS = 'select select-xs bg-base-200 border-line rounded-[var(--radius-control)] text-[12px]';
 export const TOGGLE = 'toggle toggle-sm rounded-full border-line bg-subtle text-fg-2 checked:bg-red checked:border-red checked:text-fg';
 export const RADIO = 'radio radio-sm border-line checked:bg-red checked:border-red checked:text-fg';
 

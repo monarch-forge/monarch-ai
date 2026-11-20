@@ -49,7 +49,7 @@ export function AccountMark(props: { id?: string | null; size?: number; title?: 
 export function Button(
   props: JSX.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'outline'; size?: 'xs' | 'sm' | 'md'; loading?: boolean },
 ) {
-  return <Btn {...(props as any)} />;
+  return <Btn pill {...(props as any)} />;
 }
 
 /* ─────────── modal ─────────── */
@@ -106,10 +106,10 @@ export function Modal(props: {
         role="dialog"
         aria-modal="true"
         aria-label={props.title}
-        class={`w-full max-h-[90vh] flex flex-col bg-surface rounded-[var(--radius-modal)] shadow-[0_12px_32px_rgb(0_0_0/0.45)] overflow-hidden ${props.width ?? 'max-w-lg'}`}
+        class={`w-full max-h-[90vh] flex flex-col bg-base-200 border border-[#2c2c30] rounded-[20px] shadow-[0_16px_48px_rgb(0_0_0/0.7)] overflow-hidden ${props.width ?? 'max-w-lg'}`}
       >
         <header class="flex items-center gap-3 px-5 pt-4 pb-2">
-          <h2 class="text-[15px] font-semibold text-fg">{props.title}</h2>
+          <h2 class="ds-label">{props.title}</h2>
           <button class="ml-auto -mr-1 p-1.5 rounded-md text-fg-3 hover:text-fg hover:bg-subtle transition-colors" onClick={props.onClose} title="Close (Esc)" aria-label="Close">
             <X size={15} />
           </button>
@@ -137,10 +137,10 @@ export function useConfirm(): [ComponentChildren, (o: { title: string; body?: Co
       width="max-w-md"
       footer={
         <>
-          <Btn variant="ghost" onClick={() => close(false)}>
+          <Btn pill variant="ghost" onClick={() => close(false)}>
             Cancel
           </Btn>
-          <Btn variant="primary" data-autofocus onClick={() => close(true)}>
+          <Btn pill variant="primary" data-autofocus onClick={() => close(true)}>
             {state?.confirmLabel ?? 'Confirm'}
           </Btn>
         </>
@@ -209,7 +209,7 @@ export function LoadError(props: { error?: string; onRetry?: () => void; class?:
       <div>{offline ? 'The core can’t be reached right now. We’ll try again as soon as it’s back.' : props.error}</div>
       {props.onRetry && (
         <div class="mt-3">
-          <Btn size="xs" onClick={props.onRetry}>
+          <Btn pill size="xs" onClick={props.onRetry}>
             Retry
           </Btn>
         </div>

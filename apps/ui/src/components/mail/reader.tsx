@@ -138,7 +138,7 @@ export function ThreadReader(props: {
       </div>
 
       {replyInit && (
-        <div class="h-[46%] min-h-56 flex flex-col bg-surface rounded-t-[14px] shadow-[0_-8px_24px_rgb(0_0_0/0.25)]">
+        <div class="h-[46%] min-h-56 flex flex-col bg-base-200 rounded-t-[14px] shadow-[0_-8px_24px_rgb(0_0_0/0.25)]">
           <Composer init={replyInit} accounts={props.accounts} lockAccount compact onDone={(sent) => {
             props.setReplyMode(null);
             if (sent) props.reload();
@@ -179,7 +179,7 @@ function MessageCard(props: { m: MailMessage; defaultOpen: boolean; me: string }
     );
   }
   return (
-    <article class="rounded-[var(--radius-card)] bg-surface">
+    <article class="rounded-[var(--radius-card)] bg-base-200">
       <header class="flex items-start gap-3 px-5 pt-4 pb-2 cursor-pointer" onClick={() => setOpen(false)}>
         <div class="min-w-0 flex-1">
           <div class="flex items-baseline gap-2">
