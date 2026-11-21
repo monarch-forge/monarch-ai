@@ -13,7 +13,7 @@ and only interrupt you when it matters.
 ![Platforms](https://img.shields.io/badge/platforms-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows%20%C2%B7%20Android-111)
 ![Local first](https://img.shields.io/badge/data-local--first-111)
 
-[**Download**](#install) · [Features](#features) · [Setup](docs/SETUP.md) · [Development](docs/DEVELOPMENT.md)
+[**Download**](#install) · [Videos](#videos) · [Features](#features) · [Setup](docs/SETUP.md) · [Development](docs/DEVELOPMENT.md)
 
 <br />
 
@@ -21,13 +21,12 @@ and only interrupt you when it matters.
 
 </div>
 
-## Demo
+## Videos
 
-A 45-second tour of Home, Chat, Workshop, Office, Inbox, Agenda, Ledger, System, Evolve, the Ctrl+K palette and Settings, using demo data.
-
-![Monarch demo tour](docs/pictures/demo.gif)
-
-[Watch the full-quality video (MP4)](docs/pictures/demo.mp4)
+| A 45-second tour | Real work: Chat → Workshop → PR |
+|:---:|:---:|
+| [<img src="docs/pictures/demo.jpg" width="400" alt="Tour of every page" />](docs/pictures/demo.mp4) | [<img src="docs/pictures/realwork.jpg" width="400" alt="Monarch converting its own website and opening a pull request" />](docs/pictures/realwork.mp4) |
+| Home, Chat, Workshop, Office, Inbox, Planner, Ledger, System (demo data) | One casual request in Chat: an agent turns the product site into a Vite + Preact project, then pushes it and opens a PR (3 min, partly sped up) |
 
 ## Why Monarch
 
