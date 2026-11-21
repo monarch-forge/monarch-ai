@@ -211,6 +211,8 @@ export interface ToolContext {
   progress(text: string): void;
   /** small-model mode is active for the calling session: prefer compact plain-text results */
   small?: boolean;
+  /** batch: run another session tool with the normal validation + approval (set by the engines) */
+  callTool?: (name: string, input: unknown) => Promise<string>;
 }
 
 /**

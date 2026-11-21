@@ -115,6 +115,15 @@ function shortPath(p: string): string {
 
 /** "Ran git status", "Read app.tsx", "Searched the web for …" */
 export function toolHeadline(name: string, input: unknown, status: ToolStatus): { verb: string; object: string; mono: boolean } {
+  if (displayToolName(name) === 'batch') {
+    // "Ran 12 × mail_read_thread" / "Ran 3 calls (mail_search, calendar_list, …)"
+    const o = rec(input);
+    const each = rec(o.each);
+    const calls = Array.isArray(o.calls) ? (o.calls as unknown[]).map((c) => String(rec(c).tool ?? '?')) : [];
+    const n = (Array.isArray(each.items) ? each.items.length : 0) + calls.length;
+    const what = each.tool ? `${Array.isArray(each.items) ? each.items.length : 0} × ${String(each.tool)}${calls.length ? ` + ${calls.length} more` : ''}` : `${n} calls (${calls.slice(0, 3).join(', ')}${calls.length > 3 ? ', …' : ''})`;
+    return { verb: status === 'ok' ? 'Ran' : 'Running', object: what, mono: true };
+  }
   const summary = toolSummary(name, input).split('\n')[0];
   const done = status === 'ok';
   const pick2 = (doing: string, did: string) => (done ? did : doing);

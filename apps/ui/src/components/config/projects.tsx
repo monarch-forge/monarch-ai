@@ -60,9 +60,10 @@ export function ProjectsSection() {
         }
       >
         <p class="text-[12.5px] text-fg-3 mb-3 leading-relaxed">
-          Add the folder that holds a project's repos (for example backend, frontend and services side by side). Monarch finds every git repo up to two levels
-          down and reads its own files (package.json, Makefile, go.mod, CI workflows, compose files, .env.example) to learn how to build, test and run it. Profiles
-          refresh by themselves when a repo's commit changes. Nothing is written into your repos.
+          A project is a folder you work in: one repo, or a folder holding several (backend, frontend, services side by side). Projects are
+          the folders Workshop offers, and Chat knows them, so it can start an agent in the right repo. Monarch finds every git repo up to two
+          levels down and reads its own files (package.json, Makefile, go.mod, CI workflows, compose files, .env.example) to learn how to build,
+          test and run it, refreshed when a repo's commit changes. A plain folder without git works too. Nothing is written into your repos.
         </p>
         {list.loading && !list.data ? (
           <Skeleton lines={3} class="py-2" />
@@ -70,7 +71,7 @@ export function ProjectsSection() {
           <EmptyState
             icon={<FolderGit2 size={18} strokeWidth={1.5} />}
             title="No projects yet"
-            hint="Point Monarch at a folder with your repos. It learns how to build, test and run each one."
+            hint="Add a folder you work in. Workshop lists it, and Monarch learns how to build, test and run each repo in it."
             actions={
               <Btn pill variant="primary" size="sm" onClick={() => setPicking(true)}>
                 <FolderOpen size={13} /> Add folder

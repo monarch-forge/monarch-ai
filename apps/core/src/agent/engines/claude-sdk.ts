@@ -3,6 +3,7 @@
  * streaming-input mode with a single user message), resuming the stored Claude Code session id
  * on follow-up turns. Uses the user's Claude subscription login unless settings say otherwise.
  */
+import { innerCaller } from '../batch.ts';
 import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import {
@@ -162,12 +163,16 @@ async function runOnce(ctx: TurnContext, allowResume: boolean, promptOverride?: 
           async (args: Record<string, unknown>) => {
             const callId = takeCallId(def.name);
             try {
-              const text = await runToolDef(def, args, {
+              const base = {
                 sessionId: rec.id,
                 cwd: ctx.cwd,
                 signal: ctx.signal,
-                progress: (t) => ctx.progress(callId, def.name, t),
+                progress: (t: string) => ctx.progress(callId, def.name, t),
                 small,
+              };
+              const text = await runToolDef(def, args, {
+                ...base,
+                callTool: innerCaller((n) => defByName.get(n), ctx.approve, (d, input) => runToolDef(d, input, base), callId ?? def.name),
               });
               return { content: [{ type: 'text' as const, text }] };
             } catch (e) {

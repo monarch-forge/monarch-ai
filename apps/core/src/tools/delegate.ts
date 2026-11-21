@@ -6,6 +6,7 @@
  * raised inside it go through the normal approvals flow (broadcast to the dock with the child's sessionId).
  * The child records `parentSessionId`; when it goes idle the orchestrator posts a notification linking to it.
  */
+import { knownFolders } from '../services/projects.ts';
 import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, resolve } from 'node:path';
@@ -62,7 +63,7 @@ async function validateModel(engine: EngineId | undefined, model: string | undef
 const link = (id: string) => `#/workshop/${encodeURIComponent(id)}`;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** absolute path, "~/x", or the name (basename) of a remembered Workshop workspace */
+/** absolute path, "~/x", or the name (basename) of a project or one of its repos */
 export function resolveWorkspace(spec: string | undefined): string {
   const s = getSettings().coding;
   const raw = spec?.trim();
@@ -72,10 +73,10 @@ export function resolveWorkspace(spec: string | undefined): string {
   }
   if (raw === '~' || raw.startsWith('~/')) return checkDir(resolve(homedir(), raw.slice(2)));
   if (isAbsolute(raw)) return checkDir(resolve(raw));
-  const known = [...(s.workspaces ?? []), s.defaultWorkspace].filter(Boolean);
+  const known = [...knownFolders(), s.defaultWorkspace].filter(Boolean);
   const hit = known.find((w) => basename(w).toLowerCase() === raw.toLowerCase()) ?? known.find((w) => basename(w).toLowerCase().includes(raw.toLowerCase()));
   if (hit) return checkDir(hit);
-  throw new Error(`Unknown workspace "${raw}". Give an absolute path, or one of: ${known.map((w) => basename(w)).join(', ') || '(none remembered)'}`);
+  throw new Error(`Unknown folder "${raw}". Give an absolute path, or one of the projects/repos: ${known.map((w) => basename(w)).join(', ') || '(none added yet)'}`);
 }
 
 function checkDir(p: string): string {

@@ -2,7 +2,7 @@
  * Workshop — coding sessions per workspace (route #/workshop/:id?, "new" or no id = new session). UI-B.
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import type { EngineId } from '@monarch/shared';
+import type { EngineId, ProjectView } from '@monarch/shared';
 import { Plus, FolderOpen, X, GitBranch, ChevronDown, RefreshCw, FolderGit2, SquarePen } from 'lucide-preact';
 import { Spinner, ErrorLine, Btn, EmptyState, Skeleton, fmt } from '../components/ui.tsx';
 import { ChatLayout, SideLabel, LiveBadge, Suggestions, ICON_BTN, useStoredFlag } from '../components/chat/layout.tsx';
@@ -17,6 +17,7 @@ import { PrPanel } from '../components/pr-panel.tsx';
 import { PlanPanel } from '../components/chat/plan-panel.tsx';
 import { useChatSession, useSessions } from '../lib/chat-store.ts';
 import { conn, navigate, settings, toast, useResource } from '../lib/store.ts';
+import { api } from '../lib/api.ts';
 
 interface GitInfo {
   branch: string | null;
@@ -55,7 +56,17 @@ export default function WorkshopPage(props: { params: string[] }) {
   const routeId = props.params[0];
   const sessionId = routeId && routeId !== 'new' ? routeId : null;
   const s = settings.value;
-  const workspaces = s?.coding.workspaces ?? [];
+  // Workshop folders = Projects (Settings → Projects): each project root and the git repos found in it
+  const projectsRes = useResource<ProjectView[]>('/projects', ['projects']);
+  const folders = useMemo(() => {
+    const out: { path: string; label: string; projectId?: string }[] = [];
+    for (const p of projectsRes.data ?? []) {
+      out.push({ path: norm(p.root), label: p.name, projectId: p.id });
+      for (const r of p.repos) if (norm(r.path) !== norm(p.root)) out.push({ path: norm(r.path), label: `${p.name} / ${r.path.slice(p.root.length + 1)}` });
+    }
+    return out;
+  }, [projectsRes.data]);
+  const workspaces = folders.map((f) => f.path);
 
   const chat = useChatSession(sessionId);
   const coding = useSessions('coding');
@@ -76,9 +87,9 @@ export default function WorkshopPage(props: { params: string[] }) {
   }, [session?.cwd]);
   useEffect(() => {
     if (selected || !s) return;
-    const fallback = s.coding.defaultWorkspace || s.coding.workspaces[0];
+    const fallback = s.coding.defaultWorkspace || workspaces[0];
     if (fallback) setSelected(fallback);
-  }, [s, selected]);
+  }, [s, selected, workspaces.join('|')]);
   useEffect(() => {
     if (selected) writeLS(WS_KEY, selected);
   }, [selected]);
@@ -100,18 +111,27 @@ export default function WorkshopPage(props: { params: string[] }) {
   const wsSessions = useMemo(() => (coding.sessions ?? []).filter((x) => norm(x.cwd) === norm(selected)), [coding.sessions, selected]);
   const otherSessions = useMemo(() => (coding.sessions ?? []).filter((x) => !allWs.includes(norm(x.cwd))), [coding.sessions, allWs]);
 
+  // adding a folder adds a project (scanned for repos, learned like any project)
   const addWorkspace = async (path: string) => {
     setBrowse(false);
     const p = norm(path);
     setSelected(p);
-    if (workspaces.map(norm).includes(p)) return;
-    await saveSettings({ coding: { workspaces: [...workspaces, p] } } as any, `Workspace added: ${base(p)}`);
+    if (workspaces.includes(p)) return;
+    try {
+      const v = await api.post<ProjectView>('/projects', { root: p });
+      toast(`Project added: ${v.name}${v.repos.length ? ` · ${v.repos.length} repo${v.repos.length === 1 ? '' : 's'}` : ''}`, 'success');
+      void projectsRes.reload();
+    } catch (e: any) {
+      toast(e?.message ?? String(e), 'error');
+    }
   };
 
   const removeWorkspace = async (path: string) => {
-    const next = workspaces.filter((w) => norm(w) !== norm(path));
-    await saveSettings({ coding: { workspaces: next } } as any, `Workspace removed: ${base(path)}`);
-    if (norm(selected) === norm(path)) setSelected(next[0] ?? '');
+    const f = folders.find((x) => x.path === norm(path));
+    if (!f?.projectId) return;
+    await api.del(`/projects/${encodeURIComponent(f.projectId)}`).catch((e) => toast(String(e?.message ?? e), 'error'));
+    void projectsRes.reload();
+    if (norm(selected).startsWith(norm(path))) setSelected('');
   };
 
   const pickWorkspace = (p: string) => {
@@ -152,12 +172,12 @@ export default function WorkshopPage(props: { params: string[] }) {
           class="w-full flex items-center gap-2.5 rounded-[8px] px-3 h-11 bg-[var(--bg-primary)]/60 hover:bg-[var(--bg-raised,#202023)] text-left transition-colors duration-150"
           onClick={() => setWsOpen(!wsOpen)}
           aria-expanded={wsOpen}
-          title={selected || 'Choose a workspace'}
+          title={selected || 'Choose a project'}
         >
           <FolderGit2 size={16} strokeWidth={1.75} class="text-fg-3 shrink-0" />
           <span class="flex-1 min-w-0">
-            <span class="block text-[11px] text-fg-3 leading-tight">Workspace</span>
-            <span class="block truncate text-[13.5px] text-fg leading-tight">{selected ? base(selected) : 'Choose one…'}</span>
+            <span class="block text-[11px] text-fg-3 leading-tight">Project</span>
+            <span class="block truncate text-[13.5px] text-fg leading-tight">{selected ? (folders.find((f) => f.path === norm(selected))?.label ?? base(selected)) : 'Choose one…'}</span>
           </span>
           <ChevronDown size={15} strokeWidth={1.75} class={`text-fg-3 shrink-0 transition-transform duration-150 ${wsOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -167,7 +187,8 @@ export default function WorkshopPage(props: { params: string[] }) {
               <div class="flex justify-center py-3">{conn.value === 'open' ? <Skeleton lines={2} class="w-full px-2" /> : <ErrorLine error="Core offline" />}</div>
             ) : (
               allWs.map((w) => {
-                const saved = workspaces.map(norm).includes(w);
+                const f = folders.find((x) => x.path === w);
+                const saved = !!f;
                 const on = norm(selected) === w;
                 return (
                   <div
@@ -179,15 +200,15 @@ export default function WorkshopPage(props: { params: string[] }) {
                     }}
                     title={w}
                   >
-                    <span class={`flex-1 min-w-0 truncate text-[13px] ${on ? 'text-fg' : 'text-fg-2'}`}>
-                      {base(w)}
+                    <span class={`flex-1 min-w-0 truncate text-[13px] ${on ? 'text-fg' : 'text-fg-2'} ${f && !f.projectId ? 'pl-3' : ''}`}>
+                      {f?.label ?? base(w)}
                       {norm(s.coding.defaultWorkspace) === w && <span class="text-[11px] text-fg-3 ml-1.5">default</span>}
                     </span>
                     <span class="text-[11px] text-fg-3 tabular-nums group-hover:hidden">{byWs.get(w) ?? 0}</span>
-                    {saved ? (
+                    {f?.projectId ? (
                       <button
                         class="text-fg-3 hover:text-red hidden group-hover:block"
-                        title="Remove from list (files are untouched)"
+                        title="Remove project (files are untouched)"
                         onClick={(e) => {
                           e.stopPropagation();
                           void removeWorkspace(w);
@@ -195,16 +216,16 @@ export default function WorkshopPage(props: { params: string[] }) {
                       >
                         <X size={13} />
                       </button>
-                    ) : (
+                    ) : saved ? null : (
                       <button
                         class="text-[11.5px] text-fg-3 hover:text-fg hidden group-hover:block"
-                        title="Save to workspace list"
+                        title="Add as a project"
                         onClick={(e) => {
                           e.stopPropagation();
                           void addWorkspace(w);
                         }}
                       >
-                        Save
+                        Add
                       </button>
                     )}
                   </div>
@@ -219,7 +240,7 @@ export default function WorkshopPage(props: { params: string[] }) {
               }}
               disabled={conn.value !== 'open'}
             >
-              <Plus size={14} strokeWidth={1.75} /> Add a folder…
+              <Plus size={14} strokeWidth={1.75} /> Add a project folder…
             </button>
           </div>
         )}

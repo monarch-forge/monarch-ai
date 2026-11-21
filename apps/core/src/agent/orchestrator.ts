@@ -6,7 +6,7 @@
  */
 import type { AgentPhase, ChatItem, ClientCommand, EngineId, SessionKind, Usage } from '@monarch/shared';
 import { activity, bus, newId, notify, nowIso, truncate } from '../kernel.ts';
-import { getSettings } from '../settings.ts';
+import { getSettings, onSettingsChanged } from '../settings.ts';
 import { recordUsage } from '../services/usage.ts';
 import { spawn } from 'node:child_process';
 import { getRepoProfile, repoTarget } from '../services/projects.ts';
@@ -363,7 +363,7 @@ async function startTurn(rec: SessionRecord, text: string, mode: 'turn' | 'compa
   try {
     const engine = engines[rec.engine] ?? engines['claude-sdk'];
     const cwd = effectiveCwd(rec);
-    const systemPrompt = await buildSystemPrompt({ kind: rec.kind, cwd, engine: engine.id, sessionId: rec.id, model: rec.model, piProvider: rec.engineState.piProvider });
+    const systemPrompt = await sessionPrompt(rec, { kind: rec.kind, cwd, engine: engine.id, sessionId: rec.id, model: rec.model, piProvider: rec.engineState.piProvider }, mode === 'compact');
     const ctx: TurnContext = {
       session: rec,
       text,
@@ -871,4 +871,24 @@ export function waitForSessionIdle(sessionId: string, timeoutMs: number, signal?
     signal?.addEventListener('abort', onAbort, { once: true });
     set.add(w);
   });
+}
+
+/*
+ * Per-session system prompt cache (pi). Providers cache the unchanged start of a request (prompt + history),
+ * so rebuilding the prompt every turn with fresh details (memory list, auto-mode line) throws that cache away.
+ * Reuse it until the day, the settings or the session's setup change, or the session compacts.
+ * claude-sdk keeps rebuilding: its prompt carries a live list of worker agents.
+ */
+const promptCache = new Map<string, { key: string; prompt: string }>();
+let settingsRev = 0;
+onSettingsChanged(() => settingsRev++);
+
+async function sessionPrompt(rec: SessionRecord, opts: Parameters<typeof buildSystemPrompt>[0], fresh: boolean): Promise<string> {
+  if (opts.engine !== 'pi') return buildSystemPrompt(opts);
+  const key = JSON.stringify([new Date().toDateString(), settingsRev, opts.kind, opts.cwd, opts.model, opts.piProvider]);
+  const hit = promptCache.get(rec.id);
+  if (hit && hit.key === key && !fresh) return hit.prompt;
+  const prompt = await buildSystemPrompt(opts);
+  promptCache.set(rec.id, { key, prompt });
+  return prompt;
 }

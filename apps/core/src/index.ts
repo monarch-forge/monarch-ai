@@ -114,6 +114,7 @@ async function main(): Promise<void> {
   await step('extensions', initEvolution, 25_000);
   await step('mcp', startMcp); // connects in the background; never waits on a server
   startScheduler();
+  void import('./services/projects.ts').then((m) => m.migrateWorkspaces()).catch((e) => console.warn('[projects] workspace migration failed', e));
   startMetrics();
   await step('sync', startSync);
   try {

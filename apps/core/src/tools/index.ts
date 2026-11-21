@@ -15,6 +15,7 @@
  *  + mcpToolDefs()              live tools of connected MCP servers (deferred unless the server is alwaysLoad)
  * Loading: ToolDef.loading === 'always' → in every prompt; otherwise deferred behind tool search.
  */
+import { batchTool } from '../agent/batch.ts';
 import type { ToolDef } from '../kernel.ts';
 import { tools as system } from './system.ts';
 import { tools as productivity } from './productivity.ts';
@@ -37,7 +38,7 @@ import { mcpToolDefs } from '../mcp/index.ts';
 
 /** tools available to every session */
 export function assistantTools(): ToolDef[] {
-  return [...system, ...productivity, ...web, ...mail, ...slack, ...whatsapp,...memory, ...ledger, ...projects, ...github, ...background, ...evolve, ...delegate, ...threads,...extensionToolDefs(), ...mcpToolDefs()];
+  return [batchTool(findTool), ...system, ...productivity, ...web, ...mail, ...slack, ...whatsapp,...memory, ...ledger, ...projects, ...github, ...background, ...evolve, ...delegate, ...threads,...extensionToolDefs(), ...mcpToolDefs()];
 }
 
 /** file/shell tools for the pi engine (claude-sdk engine uses Claude Code's own Read/Write/Edit/Bash/Grep/Glob instead) */

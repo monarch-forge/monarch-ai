@@ -36,18 +36,41 @@ import type { Settings } from '@monarch/shared';
 import OverviewPage from './pages/overview.tsx';
 import CommsPage from './pages/comms.tsx';
 import WorkshopPage from './pages/workshop.tsx';
-import MailPage from './pages/mail.tsx';
-import SlackPage from './pages/slack.tsx';
-import WhatsAppPage from './pages/whatsapp.tsx';
-import AgendaPage from './pages/agenda.tsx';
-import MemoryPage from './pages/memory.tsx';
-import SystemsPage from './pages/systems.tsx';
-import RouterPage from './pages/router.tsx';
-import OfficePage from './pages/office.tsx';
-import EvolvePage from './pages/evolve.tsx';
-import ConfigPage from './pages/config.tsx';
-import LedgerPage from './pages/ledger.tsx';
-import WelcomePage from './pages/welcome.tsx';
+/**
+ * Pages outside the core trio load on first visit (smaller first download, faster start, quicker over the phone link),
+ * and are prefetched once the app is idle so switching stays instant.
+ */
+const lazyLoaders: (() => Promise<unknown>)[] = [];
+function lazyPage(load: () => Promise<{ default: ComponentType<any> }>): ComponentType<any> {
+  let Loaded: ComponentType<any> | null = null;
+  let pending: Promise<void> | null = null;
+  const get = () => (pending ??= load().then((m) => void (Loaded = m.default)));
+  lazyLoaders.push(get);
+  return function LazyPage(props: any) {
+    const [, rerender] = useState(0);
+    if (Loaded) return <Loaded {...props} />;
+    void get().then(() => rerender((n) => n + 1));
+    return null;
+  };
+}
+if (typeof window !== 'undefined') {
+  const warm = () => lazyLoaders.forEach((l) => void l().catch(() => {}));
+  if ('requestIdleCallback' in window) (window as any).requestIdleCallback(warm, { timeout: 4000 });
+  else setTimeout(warm, 2500);
+}
+
+const MailPage = lazyPage(() => import('./pages/mail.tsx'));
+const SlackPage = lazyPage(() => import('./pages/slack.tsx'));
+const WhatsAppPage = lazyPage(() => import('./pages/whatsapp.tsx'));
+const AgendaPage = lazyPage(() => import('./pages/agenda.tsx'));
+const MemoryPage = lazyPage(() => import('./pages/memory.tsx'));
+const SystemsPage = lazyPage(() => import('./pages/systems.tsx'));
+const RouterPage = lazyPage(() => import('./pages/router.tsx'));
+const OfficePage = lazyPage(() => import('./pages/office.tsx'));
+const EvolvePage = lazyPage(() => import('./pages/evolve.tsx'));
+const ConfigPage = lazyPage(() => import('./pages/config.tsx'));
+const LedgerPage = lazyPage(() => import('./pages/ledger.tsx'));
+const WelcomePage = lazyPage(() => import('./pages/welcome.tsx'));
 import { ApprovalDock } from './components/approvals.tsx';
 import { CommandPalette, paletteOpen } from './components/command-palette.tsx';
 import { NotificationDrawer, notificationsOpen } from './components/notifications.tsx';

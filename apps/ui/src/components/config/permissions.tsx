@@ -92,7 +92,7 @@ export function PermissionsSection() {
               </button>
             </div>
           </Field>
-          <Field label="Default coding workspace" hint="Used by Workshop and coding tools when no folder is chosen.">
+          <Field label="Default folder" hint="Where Workshop and coding tools start when no project is picked.">
             <div class="flex gap-2">
               <input
                 class={`${INPUT} font-mono`}
@@ -100,13 +100,7 @@ export function PermissionsSection() {
                 onInput={(e) => set({ defaultWorkspace: (e.target as HTMLInputElement).value })}
                 placeholder="~/code"
                 spellcheck={false}
-                list="monarch-workspaces"
               />
-              <datalist id="monarch-workspaces">
-                {s.coding.workspaces.map((w) => (
-                  <option key={w} value={w} />
-                ))}
-              </datalist>
               <button class="btn btn-sm btn-outline border-line rounded-[var(--radius-control)] text-fg-2 hover:bg-subtle font-normal text-[12px]" onClick={() => setBrowse('ws')}>
                 <FolderOpen size={12} /> Browse
               </button>

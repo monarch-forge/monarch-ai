@@ -16,6 +16,8 @@ import { defineTool, truncate, type ToolDef } from '../../kernel.ts';
 import { getSettings } from '../../settings.ts';
 import { emptyUsage, addUsage, autoCompactPercent, type SessionRecord } from '../sessions.ts';
 import { deferToolsEnabled, errorText, shortDesc, loadsUpFront, piToolDefs, runToolDef, smallModeFor, toolJsonSchema, toolSearchReport, toolSummary } from '../toolset.ts';
+import { canRunParallel } from '../parallel.ts';
+import { innerCaller } from '../batch.ts';
 import { parseLooseObject, parseTextToolCalls, textToolResultsMessage, type TextToolCall } from '../text-tools.ts';
 import { codingAgentsBrief } from '../../tools/delegate.ts';
 import { withThreadsNote } from '../threads.ts';
@@ -109,7 +111,7 @@ function agentTool(entry: Entry, sessionId: string, def: ToolDef): AgentTool<any
     label: def.name,
     description: entry.small ? (shortDesc(def.description, 360) ?? '') : def.description,
     parameters: toolJsonSchema(def),
-    executionMode: 'sequential',
+    executionMode: canRunParallel(def) ? 'parallel' : 'sequential',
     async execute(toolCallId, params, signal) {
       const turn = entry.turn;
       if (!turn) throw new Error('No active turn');
@@ -121,12 +123,16 @@ function agentTool(entry: Entry, sessionId: string, def: ToolDef): AgentTool<any
         summary: toolSummary(def, params),
       });
       if (!ok) throw new Error('The user declined this action. Do not retry it; ask how to proceed instead.');
-      const text = await runToolDef(def, params, {
+      const base = {
         sessionId,
         cwd: turn.ctx.cwd,
         signal: signal ?? turn.ctx.signal,
-        progress: (t) => turn.ctx.progress(toolCallId, def.name, t),
+        progress: (t: string) => turn.ctx.progress(toolCallId, def.name, t),
         small: entry.small,
+      };
+      const text = await runToolDef(def, params, {
+        ...base,
+        callTool: innerCaller((n) => entry.defs.get(n), turn.ctx.approve, (d, input) => runToolDef(d, input, base), toolCallId),
       });
       return { content: [{ type: 'text', text }], details: {} };
     },
@@ -673,7 +679,7 @@ export const piEngine: Engine = {
           return { context: { messages: turnCtx.context.messages, tools } };
         },
         sessionId: rec.id,
-        toolExecution: 'sequential',
+        toolExecution: 'parallel',
         identity: { attribution: null, userAgent: 'short' },
       });
       fresh.agent.subscribe((ev) => onEvent(fresh, ev, rec));
@@ -846,10 +852,16 @@ async function drainTextCalls(entry: Entry, rec: SessionRecord, turn: TurnState,
       textToolSessions.add(rec.id);
       console.warn(`[pi] model ${model.id} writes tool calls as text (no native tool calls); session ${rec.id} uses the text tool-call fallback`);
     }
-    const results: { name: string; ok: boolean; output: string }[] = [];
-    for (const call of calls) {
-      if (ctx.signal.aborted) break;
-      results.push(await runTextCall(entry, rec, turn, call));
+    let results: { name: string; ok: boolean; output: string }[] = [];
+    const defOf = (c: TextToolCall) => entry.defs.get(c.name);
+    if (calls.length > 1 && calls.every((c) => { const d = defOf(c); return !!d && canRunParallel(d); })) {
+      // all read-only: run together, results kept in call order (same rule as native tool calls)
+      results = await Promise.all(calls.map((call) => runTextCall(entry, rec, turn, call)));
+    } else {
+      for (const call of calls) {
+        if (ctx.signal.aborted) break;
+        results.push(await runTextCall(entry, rec, turn, call));
+      }
     }
     if (ctx.signal.aborted) return;
     if (entry.toolsDirty) {

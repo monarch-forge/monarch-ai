@@ -350,8 +350,8 @@ export async function addProject(input: { name?: string; root?: string }): Promi
   }
   if (projects.get().some((p) => p.root === root)) throw new HttpError(409, `already added: ${root}`);
   const p: Project = { id: newId(), name: input.name?.trim() || basename(root), root, createdAt: nowIso() };
+  // a plain folder (no git repos) is fine: it is still a place Workshop agents can work in
   const view = await projectView(p);
-  if (!view.repos.length) throw new HttpError(400, `no git repositories found in ${root} (looked two levels deep)`);
   projects.update((a) => {
     a.push(p);
   });
@@ -378,6 +378,29 @@ export async function rescanProject(id: string): Promise<ProjectView> {
 export function projectOf(path: string): Project | undefined {
   const abs = resolve(expandHome(path));
   return projects.get().find((p) => abs === p.root || abs.startsWith(`${p.root}/`));
+}
+
+/** every folder Workshop can work in: project roots, then the repos found in them (deduped) */
+export function knownFolders(): string[] {
+  const roots = projects.get().map((p) => p.root);
+  const repos = Object.keys(profiles.get()).filter((r) => roots.some((root) => r === root || r.startsWith(`${root}/`)));
+  return [...new Set([...roots, ...repos])];
+}
+
+/**
+ * One-time move: Workshop used to keep its own folder list (settings.coding.workspaces). Projects is now the
+ * only list, so each old entry not already covered by a project becomes one, and the old list is cleared.
+ */
+export async function migrateWorkspaces(): Promise<void> {
+  const { getSettings, updateSettings } = await import('../settings.ts');
+  const old = getSettings().coding.workspaces ?? [];
+  if (!old.length) return;
+  for (const w of old) {
+    if (!existsSync(w) || projectOf(w)) continue;
+    await addProject({ root: w }).catch((e) => console.warn(`[projects] could not move workspace ${w}: ${e?.message ?? e}`));
+  }
+  updateSettings({ coding: { workspaces: [] } } as any);
+  console.log(`[projects] moved ${old.length} Workshop workspace(s) into Projects`);
 }
 
 /* ─────────────── prompt text ─────────────── */
