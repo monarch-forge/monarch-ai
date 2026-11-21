@@ -96,20 +96,20 @@ Download the installer for your platform from the [latest release](https://githu
 
 | Platform | File | How |
 |---|---|---|
-| **Arch Linux** | `monarch-ai-bin-0.18.0-1-x86_64.pkg.tar.zst` | See below |
-| **Debian / Ubuntu** | `Monarch_0.18.0_amd64.deb` | `sudo apt install ./Monarch_0.18.0_amd64.deb` |
-| **Fedora / openSUSE** | `Monarch-0.18.0-1.x86_64.rpm` | `sudo dnf install ./Monarch-0.18.0-1.x86_64.rpm` |
-| **Any Linux** | `Monarch_0.18.0_amd64.AppImage` | `chmod +x` it, then run it |
-| **macOS (Apple Silicon)** | `Monarch_0.18.0_aarch64.dmg` | Drag to Applications |
-| **macOS (Intel)** | `Monarch_0.18.0_x64.dmg` | Drag to Applications |
-| **Windows** | `Monarch_0.18.0_x64-setup.exe` or `.msi` | Run the installer |
-| **Android** | `Monarch-0.18.0-android-arm64.apk` | Install, then pair with your laptop |
+| **Arch Linux** | `monarch-ai-bin-0.18.1-1-x86_64.pkg.tar.zst` | See below |
+| **Debian / Ubuntu** | `Monarch_0.18.1_amd64.deb` | `sudo apt install ./Monarch_0.18.1_amd64.deb` |
+| **Fedora / openSUSE** | `Monarch-0.18.1-1.x86_64.rpm` | `sudo dnf install ./Monarch-0.18.1-1.x86_64.rpm` |
+| **Any Linux** | `Monarch_0.18.1_amd64.AppImage` | `chmod +x` it, then run it |
+| **macOS (Apple Silicon)** | `Monarch_0.18.1_aarch64.dmg` | Drag to Applications |
+| **macOS (Intel)** | `Monarch_0.18.1_x64.dmg` | Drag to Applications |
+| **Windows** | `Monarch_0.18.1_x64-setup.exe` or `.msi` | Run the installer |
+| **Android** | `Monarch-0.18.1-android-arm64.apk` | Install, then pair with your laptop |
 
 **Arch Linux.** Download the package, then install the local file:
 
 ```bash
-curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.18.0/monarch-ai-bin-0.18.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./monarch-ai-bin-0.18.0-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/monarch-forge/monarch-ai/releases/download/v0.18.1/monarch-ai-bin-0.18.1-1-x86_64.pkg.tar.zst
+sudo pacman -U ./monarch-ai-bin-0.18.1-1-x86_64.pkg.tar.zst
 ```
 
 Don't pass the URL straight to `pacman -U`: the package isn't GPG-signed, and pacman rejects unsigned remote packages. Optional extras for notifications, opening links and faster code search: `sudo pacman -S --needed libnotify xdg-utils ripgrep`.

@@ -2,7 +2,7 @@
  * Systems — detailed machine + core telemetry.
  * OWNED BY UI-A.
  */
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { ProcessInfo, SystemInfo, SystemMetrics } from '@monarch/shared';
 import { conn, health, metrics, metricsHistory, phase, settings, useResource } from '../lib/store.ts';
 import { DotText, Glyph, Panel, Sparkline, Stat, Tag, fmt, useNow } from '../components/ui.tsx';
@@ -196,12 +196,17 @@ function MemBody(props: { m: SystemMetrics; hist: SystemMetrics[] }) {
 
 function MeterRow(props: { label: string; pct: number; detail: string }) {
   return (
-    <div class="grid grid-cols-[44px_1fr_auto] gap-3 items-center">
-      <span class="hud-label text-[10px]">{props.label}</span>
-      <Glyph value={(props.pct / 100) * 24} of={24} tone={glyphTone(props.pct)} title={fmt.pct(props.pct)} />
-      <span class={`hud-value text-[11px] text-right min-w-[150px] ${props.pct >= 85 ? 'text-red' : ''}`}>
-        <span class="text-fg-2">{props.detail}</span> · {fmt.pct(props.pct)}
-      </span>
+    // label + numbers on one line, the meter below: fits any card width and text size
+    <div class="flex flex-col gap-1.5 min-w-0">
+      <div class="flex items-baseline justify-between gap-3 min-w-0">
+        <span class="hud-label text-[10px] shrink-0">{props.label}</span>
+        <span class={`hud-value text-[11px] text-right truncate ${props.pct >= 85 ? 'text-red' : ''}`}>
+          <span class="text-fg-2">{props.detail}</span> · {fmt.pct(props.pct)}
+        </span>
+      </div>
+      <div class="min-w-0 overflow-hidden">
+        <Glyph value={(props.pct / 100) * 24} of={24} tone={glyphTone(props.pct)} title={fmt.pct(props.pct)} />
+      </div>
     </div>
   );
 }
@@ -331,7 +336,9 @@ function CoreBody() {
 type SortKey = 'cpu' | 'mem' | 'name' | 'pid';
 
 function ProcessesPanel(props: { class?: string }) {
-  const res = useResource<ProcessInfo[]>('/system/processes?limit=20', [], { intervalMs: 5000 });
+  const visible = usePageVisible();
+  // refresh only while the window is visible (the core reads /proc, no `ps` spawn)
+  const res = useResource<ProcessInfo[]>(visible ? '/system/processes?limit=20' : null, [], { intervalMs: 3000 });
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'cpu', desc: true });
   const rows = useMemo(() => {
     const list = (res.data ?? []).slice();
@@ -412,3 +419,14 @@ function ProcessesPanel(props: { class?: string }) {
 }
 
 const glyphTone = (pct: number) => (tone85(pct) === 'red' ? 'red' : 'fg');
+
+/** true while the window is visible (not minimised or in a background tab) */
+function usePageVisible(): boolean {
+  const [v, setV] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
+  useEffect(() => {
+    const on = () => setV(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+  return v;
+}

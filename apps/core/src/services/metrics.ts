@@ -4,6 +4,7 @@ import si from 'systeminformation';
 import type { ProcessInfo, SystemInfo, SystemMetrics } from '@monarch/shared';
 import { bus } from '../kernel.ts';
 import { CORE_VERSION } from './meta.ts';
+import { procList } from './procs.ts';
 
 const INTERVAL_MS = 2000;
 
@@ -177,6 +178,12 @@ export async function systemInfo(): Promise<SystemInfo> {
 }
 
 export async function topProcesses(limit = 15, sortBy: 'cpu' | 'mem' = 'cpu'): Promise<ProcessInfo[]> {
+  // Linux: read /proc directly; systeminformation spawns `ps`, which pinned a core on every refresh
+  if (process.platform === 'linux') return procList(limit, sortBy).catch(() => siProcesses(limit, sortBy));
+  return siProcesses(limit, sortBy);
+}
+
+async function siProcesses(limit: number, sortBy: 'cpu' | 'mem'): Promise<ProcessInfo[]> {
   const p = await si.processes();
   return p.list
     .map(
